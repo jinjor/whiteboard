@@ -1,0 +1,17 @@
+{
+  "name": "whiteboard",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@cloudflare/wrangler": "^1.19.7",
+    "esbuild": "^0.14.13",
+    "typescript": "^4.5.5"
+  }
+}
