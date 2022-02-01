@@ -12,6 +12,7 @@ rules = [{type = "Data", globs = ["**/*.html"]}]
 
 [durable_objects]
 bindings = [
+  { name = "manager", class_name = "RoomManager" },
   { name = "rooms", class_name = "ChatRoom" },
   { name = "limiters", class_name = "RateLimiter" }
 ]
@@ -20,3 +21,7 @@ bindings = [
 [[migrations]]
 tag = "v1" # Should be unique for each entry
 new_classes = ["ChatRoom", "RateLimiter"]
+
+[[migrations]]
+tag = "v2" # Should be unique for each entry
+new_classes = ["RoomManager"]
