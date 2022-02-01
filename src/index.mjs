@@ -1,5 +1,11 @@
 import HTML from "index.html";
 
+const MAX_ACTIVE_ROOMS = parseInt(process.env.MAX_ACTIVE_ROOMS) || 10;
+const LIVE_DURATION =
+  parseInt(process.env.LIVE_DURATION) || 7 * 24 * 60 * 60 * 1000;
+const ACTIVE_DURATION =
+  parseInt(process.env.ACTIVE_DURATION) || 24 * 60 * 60 * 1000;
+
 // エラーを 500 にする
 async function handleErrors(request, func) {
   try {
@@ -113,9 +119,66 @@ export class RoomManager {
       const url = new URL(request.url);
       console.log("RoomManager's fetch(): " + request.method, request.url);
 
-      switch (url.pathname) {
-        case "/list": {
-          // TODO: implement
+      const path = url.pathname.slice(1).split("/");
+
+      switch (path[0]) {
+        case "rooms": {
+          // `/rooms`
+          if (!path[1]) {
+            return new Response("Not found", { status: 404 });
+          }
+          if (path[3]) {
+            return new Response("Not found", { status: 404 });
+          }
+          // `/rooms/{id}`
+          const id = path[2];
+
+          if (request.method === "GET") {
+            const roomInfo = await this.storage.get(id);
+            return new Response(JSON.stringify(roomInfo), { status: 500 });
+          }
+          if (request.method === "PUT") {
+            const map = await this.storage.list();
+            let activeRooms = 0;
+            for (const [id, roomInfo] of map.entries()) {
+              if (roomInfo.active) {
+                activeRooms++;
+              }
+            }
+            if (activeRooms >= MAX_ACTIVE_ROOMS) {
+              return new Response(
+                "The maximum number of rooms has been reached.",
+                { status: 403 }
+              );
+            }
+            const roomInfo = {
+              id,
+              createdAt: Date.now(),
+              active: true,
+            };
+            await this.storage.put(id, roomInfo);
+            return new Response(JSON.stringify(roomInfo), { status: 200 });
+          }
+          return new Response("Not found", { status: 404 });
+        }
+        case "clean": {
+          if (request.method === "POST") {
+            // タイムスタンプ見てガベコレ
+            const map = await this.storage.list();
+            for (const [id, roomInfo] of map.entries()) {
+              const now = Date.now();
+              if (now - roomInfo.createdAt > LIVE_DURATION) {
+                await this.storage.delete(id);
+                continue;
+              }
+              if (now - roomInfo.createdAt > ACTIVE_DURATION) {
+                roomInfo.active = false;
+                await this.storage.put(id, roomInfo);
+                continue;
+              }
+            }
+            return new Response({ status: 200 });
+          }
           return new Response("Not found", { status: 404 });
         }
         default: {
@@ -152,16 +215,8 @@ export class ChatRoom {
           if (request.headers.get("Upgrade") != "websocket") {
             return new Response("expected websocket", { status: 400 });
           }
-
-          // Get the client's IP address for use with the rate limiter.
+          // TODO: ip は今回多分使わない
           const ip = request.headers.get("CF-Connecting-IP");
-
-          // To accept the WebSocket request, we create a WebSocketPair (which is like a socketpair,
-          // i.e. two WebSockets that talk to each other), we return one end of the pair in the
-          // response, and we operate on the other end. Note that this API is not part of the
-          // Fetch API standard; unfortunately, the Fetch API / Service Workers specs do not define
-          // any way to act as a WebSocket server today.
-          // https://developers.cloudflare.com/workers/runtime-apis/websockets
           const pair = new WebSocketPair();
 
           // We're going to take pair[1] as our end, and return pair[0] to the client.
