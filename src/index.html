@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, user-scalable=no"
+    />
+    <style type="text/css">
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        font-family: Arial, Helvetica, sans-serif;
+      }
+    </style>
+  </head>
+  <body></body>
+  <script type="text/javascript">
+    (async () => {
+      const hostName =
+        window.location.host || "edge-chat-demo.jinjor.workers.dev";
+
+      const splitted = window.location.pathname.split("/");
+      switch (splitted[1]) {
+        case "rooms":
+          const roomName = splitted[2];
+          if (!roomName) {
+            addLog("Not a room.");
+            return;
+          }
+          addLog("Fetching room...");
+          const res = await fetch("/api/rooms/" + roomName);
+          if (res.status !== 200) {
+            const errMessage = await res.text();
+            addLog("Room not found: " + roomName);
+            addLog(res.status + " " + errMessage);
+            if (location.hostname === "localhost") {
+              const button = document.createElement("button");
+              button.textContent = "Create Room for Debug";
+              button.onclick = async () => {
+                const res = await fetch("/api/rooms/", {
+                  method: "POST",
+                });
+                if (res.status !== 200) {
+                  const errMessage = await res.text();
+                  addLog("Failed to create room: " + roomName);
+                  return;
+                }
+                const roomName = await await res.text();
+                location.href = "/rooms/" + roomName;
+              };
+              document.body.append(button);
+            }
+            return;
+          }
+          addLog("Found room: " + roomName);
+          const userName = "Jinjor";
+          join(hostName, roomName, userName);
+          break;
+        default:
+          addLog("Not a room.");
+          break;
+      }
+    })();
+
+    let currentWebSocket = null;
+    function join(hostName, roomName, userName) {
+      const ws = new WebSocket(
+        "wss://" + hostName + "/api/rooms/" + roomName + "/websocket"
+      );
+      ws.addEventListener("open", (event) => {
+        currentWebSocket = ws;
+        ws.send(JSON.stringify({ name: userName }));
+      });
+      ws.addEventListener("message", (event) => {
+        const data = JSON.parse(event.data);
+        if (data.error != null) {
+          addLog(data.error);
+        } else if (data.joined) {
+          addLog(data.joined + " joined.");
+        } else if (data.quit) {
+          addLog(data.joined + " quitted.");
+        } else if (data.ready) {
+          addLog("ready");
+        } else {
+          addLog(data.timestamp + " " + data.name + ": " + data.message);
+        }
+      });
+      ws.addEventListener("close", (event) => {
+        addLog("WebSocket closed: " + event.code + " " + event.reason);
+        // TODO: rejoin
+      });
+      ws.addEventListener("error", (event) => {
+        console.log("WebSocket error:", event);
+        // TODO: rejoin
+      });
+    }
+    function addLog(message) {
+      const div = document.createElement("div");
+      div.innerText = message;
+      document.body.append(div);
+    }
+
+    document.body.onclick = () => {
+      if (currentWebSocket) {
+        currentWebSocket.send(JSON.stringify({ message: "clicked" }));
+      }
+    };
+  </script>
+</html>
