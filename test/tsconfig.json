@@ -1,13 +1,11 @@
 {
   "compilerOptions": {
-    "module": "NodeNext",
-    "target": "ES2022",
+    "module": "CommonJS",
+    "target": "es2021",
     "strict": true,
     "noEmitOnError": false,
     "moduleResolution": "node",
     "esModuleInterop": true,
     "types": ["node", "mocha"]
-  },
-  "include": ["test"],
-  "exclude": ["dist"]
+  }
 }
