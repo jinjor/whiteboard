@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "module": "ES2022",
+    "target": "esnext",
+    "lib": ["esnext"],
+    "strict": true,
+    "noEmitOnError": false,
+    "moduleResolution": "node",
+    "esModuleInterop": true,
+    "types": ["@cloudflare/workers-types"],
+    "allowJs": true,
+    "outDir": "dist"
+  },
+  "include": ["src"],
+  "exclude": ["node_modules", "dist"]
+}

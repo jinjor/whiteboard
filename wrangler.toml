@@ -6,7 +6,7 @@ account_id = "7e155f728b0311833218e72046aaa90a"
 
 [build.upload]
 format = "modules"
-dir = "src"
+dir = "dist"
 main = "./index.mjs"
 rules = [{type = "Data", globs = ["**/*.html"]}]
 

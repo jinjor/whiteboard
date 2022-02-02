@@ -1,16 +1,14 @@
-import HTML from "index.html";
+import HTML from "./html.mjs";
 
-const MAX_ACTIVE_ROOMS = parseInt(process.env.MAX_ACTIVE_ROOMS) || 10;
-const LIVE_DURATION =
-  parseInt(process.env.LIVE_DURATION) || 7 * 24 * 60 * 60 * 1000;
-const ACTIVE_DURATION =
-  parseInt(process.env.ACTIVE_DURATION) || 24 * 60 * 60 * 1000;
+const MAX_ACTIVE_ROOMS = 10;
+const LIVE_DURATION = 7 * 24 * 60 * 60 * 1000;
+const ACTIVE_DURATION = 24 * 60 * 60 * 1000;
 
 // エラーを 500 にする
-async function handleErrors(request, func) {
+async function handleErrors(request: Request, func: Function) {
   try {
     return await func();
-  } catch (err) {
+  } catch (err: any) {
     if (request.headers.get("Upgrade") == "websocket") {
       // Annoyingly, if we return an HTTP error in response to a WebSocket request, Chrome devtools
       // won't show us the response body! So... let's send a WebSocket response with an error
@@ -28,7 +26,7 @@ async function handleErrors(request, func) {
 }
 
 export default {
-  async fetch(request, env) {
+  async fetch(request: Request, env: any) {
     return await handleErrors(request, async () => {
       const url = new URL(request.url);
       const path = url.pathname.slice(1).split("/");
@@ -55,7 +53,7 @@ export default {
   },
 };
 
-async function handleApiRequest(path, request, env) {
+async function handleApiRequest(path: string[], request: Request, env: any) {
   switch (path[0]) {
     case "rooms": {
       if (!path[1]) {
@@ -109,12 +107,15 @@ async function handleApiRequest(path, request, env) {
 // The RoomManager Durable Object Class
 
 export class RoomManager {
-  constructor(controller, env) {
+  storage: any;
+  env: any;
+
+  constructor(controller: any, env: any) {
     this.storage = controller.storage;
     this.env = env;
   }
 
-  async fetch(request) {
+  async fetch(request: Request) {
     return await handleErrors(request, async () => {
       const url = new URL(request.url);
       console.log("RoomManager's fetch(): " + request.method, request.url);
@@ -177,7 +178,7 @@ export class RoomManager {
                 continue;
               }
             }
-            return new Response({ status: 200 });
+            return new Response("", { status: 200 });
           }
           return new Response("Not found", { status: 404 });
         }
@@ -192,8 +193,19 @@ export class RoomManager {
 // =======================================================================================
 // The ChatRoom Durable Object Class
 
+type ChatSession = {
+  name?: string;
+  quit?: boolean;
+  webSocket: WebSocket;
+  blockedMessages: string[];
+};
+
 export class ChatRoom {
-  constructor(controller, env) {
+  storage: any;
+  env: any;
+  sessions: ChatSession[];
+  lastTimestamp: number;
+  constructor(controller: any, env: any) {
     // get()/put() を持つ Durable Storage
     this.storage = controller.storage;
     this.env = env;
@@ -205,7 +217,7 @@ export class ChatRoom {
     this.lastTimestamp = 0;
   }
 
-  async fetch(request) {
+  async fetch(request: Request) {
     return await handleErrors(request, async () => {
       const url = new URL(request.url);
       console.log("ChatRoom's fetch(): " + request.method, request.url);
@@ -216,7 +228,7 @@ export class ChatRoom {
             return new Response("expected websocket", { status: 400 });
           }
           // TODO: ip は今回多分使わない
-          const ip = request.headers.get("CF-Connecting-IP");
+          const ip = request.headers.get("CF-Connecting-IP")!;
           const pair = new WebSocketPair();
 
           // We're going to take pair[1] as our end, and return pair[0] to the client.
@@ -234,7 +246,7 @@ export class ChatRoom {
   }
 
   // handleSession() implements our WebSocket-based chat protocol.
-  async handleSession(webSocket, ip) {
+  async handleSession(webSocket: WebSocket, ip: string) {
     // Accept our end of the WebSocket. This tells the runtime that we'll be terminating the
     // WebSocket in JavaScript, not sending it elsewhere.
     webSocket.accept();
@@ -247,7 +259,7 @@ export class ChatRoom {
     );
 
     // クライアントから info が送られてくるまで blockedMessages にキューしておく
-    let session = { webSocket, blockedMessages: [] };
+    let session: ChatSession = { webSocket, blockedMessages: [] };
     this.sessions.push(session);
 
     // 他のユーザの名前を詰めておく
@@ -269,7 +281,7 @@ export class ChatRoom {
 
     // Set event handlers to receive messages.
     let receivedUserInfo = false;
-    webSocket.addEventListener("message", async (msg) => {
+    webSocket.addEventListener("message", async (msg: MessageEvent) => {
       try {
         if (session.quit) {
           // Whoops, when trying to send to this WebSocket in the past, it threw an exception and
@@ -294,7 +306,7 @@ export class ChatRoom {
         }
 
         // I guess we'll use JSON.
-        let data = JSON.parse(msg.data);
+        let data = JSON.parse(msg.data as string);
 
         if (!receivedUserInfo) {
           // 初回はユーザー情報を受け取る
@@ -311,7 +323,7 @@ export class ChatRoom {
           session.blockedMessages.forEach((queued) => {
             webSocket.send(queued);
           });
-          delete session.blockedMessages;
+          session.blockedMessages = [];
 
           // 名前を知らせる
           this.broadcast({ joined: session.name });
@@ -337,13 +349,13 @@ export class ChatRoom {
         this.lastTimestamp = data.timestamp;
 
         // Broadcast the message to all other WebSockets.
-        let dataStr = JSON.stringify(data);
+        const dataStr = JSON.stringify(data);
         this.broadcast(dataStr);
 
         // Save message.
-        let key = new Date(data.timestamp).toISOString();
+        const key = new Date(data.timestamp).toISOString();
         await this.storage.put(key, dataStr);
-      } catch (err) {
+      } catch (err: any) {
         // stack 返しているので本番ではやめる
         webSocket.send(JSON.stringify({ error: err.stack }));
       }
@@ -351,7 +363,7 @@ export class ChatRoom {
 
     // On "close" and "error" events, remove the WebSocket from the sessions list and broadcast
     // a quit message.
-    let closeOrErrorHandler = (evt) => {
+    const closeOrErrorHandler = (evt: Event) => {
       session.quit = true;
       this.sessions = this.sessions.filter((member) => member !== session);
       if (session.name) {
@@ -363,14 +375,14 @@ export class ChatRoom {
   }
 
   // broadcast() broadcasts a message to all clients.
-  broadcast(message) {
+  broadcast(message: any) {
     // Apply JSON if we weren't given a string to start with.
     if (typeof message !== "string") {
       message = JSON.stringify(message);
     }
 
     // Iterate over all the sessions sending them messages.
-    let quitters = [];
+    const quitters: ChatSession[] = [];
     this.sessions = this.sessions.filter((session) => {
       if (session.name) {
         try {
@@ -404,13 +416,14 @@ export class ChatRoom {
 //
 // IP アドレス毎にインスタンスが作られる。このレートリミットはグローバル（部屋を跨ぐ）
 export class RateLimiter {
-  constructor(controller, env) {
+  nextAllowedTime: number;
+  constructor(controller: any, env: any) {
     this.nextAllowedTime = 0;
   }
 
   // POST はアクションがあった時。GET は単に取得するとき。
   // 両方とも次のアクションまでの待ち時間を返す
-  async fetch(request) {
+  async fetch(request: Request) {
     return await handleErrors(request, async () => {
       let now = Date.now() / 1000;
 
@@ -422,8 +435,8 @@ export class RateLimiter {
       }
 
       // 最初の 20 秒は素早くアクションを起こしても許容する
-      let cooldown = Math.max(0, this.nextAllowedTime - now - 20);
-      return new Response(cooldown);
+      const cooldown = Math.max(0, this.nextAllowedTime - now - 20);
+      return new Response(String(cooldown));
     });
   }
 }
@@ -436,7 +449,16 @@ class RateLimiterClient {
   //   lost.
   // * reportError(err) is called when something goes wrong and the rate limiter is broken. It
   //   should probably disconnect the client, so that they can reconnect and start over.
-  constructor(getLimiterStub, reportError) {
+
+  getLimiterStub: () => RateLimiter;
+  reportError: (e: Error) => void;
+  limiter: any;
+  inCooldown: boolean;
+
+  constructor(
+    getLimiterStub: () => RateLimiter,
+    reportError: (e: Error) => void
+  ) {
     this.getLimiterStub = getLimiterStub;
     this.reportError = reportError;
 
@@ -483,11 +505,12 @@ class RateLimiterClient {
       }
 
       // 待ち時間
-      let cooldown = +(await response.text());
-      await new Promise((resolve) => setTimeout(resolve, cooldown * 1000));
-
+      const cooldown = +(await response.text());
+      await new Promise((resolve) =>
+        setTimeout(resolve as any, cooldown * 1000)
+      );
       this.inCooldown = false;
-    } catch (err) {
+    } catch (err: any) {
       this.reportError(err);
     }
   }
