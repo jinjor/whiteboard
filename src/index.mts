@@ -4,6 +4,12 @@ const MAX_ACTIVE_ROOMS = 10;
 const LIVE_DURATION = 7 * 24 * 60 * 60 * 1000;
 const ACTIVE_DURATION = 24 * 60 * 60 * 1000;
 
+type Env = {
+  manager: DurableObjectNamespace;
+  rooms: DurableObjectNamespace;
+  limiters: DurableObjectNamespace;
+};
+
 // エラーを 500 にする
 async function handleErrors(request: Request, func: Function) {
   try {
@@ -13,7 +19,7 @@ async function handleErrors(request: Request, func: Function) {
       // Annoyingly, if we return an HTTP error in response to a WebSocket request, Chrome devtools
       // won't show us the response body! So... let's send a WebSocket response with an error
       // frame instead.
-      let pair = new WebSocketPair();
+      const pair = new WebSocketPair();
       pair[1].accept();
       pair[1].send(JSON.stringify({ error: err.stack }));
       pair[1].close(1011, "Uncaught exception during session setup");
@@ -26,7 +32,7 @@ async function handleErrors(request: Request, func: Function) {
 }
 
 export default {
-  async fetch(request: Request, env: any) {
+  async fetch(request: Request, env: Env) {
     return await handleErrors(request, async () => {
       const url = new URL(request.url);
       const path = url.pathname.slice(1).split("/");
@@ -45,15 +51,22 @@ export default {
           });
         case "api":
           return handleApiRequest(path.slice(1), request, env);
-
         default:
           return new Response("Not found", { status: 404 });
       }
     });
   },
+  async scheduled(event: { cron: string; scheduledTime: number }, env: Env) {
+    const singletonId = env.manager.idFromName("singleton");
+    const managerStub = env.manager.get(singletonId);
+    const res = await managerStub.fetch("https://dummy-url/clean", {
+      method: "POST",
+    });
+    // TODO: room の実体も clean する必要がある
+  },
 };
 
-async function handleApiRequest(path: string[], request: Request, env: any) {
+async function handleApiRequest(path: string[], request: Request, env: Env) {
   switch (path[0]) {
     case "rooms": {
       if (!path[1]) {
@@ -95,7 +108,7 @@ async function handleApiRequest(path: string[], request: Request, env: any) {
       // `/api/room/<name>/...` の ... 部分
       const newUrl = new URL(request.url);
       newUrl.pathname = "/" + path.slice(2).join("/");
-      return roomObject.fetch(newUrl, request);
+      return roomObject.fetch(newUrl as any, request); // 型定義がおかしい？
     }
 
     default:
@@ -104,13 +117,12 @@ async function handleApiRequest(path: string[], request: Request, env: any) {
 }
 
 // =======================================================================================
-// The RoomManager Durable Object Class
 
-export class RoomManager {
-  storage: any;
-  env: any;
+export class RoomManager implements DurableObject {
+  private storage: any;
+  private env: Env;
 
-  constructor(controller: any, env: any) {
+  constructor(controller: any, env: Env) {
     this.storage = controller.storage;
     this.env = env;
   }
@@ -191,7 +203,6 @@ export class RoomManager {
 }
 
 // =======================================================================================
-// The ChatRoom Durable Object Class
 
 type ChatSession = {
   name?: string;
@@ -200,12 +211,12 @@ type ChatSession = {
   blockedMessages: string[];
 };
 
-export class ChatRoom {
-  storage: any;
-  env: any;
-  sessions: ChatSession[];
-  lastTimestamp: number;
-  constructor(controller: any, env: any) {
+export class ChatRoom implements DurableObject {
+  private storage: any;
+  private env: Env;
+  private sessions: ChatSession[];
+  private lastTimestamp: number;
+  constructor(controller: any, env: Env) {
     // get()/put() を持つ Durable Storage
     this.storage = controller.storage;
     this.env = env;
@@ -246,20 +257,20 @@ export class ChatRoom {
   }
 
   // handleSession() implements our WebSocket-based chat protocol.
-  async handleSession(webSocket: WebSocket, ip: string) {
+  private async handleSession(webSocket: WebSocket, ip: string) {
     // Accept our end of the WebSocket. This tells the runtime that we'll be terminating the
     // WebSocket in JavaScript, not sending it elsewhere.
     webSocket.accept();
 
     // Set up our rate limiter client.
-    let limiterId = this.env.limiters.idFromName(ip);
-    let limiter = new RateLimiterClient(
+    const limiterId = this.env.limiters.idFromName(ip);
+    const limiter = new RateLimiterClient(
       () => this.env.limiters.get(limiterId),
       (err) => webSocket.close(1011, err.stack)
     );
 
     // クライアントから info が送られてくるまで blockedMessages にキューしておく
-    let session: ChatSession = { webSocket, blockedMessages: [] };
+    const session: ChatSession = { webSocket, blockedMessages: [] };
     this.sessions.push(session);
 
     // 他のユーザの名前を詰めておく
@@ -272,8 +283,8 @@ export class ChatRoom {
     });
 
     // 最終 100 メッセージを詰めておく
-    let storage = await this.storage.list({ reverse: true, limit: 100 });
-    let backlog = [...storage.values()];
+    const storage = await this.storage.list({ reverse: true, limit: 100 });
+    const backlog = [...storage.values()];
     backlog.reverse();
     backlog.forEach((value) => {
       session.blockedMessages.push(value);
@@ -375,7 +386,7 @@ export class ChatRoom {
   }
 
   // broadcast() broadcasts a message to all clients.
-  broadcast(message: any) {
+  private broadcast(message: any) {
     // Apply JSON if we weren't given a string to start with.
     if (typeof message !== "string") {
       message = JSON.stringify(message);
@@ -412,12 +423,11 @@ export class ChatRoom {
 }
 
 // =======================================================================================
-// The RateLimiter Durable Object class.
-//
+
 // IP アドレス毎にインスタンスが作られる。このレートリミットはグローバル（部屋を跨ぐ）
-export class RateLimiter {
-  nextAllowedTime: number;
-  constructor(controller: any, env: any) {
+export class RateLimiter implements DurableObject {
+  private nextAllowedTime: number;
+  constructor(controller: any, env: Env) {
     this.nextAllowedTime = 0;
   }
 
@@ -441,7 +451,6 @@ export class RateLimiter {
   }
 }
 
-// これはクライアント (Worker) サイド
 class RateLimiterClient {
   // The constructor takes two functions:
   // * getLimiterStub() returns a new Durable Object stub for the RateLimiter object that manages
@@ -449,14 +458,13 @@ class RateLimiterClient {
   //   lost.
   // * reportError(err) is called when something goes wrong and the rate limiter is broken. It
   //   should probably disconnect the client, so that they can reconnect and start over.
-
-  getLimiterStub: () => RateLimiter;
-  reportError: (e: Error) => void;
-  limiter: any;
-  inCooldown: boolean;
+  private getLimiterStub: () => DurableObjectStub;
+  private reportError: (e: Error) => void;
+  private limiter: any;
+  private inCooldown: boolean;
 
   constructor(
-    getLimiterStub: () => RateLimiter,
+    getLimiterStub: () => DurableObjectStub,
     reportError: (e: Error) => void
   ) {
     this.getLimiterStub = getLimiterStub;
@@ -480,7 +488,7 @@ class RateLimiterClient {
   }
 
   // callLimiter() is an internal method which talks to the rate limiter.
-  async callLimiter() {
+  private async callLimiter() {
     try {
       let response;
       try {

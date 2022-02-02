@@ -10,6 +10,9 @@ dir = "dist"
 main = "./index.mjs"
 rules = [{type = "Data", globs = ["**/*.html"]}]
 
+[triggers]
+crons = ["* * * * *"]
+
 [durable_objects]
 bindings = [
   { name = "manager", class_name = "RoomManager" },
