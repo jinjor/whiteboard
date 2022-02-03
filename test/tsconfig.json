@@ -6,6 +6,7 @@
     "noEmitOnError": false,
     "moduleResolution": "node",
     "esModuleInterop": true,
+    "sourceMap": true,
     "types": ["node", "mocha"]
   }
 }

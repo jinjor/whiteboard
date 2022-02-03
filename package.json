@@ -2,7 +2,7 @@
   "name": "whiteboard",
   "scripts": {
     "build": "tsc -p src/tsconfig.json && cp src/index.html dist",
-    "test": "npm run build && tsc -p test/tsconfig.json && mocha"
+    "test": "npm run build && tsc -p test/tsconfig.json && mocha -r source-map-support/register"
   },
   "keywords": [],
   "author": "",
@@ -17,6 +17,7 @@
     "miniflare": "^2.2.0",
     "mocha": "^9.2.0",
     "node-fetch": "^2.6.7",
+    "source-map-support": "^0.5.21",
     "tree-kill": "^1.2.2",
     "typescript": "^4.6.0-dev.20220201"
   }

@@ -9,6 +9,7 @@
     "esModuleInterop": true,
     "types": ["@cloudflare/workers-types"],
     "allowJs": true,
+    "sourceMap": true,
     "outDir": "../dist"
   }
 }

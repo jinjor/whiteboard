@@ -34,6 +34,7 @@ async function handleErrors(request: Request, func: Function) {
 export default {
   async fetch(request: Request, env: Env) {
     return await handleErrors(request, async () => {
+      console.log("Root's fetch(): " + request.method, request.url);
       const url = new URL(request.url);
       const path = url.pathname.slice(1).split("/");
 
@@ -46,6 +47,8 @@ export default {
 
       switch (path[0]) {
         case "rooms":
+          // TODO: 部屋の存在判定？
+          // TODO: SSR？
           return new Response(HTML.slice(0), {
             headers: { "Content-Type": "text/html;charset=UTF-8" },
           });
@@ -105,7 +108,7 @@ async function handleApiRequest(path: string[], request: Request, env: Env) {
       // スタブ（クライアント）が即時に作られる。リモートでは ID が最初に使われた時に必要に応じて作られる。
       const roomObject = env.rooms.get(id);
 
-      // `/api/room/<name>/...` の ... 部分
+      // `/api/room/<name>/...` の /... 部分
       const newUrl = new URL(request.url);
       newUrl.pathname = "/" + path.slice(2).join("/");
       return roomObject.fetch(newUrl as any, request); // 型定義がおかしい？
@@ -130,8 +133,13 @@ export class RoomManager implements DurableObject {
   async fetch(request: Request) {
     return await handleErrors(request, async () => {
       const url = new URL(request.url);
-      console.log("RoomManager's fetch(): " + request.method, request.url);
-
+      console.log(
+        "RoomManager's fetch(): " + request.method,
+        request.url,
+        request.headers.get("WB-TEST-MAX_ACTIVE_ROOMS"),
+        request.headers.get("WB-TEST-LIVE_DURATION"),
+        request.headers.get("WB-TEST-ACTIVE_DURATION")
+      );
       const path = url.pathname.slice(1).split("/");
 
       switch (path[0]) {
@@ -232,7 +240,6 @@ export class ChatRoom implements DurableObject {
     return await handleErrors(request, async () => {
       const url = new URL(request.url);
       console.log("ChatRoom's fetch(): " + request.method, request.url);
-
       switch (url.pathname) {
         case "/websocket": {
           if (request.headers.get("Upgrade") != "websocket") {
