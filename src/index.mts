@@ -1,4 +1,6 @@
-import HTML from "./html.mjs";
+// @ts-ignore
+import HTML from "./index.html";
+import { Router } from "itty-router";
 
 const MAX_ACTIVE_ROOMS = 10;
 const LIVE_DURATION = 7 * 24 * 60 * 60 * 1000;
@@ -10,7 +12,7 @@ type Env = {
   limiters: DurableObjectNamespace;
 };
 
-// エラーを 500 にする
+// エラーを 500 にする（deprecated）
 async function handleErrors(request: Request, func: Function) {
   try {
     return await func();
@@ -31,32 +33,117 @@ async function handleErrors(request: Request, func: Function) {
   }
 }
 
+function handleError(request: Request, error: any) {
+  console.log(error.stack);
+  if (request.headers.get("Upgrade") == "websocket") {
+    // Annoyingly, if we return an HTTP error in response to a WebSocket request, Chrome devtools
+    // won't show us the response body! So... let's send a WebSocket response with an error
+    // frame instead.
+    const pair = new WebSocketPair();
+    pair[1].accept();
+    pair[1].send(JSON.stringify({ error: error.stack }));
+    pair[1].close(1011, "Uncaught exception during session setup");
+    return new Response(null, { status: 101, webSocket: pair[0] });
+  }
+  // stack 表示するため本番では消したい
+  return new Response(error.stack, { status: 500 });
+}
+
+const apiRouter = Router({ base: "/api" })
+  .post("/rooms", async (request: Request, env: Env) => {
+    // TODO: ここでアクティブな部屋数の上限に達していたら 403
+
+    const roomId = env.rooms.newUniqueId();
+    const singletonId = env.manager.idFromName("singleton");
+    const managerStub = env.manager.get(singletonId);
+    const res = await managerStub.fetch(
+      "https://dummy-url/rooms/" + roomId.toString(),
+      {
+        method: "PUT",
+      }
+      // TODO: request を渡す
+    );
+    if (res.status !== 200) {
+      return new Response(roomId.toString(), {
+        status: res.status,
+      });
+    }
+    return new Response(roomId.toString());
+  })
+  .get(
+    "/rooms/:roomName",
+    async (request: Request & { params: { roomName: string } }, env: Env) => {
+      const roomName = request.params.roomName;
+      if (!roomName.match(/^[0-9a-f]{64}$/)) {
+        return new Response("Invalid room name", { status: 400 });
+      }
+      const singletonId = env.manager.idFromName("singleton");
+      const managerStub = env.manager.get(singletonId);
+      const roomId = env.rooms.idFromString(roomName);
+      const res = await managerStub.fetch(
+        "https://dummy-url/rooms/" + roomId.toString(),
+        request
+      );
+      if (res.status === 200) {
+        return new Response(JSON.stringify({ id: roomId.toString() }));
+      }
+      return new Response("Not found.", { status: 404 });
+    }
+  )
+  .all(
+    "/rooms/:roomName/websocket",
+    async (request: Request & { params: { roomName: string } }, env: Env) => {
+      // TODO: ここでアクティブな部屋数の上限に達していたら 403
+
+      const roomName = request.params.roomName;
+      if (!roomName.match(/^[0-9a-f]{64}$/)) {
+        return new Response("Invalid room name", { status: 400 });
+      }
+      const roomId = env.rooms.idFromString(roomName);
+
+      const singletonId = env.manager.idFromName("singleton");
+      const managerStub = env.manager.get(singletonId);
+      const res = await managerStub.fetch("https://dummy-url/rooms/" + roomId);
+
+      if (res.status !== 200) {
+        return new Response("Not found.", { status: 404 });
+      }
+
+      // スタブ（クライアント）が即時に作られる。リモートでは ID が最初に使われた時に必要に応じて作られる。
+      const roomStub = env.rooms.get(roomId);
+
+      // TODO: 正確なインターフェイスが知りたい
+      return roomStub.fetch(
+        new URL("https://dummy-url/websocket") as any,
+        request
+      );
+    }
+  );
+
+const router = Router()
+  .get("/", () => {
+    return new Response(HTML.slice(0), {
+      headers: { "Content-Type": "text/html;charset=UTF-8" },
+    });
+  })
+  .get("/rooms", () => {
+    return new Response(HTML.slice(0), {
+      headers: { "Content-Type": "text/html;charset=UTF-8" },
+    });
+  })
+  .get("/rooms/:roomName", () => {
+    return new Response(HTML.slice(0), {
+      headers: { "Content-Type": "text/html;charset=UTF-8" },
+    });
+  })
+  .all("/api/*", apiRouter.handle)
+  .all("*", () => new Response("Not found.", { status: 404 }));
+
 export default {
   async fetch(request: Request, env: Env) {
-    return await handleErrors(request, async () => {
-      console.log("Root's fetch(): " + request.method, request.url);
-      const url = new URL(request.url);
-      const path = url.pathname.slice(1).split("/");
-
-      if (!path[0]) {
-        // Serve our HTML at the root path.
-        return new Response(HTML.slice(0), {
-          headers: { "Content-Type": "text/html;charset=UTF-8" },
-        });
-      }
-
-      switch (path[0]) {
-        case "rooms":
-          // TODO: 部屋の存在判定？
-          // TODO: SSR？
-          return new Response(HTML.slice(0), {
-            headers: { "Content-Type": "text/html;charset=UTF-8" },
-          });
-        case "api":
-          return handleApiRequest(path.slice(1), request, env);
-        default:
-          return new Response("Not found", { status: 404 });
-      }
+    console.log("Root's fetch(): " + request.method, request.url);
+    return router.handle(request, env).catch((error: any) => {
+      return handleError(request, error);
     });
   },
   async scheduled(event: { cron: string; scheduledTime: number }, env: Env) {
@@ -68,56 +155,6 @@ export default {
     // TODO: room の実体も clean する必要がある
   },
 };
-
-async function handleApiRequest(path: string[], request: Request, env: Env) {
-  switch (path[0]) {
-    case "rooms": {
-      if (!path[1]) {
-        if (request.method == "POST") {
-          // POST /api/rooms
-
-          // TODO: ここでアクティブな部屋数の上限に達していたら 403
-
-          // room 名前空間内で一意な ID
-          const id = env.rooms.newUniqueId();
-
-          // TODO: ここで managed rooms に id を登録する
-
-          return new Response(id.toString(), {
-            headers: { "Access-Control-Allow-Origin": "*" },
-          });
-        } else {
-          // GET はサポートしない
-          return new Response("Method not allowed", { status: 405 });
-        }
-      }
-
-      // `/api/room/<name>/...`
-      const name = path[1];
-      if (!name.match(/^[0-9a-f]{64}$/)) {
-        return new Response("Invalid room name", { status: 400 });
-      }
-      const id = env.rooms.idFromString(name);
-
-      // TODO: ここで id を作成済みであることを確認する必要がある
-      // managed rooms に存在しない場合は 404
-
-      console.log("name: " + name);
-      console.log("id: " + id);
-
-      // スタブ（クライアント）が即時に作られる。リモートでは ID が最初に使われた時に必要に応じて作られる。
-      const roomObject = env.rooms.get(id);
-
-      // `/api/room/<name>/...` の /... 部分
-      const newUrl = new URL(request.url);
-      newUrl.pathname = "/" + path.slice(2).join("/");
-      return roomObject.fetch(newUrl as any, request); // 型定義がおかしい？
-    }
-
-    default:
-      return new Response("Not found", { status: 404 });
-  }
-}
 
 // =======================================================================================
 
@@ -148,15 +185,18 @@ export class RoomManager implements DurableObject {
           if (!path[1]) {
             return new Response("Not found", { status: 404 });
           }
-          if (path[3]) {
+          if (path[2]) {
             return new Response("Not found", { status: 404 });
           }
           // `/rooms/{id}`
-          const id = path[2];
+          const id = path[1];
 
           if (request.method === "GET") {
             const roomInfo = await this.storage.get(id);
-            return new Response(JSON.stringify(roomInfo), { status: 500 });
+            if (roomInfo == null) {
+              return new Response("Not found", { status: 404 });
+            }
+            return new Response(JSON.stringify(roomInfo), { status: 200 });
           }
           if (request.method === "PUT") {
             const map = await this.storage.list();
@@ -256,7 +296,6 @@ export class ChatRoom implements DurableObject {
           // 101 Switching Protocols
           return new Response(null, { status: 101, webSocket: pair[0] });
         }
-
         default:
           return new Response("Not found", { status: 404 });
       }

@@ -1,7 +1,7 @@
 {
   "name": "whiteboard",
   "scripts": {
-    "build": "tsc -p src/tsconfig.json && cp src/index.html dist",
+    "build": "esbuild --tsconfig=src/tsconfig.json src/index.mts --bundle --loader:.html=binary --format=esm --outfile=dist/index.mjs",
     "test": "npm run build && tsc -p test/tsconfig.json && mocha -r source-map-support/register"
   },
   "keywords": [],
@@ -14,6 +14,7 @@
     "@types/node": "^17.0.14",
     "@types/node-fetch": "^2.5.12",
     "esbuild": "^0.14.13",
+    "itty-router": "^2.4.10",
     "miniflare": "^2.2.0",
     "mocha": "^9.2.0",
     "node-fetch": "^2.6.7",
