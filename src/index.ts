@@ -137,10 +137,30 @@ export default {
 
 // =======================================================================================
 
+type RoomInfo = {
+  id: string;
+  active: boolean;
+  createdAt: number;
+};
+
 class RoomManagerState {
-  storage: DurableObjectStorage;
+  private storage: DurableObjectStorage;
   constructor(storage: DurableObjectStorage) {
     this.storage = storage;
+  }
+  async getRoomInfo(roomId: string): Promise<RoomInfo | null> {
+    const roomInfo = await this.storage.get(roomId);
+    return (roomInfo ?? null) as RoomInfo | null;
+  }
+  async setRoomInfo(roomInfo: RoomInfo): Promise<void> {
+    await this.storage.put(roomInfo.id, roomInfo);
+  }
+  async deleteRoomInfo(roomId: string): Promise<void> {
+    await this.storage.delete(roomId);
+  }
+  async listRoomInfo(): Promise<RoomInfo[]> {
+    const map = (await this.storage.list()) as Map<string, RoomInfo>;
+    return [...map.values()];
   }
 }
 
@@ -152,7 +172,7 @@ const roomManagerRouter = Router()
       state: RoomManagerState
     ) => {
       const roomId = request.params.roomId;
-      const roomInfo = await state.storage.get(roomId);
+      const roomInfo = await state.getRoomInfo(roomId);
       if (roomInfo == null) {
         return new Response("Not found", { status: 404 });
       }
@@ -166,9 +186,8 @@ const roomManagerRouter = Router()
       state: RoomManagerState
     ) => {
       const roomId = request.params.roomId;
-      const map = await state.storage.list();
       let activeRooms = 0;
-      for (const [id, roomInfo] of map.entries() as any) {
+      for (const roomInfo of await state.listRoomInfo()) {
         if (roomInfo.active) {
           activeRooms++;
         }
@@ -179,11 +198,11 @@ const roomManagerRouter = Router()
         });
       }
       const roomInfo = {
-        roomId,
+        id: roomId,
         createdAt: Date.now(),
         active: true,
       };
-      await state.storage.put(roomId, roomInfo);
+      await state.setRoomInfo(roomInfo);
       return new Response(JSON.stringify(roomInfo), { status: 200 });
     }
   )
@@ -194,16 +213,15 @@ const roomManagerRouter = Router()
       state: RoomManagerState
     ) => {
       const roomId = request.params.roomId;
-      const map = (await state.storage.list()) as any;
-      for (const [id, roomInfo] of map.entries()) {
+      for (const roomInfo of await state.listRoomInfo()) {
         const now = Date.now();
         if (now - roomInfo.createdAt > LIVE_DURATION) {
-          await state.storage.delete(id);
+          await state.deleteRoomInfo(roomId);
           continue;
         }
         if (now - roomInfo.createdAt > ACTIVE_DURATION) {
           roomInfo.active = false;
-          await state.storage.put(id, roomInfo);
+          await state.setRoomInfo(roomInfo);
           continue;
         }
       }
