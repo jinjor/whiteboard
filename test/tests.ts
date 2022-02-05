@@ -31,6 +31,12 @@ describe("Whiteboard", function () {
       kill(p.pid!);
     }
   });
+  beforeEach(async function () {
+    const res = await fetch("http://localhost:8787/debug", {
+      method: "DELETE",
+    });
+    assert.strictEqual(res.status, 200);
+  });
   it("responds correct status", async function () {
     {
       const res = await fetch("http://localhost:8787/");
@@ -63,28 +69,101 @@ describe("Whiteboard", function () {
   });
   it("creates rooms", async function () {
     const res = await fetch("http://localhost:8787/api/rooms", {
-      headers: {
-        "WB-TEST-MAX_ACTIVE_ROOMS": String(2),
-        "WB-TEST-LIVE_DURATION": String(5000),
-        "WB-TEST-ACTIVE_DURATION": String(1000),
-      },
       method: "POST",
     });
     const id = await res.text();
     assert.strictEqual(res.status, 200);
     assert.strictEqual(id.length, 64);
     {
-      const res = await fetch("http://localhost:8787/api/rooms/" + id, {
-        headers: {
-          "WB-TEST-MAX_ACTIVE_ROOMS": String(2),
-          "WB-TEST-LIVE_DURATION": String(5000),
-          "WB-TEST-ACTIVE_DURATION": String(1000),
-        },
-        method: "GET",
-      });
-      const room = await res.text();
+      const res = await fetch("http://localhost:8787/api/rooms/" + id);
       assert.strictEqual(res.status, 200);
-      console.log(room);
+      const room = await res.json();
+      assert.strictEqual(room.id, id);
+    }
+  });
+  it("restrict number of active rooms", async function () {
+    const MAX_ACTIVE_ROOMS = 2;
+    const ACTIVE_DURATION = 1000;
+    const createdRoomIds = [];
+    {
+      const res = await fetch("http://localhost:8787/debug/config", {
+        method: "PATCH",
+        body: JSON.stringify({
+          MAX_ACTIVE_ROOMS: String(MAX_ACTIVE_ROOMS),
+          ACTIVE_DURATION: String(ACTIVE_DURATION),
+        }),
+      });
+      assert.strictEqual(res.status, 200);
+    }
+    for (let i = 0; i < MAX_ACTIVE_ROOMS; i++) {
+      const res = await fetch("http://localhost:8787/api/rooms", {
+        method: "POST",
+      });
+      const id = await res.text();
+      assert.strictEqual(res.status, 200);
+      assert.strictEqual(id.length, 64);
+      createdRoomIds.push(id);
+    }
+    {
+      const res = await fetch("http://localhost:8787/api/rooms", {
+        method: "POST",
+      });
+      assert.strictEqual(res.status, 403);
+    }
+    {
+      await setTimeout(ACTIVE_DURATION);
+      const res = await fetch("http://localhost:8787/debug/clean", {
+        method: "POST",
+      });
+      assert.strictEqual(res.status, 200);
+    }
+    {
+      const res = await fetch("http://localhost:8787/api/rooms", {
+        method: "POST",
+      });
+      const id = await res.text();
+      assert.strictEqual(res.status, 200);
+      assert.strictEqual(id.length, 64);
+      createdRoomIds.push(id);
+    }
+    for (const id of createdRoomIds) {
+      const res = await fetch("http://localhost:8787/api/rooms/" + id);
+      assert.strictEqual(res.status, 200);
+      const room = await res.json();
+      assert.strictEqual(room.id, id);
+    }
+  });
+  it("deletes outdated rooms", async function () {
+    const LIVE_DURATION = 1000;
+    const createdRoomIds = [];
+    {
+      const res = await fetch("http://localhost:8787/debug/config", {
+        method: "PATCH",
+        body: JSON.stringify({
+          LIVE_DURATION: String(LIVE_DURATION),
+        }),
+      });
+      assert.strictEqual(res.status, 200);
+    }
+    {
+      const res = await fetch("http://localhost:8787/api/rooms", {
+        method: "POST",
+      });
+      const id = await res.text();
+      assert.strictEqual(res.status, 200);
+      assert.strictEqual(id.length, 64);
+      createdRoomIds.push(id);
+    }
+    {
+      await setTimeout(LIVE_DURATION);
+      const res = await fetch("http://localhost:8787/debug/clean", {
+        method: "POST",
+      });
+      assert.strictEqual(res.status, 200);
+    }
+    for (const id of createdRoomIds) {
+      const res = await fetch("http://localhost:8787/api/rooms/" + id);
+      assert.strictEqual(res.status, 404);
     }
   });
 });

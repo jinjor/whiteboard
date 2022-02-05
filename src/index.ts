@@ -2,10 +2,6 @@
 import HTML from "./index.html";
 import { Router } from "itty-router";
 
-const MAX_ACTIVE_ROOMS = 10;
-const LIVE_DURATION = 7 * 24 * 60 * 60 * 1000;
-const ACTIVE_DURATION = 24 * 60 * 60 * 1000;
-
 type Env = {
   manager: DurableObjectNamespace;
   rooms: DurableObjectNamespace;
@@ -27,7 +23,27 @@ function handleError(request: Request, error: any) {
   // stack 表示するため本番では消したい
   return new Response(error.stack, { status: 500 });
 }
-
+const debugRouter = Router({ base: "/debug" })
+  .patch("/config", async (request: Request, env: Env) => {
+    const config = await request.json();
+    const singletonId = env.manager.idFromName("singleton");
+    const managerStub = env.manager.get(singletonId);
+    return await managerStub.fetch("https://dummy-url/config", {
+      method: "PATCH",
+      body: JSON.stringify(config),
+    });
+  })
+  .post("/clean", async (request: Request, env: Env) => {
+    await clean(env);
+    return new Response();
+  })
+  .delete("/", async (request: Request, env: Env) => {
+    const singletonId = env.manager.idFromName("singleton");
+    const managerStub = env.manager.get(singletonId);
+    return await managerStub.fetch("https://dummy-url", {
+      method: "DELETE",
+    });
+  });
 const apiRouter = Router({ base: "/api" })
   .post("/rooms", async (request: Request, env: Env) => {
     // TODO: ここでアクティブな部屋数の上限に達していたら 403
@@ -40,9 +56,9 @@ const apiRouter = Router({ base: "/api" })
       {
         method: "PUT",
       }
-      // TODO: request を渡す
     );
     if (res.status !== 200) {
+      // TODO: ?
       return new Response(roomId.toString(), {
         status: res.status,
       });
@@ -68,7 +84,8 @@ const apiRouter = Router({ base: "/api" })
       if (res.status === 200) {
         return new Response(JSON.stringify({ id: roomId.toString() }));
       }
-      return new Response("Not found.", { status: 404 });
+      return res;
+      // return new Response("Not found.", { status: 404 });
     }
   )
   .all(
@@ -119,6 +136,8 @@ const router = Router()
     });
   })
   .all("/api/*", apiRouter.handle)
+  // TODO: テストの場合のみに制限
+  .all("/debug/*", debugRouter.handle)
   .all("*", () => new Response("Not found.", { status: 404 }));
 
 export default {
@@ -129,14 +148,18 @@ export default {
     });
   },
   async scheduled(event: { cron: string; scheduledTime: number }, env: Env) {
-    const singletonId = env.manager.idFromName("singleton");
-    const managerStub = env.manager.get(singletonId);
-    const res = await managerStub.fetch("https://dummy-url/clean", {
-      method: "POST",
-    });
-    // TODO: room の実体も clean する必要がある
+    await clean(env);
   },
 };
+
+async function clean(env: Env) {
+  const singletonId = env.manager.idFromName("singleton");
+  const managerStub = env.manager.get(singletonId);
+  const res = await managerStub.fetch("https://dummy-url/clean", {
+    method: "POST",
+  });
+  // TODO: room の実体も clean する必要がある
+}
 
 // =======================================================================================
 
@@ -148,12 +171,49 @@ type RoomInfo = {
 
 class RoomManagerState {
   private storage: DurableObjectStorage;
+  private MAX_ACTIVE_ROOMS = 10;
+  private LIVE_DURATION = 7 * 24 * 60 * 60 * 1000;
+  private ACTIVE_DURATION = 24 * 60 * 60 * 1000;
   constructor(storage: DurableObjectStorage) {
     this.storage = storage;
+  }
+  async updateConfig(config: {
+    MAX_ACTIVE_ROOMS?: number;
+    LIVE_DURATION?: number;
+    ACTIVE_DURATION?: number;
+  }): Promise<void> {
+    if (config.MAX_ACTIVE_ROOMS != null) {
+      this.MAX_ACTIVE_ROOMS = config.MAX_ACTIVE_ROOMS;
+    }
+    if (config.LIVE_DURATION != null) {
+      this.LIVE_DURATION = config.LIVE_DURATION;
+    }
+    if (config.ACTIVE_DURATION != null) {
+      this.ACTIVE_DURATION = config.ACTIVE_DURATION;
+    }
   }
   async getRoomInfo(roomId: string): Promise<RoomInfo | null> {
     const roomInfo = await this.storage.get(roomId);
     return (roomInfo ?? null) as RoomInfo | null;
+  }
+  async createRoomInfo(roomId: string): Promise<RoomInfo | null> {
+    let activeRooms = 0;
+    for (const roomInfo of await this.listRoomInfo()) {
+      if (roomInfo.active) {
+        activeRooms++;
+      }
+    }
+    console.log("activeRooms:", activeRooms);
+    if (activeRooms >= this.MAX_ACTIVE_ROOMS) {
+      return null;
+    }
+    const roomInfo = {
+      id: roomId,
+      createdAt: Date.now(),
+      active: true,
+    };
+    await this.setRoomInfo(roomInfo);
+    return roomInfo;
   }
   async setRoomInfo(roomInfo: RoomInfo): Promise<void> {
     await this.storage.put(roomInfo.id, roomInfo);
@@ -165,9 +225,39 @@ class RoomManagerState {
     const map = (await this.storage.list()) as Map<string, RoomInfo>;
     return [...map.values()];
   }
+  async clean(): Promise<void> {
+    for (const roomInfo of await this.listRoomInfo()) {
+      const now = Date.now();
+      if (now - roomInfo.createdAt > this.LIVE_DURATION) {
+        await this.deleteRoomInfo(roomInfo.id);
+        continue;
+      }
+      if (now - roomInfo.createdAt > this.ACTIVE_DURATION) {
+        roomInfo.active = false;
+        await this.setRoomInfo(roomInfo);
+        continue;
+      }
+    }
+  }
+  async reset(): Promise<void> {
+    await this.storage.deleteAll();
+  }
 }
 
 const roomManagerRouter = Router()
+  .delete("/", async (request: Request, state: RoomManagerState) => {
+    await state.reset();
+    return new Response("null", { status: 200 });
+  })
+  .patch("/config", async (request: Request, state: RoomManagerState) => {
+    const config = await request.json();
+    await state.updateConfig(config as any);
+    return new Response("null", { status: 200 });
+  })
+  .post("/clean", async (request: Request, state: RoomManagerState) => {
+    await state.clean();
+    return new Response("null", { status: 200 });
+  })
   .get(
     "/rooms/:roomId",
     async (
@@ -189,46 +279,17 @@ const roomManagerRouter = Router()
       state: RoomManagerState
     ) => {
       const roomId = request.params.roomId;
-      let activeRooms = 0;
-      for (const roomInfo of await state.listRoomInfo()) {
-        if (roomInfo.active) {
-          activeRooms++;
-        }
+      const exsistingRoomInfo = await state.getRoomInfo(roomId);
+      if (exsistingRoomInfo != null) {
+        return new Response(JSON.stringify(exsistingRoomInfo), { status: 200 });
       }
-      if (activeRooms >= MAX_ACTIVE_ROOMS) {
+      const newRoomInfo = await state.createRoomInfo(roomId);
+      if (newRoomInfo == null) {
         return new Response("The maximum number of rooms has been reached.", {
           status: 403,
         });
       }
-      const roomInfo = {
-        id: roomId,
-        createdAt: Date.now(),
-        active: true,
-      };
-      await state.setRoomInfo(roomInfo);
-      return new Response(JSON.stringify(roomInfo), { status: 200 });
-    }
-  )
-  .post(
-    "/clean",
-    async (
-      request: Request & { params: { roomId: string } },
-      state: RoomManagerState
-    ) => {
-      const roomId = request.params.roomId;
-      for (const roomInfo of await state.listRoomInfo()) {
-        const now = Date.now();
-        if (now - roomInfo.createdAt > LIVE_DURATION) {
-          await state.deleteRoomInfo(roomId);
-          continue;
-        }
-        if (now - roomInfo.createdAt > ACTIVE_DURATION) {
-          roomInfo.active = false;
-          await state.setRoomInfo(roomInfo);
-          continue;
-        }
-      }
-      return new Response("null", { status: 200 });
+      return new Response(JSON.stringify(newRoomInfo), { status: 200 });
     }
   )
   .all("*", () => new Response("Not found.", { status: 404 }));
