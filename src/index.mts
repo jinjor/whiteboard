@@ -158,6 +158,70 @@ export default {
 
 // =======================================================================================
 
+const roomManagerRouter = Router()
+  .get("/", () => {
+    return new Response(HTML.slice(0), {
+      headers: { "Content-Type": "text/html;charset=UTF-8" },
+    });
+  })
+  .get(
+    "/rooms/:roomId",
+    async (request: Request & { params: { roomId: string } }, storage: any) => {
+      const roomId = request.params.roomId;
+      const roomInfo = await storage.get(roomId);
+      if (roomInfo == null) {
+        return new Response("Not found", { status: 404 });
+      }
+      return new Response(JSON.stringify(roomInfo), { status: 200 });
+    }
+  )
+  .put(
+    "/rooms/:roomId",
+    async (request: Request & { params: { roomId: string } }, storage: any) => {
+      const roomId = request.params.roomId;
+      const map = await storage.list();
+      let activeRooms = 0;
+      for (const [id, roomInfo] of map.entries()) {
+        if (roomInfo.active) {
+          activeRooms++;
+        }
+      }
+      if (activeRooms >= MAX_ACTIVE_ROOMS) {
+        return new Response("The maximum number of rooms has been reached.", {
+          status: 403,
+        });
+      }
+      const roomInfo = {
+        roomId,
+        createdAt: Date.now(),
+        active: true,
+      };
+      await storage.put(roomId, roomInfo);
+      return new Response(JSON.stringify(roomInfo), { status: 200 });
+    }
+  )
+  .post(
+    "/clean",
+    async (request: Request & { params: { roomId: string } }, storage: any) => {
+      const roomId = request.params.roomId;
+      const map = await storage.list();
+      for (const [id, roomInfo] of map.entries()) {
+        const now = Date.now();
+        if (now - roomInfo.createdAt > LIVE_DURATION) {
+          await storage.delete(id);
+          continue;
+        }
+        if (now - roomInfo.createdAt > ACTIVE_DURATION) {
+          roomInfo.active = false;
+          await storage.put(id, roomInfo);
+          continue;
+        }
+      }
+      return new Response("null", { status: 200 });
+    }
+  )
+  .all("*", () => new Response("Not found.", { status: 404 }));
+
 export class RoomManager implements DurableObject {
   private storage: any;
   private env: Env;
@@ -166,87 +230,13 @@ export class RoomManager implements DurableObject {
     this.storage = controller.storage;
     this.env = env;
   }
-
   async fetch(request: Request) {
-    return await handleErrors(request, async () => {
-      const url = new URL(request.url);
-      console.log(
-        "RoomManager's fetch(): " + request.method,
-        request.url,
-        request.headers.get("WB-TEST-MAX_ACTIVE_ROOMS"),
-        request.headers.get("WB-TEST-LIVE_DURATION"),
-        request.headers.get("WB-TEST-ACTIVE_DURATION")
-      );
-      const path = url.pathname.slice(1).split("/");
-
-      switch (path[0]) {
-        case "rooms": {
-          // `/rooms`
-          if (!path[1]) {
-            return new Response("Not found", { status: 404 });
-          }
-          if (path[2]) {
-            return new Response("Not found", { status: 404 });
-          }
-          // `/rooms/{id}`
-          const id = path[1];
-
-          if (request.method === "GET") {
-            const roomInfo = await this.storage.get(id);
-            if (roomInfo == null) {
-              return new Response("Not found", { status: 404 });
-            }
-            return new Response(JSON.stringify(roomInfo), { status: 200 });
-          }
-          if (request.method === "PUT") {
-            const map = await this.storage.list();
-            let activeRooms = 0;
-            for (const [id, roomInfo] of map.entries()) {
-              if (roomInfo.active) {
-                activeRooms++;
-              }
-            }
-            if (activeRooms >= MAX_ACTIVE_ROOMS) {
-              return new Response(
-                "The maximum number of rooms has been reached.",
-                { status: 403 }
-              );
-            }
-            const roomInfo = {
-              id,
-              createdAt: Date.now(),
-              active: true,
-            };
-            await this.storage.put(id, roomInfo);
-            return new Response(JSON.stringify(roomInfo), { status: 200 });
-          }
-          return new Response("Not found", { status: 404 });
-        }
-        case "clean": {
-          if (request.method === "POST") {
-            // タイムスタンプ見てガベコレ
-            const map = await this.storage.list();
-            for (const [id, roomInfo] of map.entries()) {
-              const now = Date.now();
-              if (now - roomInfo.createdAt > LIVE_DURATION) {
-                await this.storage.delete(id);
-                continue;
-              }
-              if (now - roomInfo.createdAt > ACTIVE_DURATION) {
-                roomInfo.active = false;
-                await this.storage.put(id, roomInfo);
-                continue;
-              }
-            }
-            return new Response("", { status: 200 });
-          }
-          return new Response("Not found", { status: 404 });
-        }
-        default: {
-          return new Response("Not found", { status: 404 });
-        }
-      }
-    });
+    console.log("Root's fetch(): " + request.method, request.url);
+    return roomManagerRouter
+      .handle(request, this.storage)
+      .catch((error: any) => {
+        return handleError(request, error);
+      });
   }
 }
 
