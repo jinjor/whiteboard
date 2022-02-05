@@ -12,27 +12,6 @@ type Env = {
   limiters: DurableObjectNamespace;
 };
 
-// エラーを 500 にする（deprecated）
-async function handleErrors(request: Request, func: Function) {
-  try {
-    return await func();
-  } catch (err: any) {
-    if (request.headers.get("Upgrade") == "websocket") {
-      // Annoyingly, if we return an HTTP error in response to a WebSocket request, Chrome devtools
-      // won't show us the response body! So... let's send a WebSocket response with an error
-      // frame instead.
-      const pair = new WebSocketPair();
-      pair[1].accept();
-      pair[1].send(JSON.stringify({ error: err.stack }));
-      pair[1].close(1011, "Uncaught exception during session setup");
-      return new Response(null, { status: 101, webSocket: pair[0] });
-    } else {
-      // stack 表示するため本番では消したい
-      return new Response(err.stack, { status: 500 });
-    }
-  }
-}
-
 function handleError(request: Request, error: any) {
   console.log(error.stack);
   if (request.headers.get("Upgrade") == "websocket") {
@@ -158,17 +137,22 @@ export default {
 
 // =======================================================================================
 
+class RoomManagerState {
+  storage: DurableObjectStorage;
+  constructor(storage: DurableObjectStorage) {
+    this.storage = storage;
+  }
+}
+
 const roomManagerRouter = Router()
-  .get("/", () => {
-    return new Response(HTML.slice(0), {
-      headers: { "Content-Type": "text/html;charset=UTF-8" },
-    });
-  })
   .get(
     "/rooms/:roomId",
-    async (request: Request & { params: { roomId: string } }, storage: any) => {
+    async (
+      request: Request & { params: { roomId: string } },
+      state: RoomManagerState
+    ) => {
       const roomId = request.params.roomId;
-      const roomInfo = await storage.get(roomId);
+      const roomInfo = await state.storage.get(roomId);
       if (roomInfo == null) {
         return new Response("Not found", { status: 404 });
       }
@@ -177,11 +161,14 @@ const roomManagerRouter = Router()
   )
   .put(
     "/rooms/:roomId",
-    async (request: Request & { params: { roomId: string } }, storage: any) => {
+    async (
+      request: Request & { params: { roomId: string } },
+      state: RoomManagerState
+    ) => {
       const roomId = request.params.roomId;
-      const map = await storage.list();
+      const map = await state.storage.list();
       let activeRooms = 0;
-      for (const [id, roomInfo] of map.entries()) {
+      for (const [id, roomInfo] of map.entries() as any) {
         if (roomInfo.active) {
           activeRooms++;
         }
@@ -196,24 +183,27 @@ const roomManagerRouter = Router()
         createdAt: Date.now(),
         active: true,
       };
-      await storage.put(roomId, roomInfo);
+      await state.storage.put(roomId, roomInfo);
       return new Response(JSON.stringify(roomInfo), { status: 200 });
     }
   )
   .post(
     "/clean",
-    async (request: Request & { params: { roomId: string } }, storage: any) => {
+    async (
+      request: Request & { params: { roomId: string } },
+      state: RoomManagerState
+    ) => {
       const roomId = request.params.roomId;
-      const map = await storage.list();
+      const map = (await state.storage.list()) as any;
       for (const [id, roomInfo] of map.entries()) {
         const now = Date.now();
         if (now - roomInfo.createdAt > LIVE_DURATION) {
-          await storage.delete(id);
+          await state.storage.delete(id);
           continue;
         }
         if (now - roomInfo.createdAt > ACTIVE_DURATION) {
           roomInfo.active = false;
-          await storage.put(id, roomInfo);
+          await state.storage.put(id, roomInfo);
           continue;
         }
       }
@@ -223,77 +213,55 @@ const roomManagerRouter = Router()
   .all("*", () => new Response("Not found.", { status: 404 }));
 
 export class RoomManager implements DurableObject {
-  private storage: any;
-  private env: Env;
+  private state: RoomManagerState;
 
   constructor(controller: any, env: Env) {
-    this.storage = controller.storage;
-    this.env = env;
+    this.state = new RoomManagerState(controller.storage);
   }
   async fetch(request: Request) {
     console.log("Root's fetch(): " + request.method, request.url);
-    return roomManagerRouter
-      .handle(request, this.storage)
-      .catch((error: any) => {
-        return handleError(request, error);
-      });
+    return roomManagerRouter.handle(request, this.state).catch((error: any) => {
+      return handleError(request, error);
+    });
   }
 }
 
 // =======================================================================================
 
-type ChatSession = {
-  name?: string;
-  quit?: boolean;
-  webSocket: WebSocket;
-  blockedMessages: string[];
-};
+const roomRouter = Router()
+  .all("/websocket", async (request: Request, state: RoomState) => {
+    if (request.headers.get("Upgrade") != "websocket") {
+      return new Response("expected websocket", { status: 400 });
+    }
+    // TODO: ip は今回多分使わない
+    const ip = request.headers.get("CF-Connecting-IP")!;
+    const pair = new WebSocketPair();
 
-export class ChatRoom implements DurableObject {
-  private storage: any;
+    // We're going to take pair[1] as our end, and return pair[0] to the client.
+    await state.handleSession(pair[1], ip);
+
+    // Now we return the other end of the pair to the client.
+    // 101 Switching Protocols
+    return new Response(null, { status: 101, webSocket: pair[0] });
+  })
+  .all("*", () => new Response("Not found.", { status: 404 }));
+
+class RoomState {
+  private storage: DurableObjectStorage;
   private env: Env;
   private sessions: ChatSession[];
   private lastTimestamp: number;
   constructor(controller: any, env: Env) {
-    // get()/put() を持つ Durable Storage
     this.storage = controller.storage;
     this.env = env;
-
     // 各クライアントの WebSocket object とメタデータ
     this.sessions = [];
-
     // 同時にメッセージが来てもタイムスタンプを単調増加にするための仕掛け
     this.lastTimestamp = 0;
   }
 
-  async fetch(request: Request) {
-    return await handleErrors(request, async () => {
-      const url = new URL(request.url);
-      console.log("ChatRoom's fetch(): " + request.method, request.url);
-      switch (url.pathname) {
-        case "/websocket": {
-          if (request.headers.get("Upgrade") != "websocket") {
-            return new Response("expected websocket", { status: 400 });
-          }
-          // TODO: ip は今回多分使わない
-          const ip = request.headers.get("CF-Connecting-IP")!;
-          const pair = new WebSocketPair();
-
-          // We're going to take pair[1] as our end, and return pair[0] to the client.
-          await this.handleSession(pair[1], ip);
-
-          // Now we return the other end of the pair to the client.
-          // 101 Switching Protocols
-          return new Response(null, { status: 101, webSocket: pair[0] });
-        }
-        default:
-          return new Response("Not found", { status: 404 });
-      }
-    });
-  }
-
   // handleSession() implements our WebSocket-based chat protocol.
-  private async handleSession(webSocket: WebSocket, ip: string) {
+  async handleSession(webSocket: WebSocket, ip: string) {
     // Accept our end of the WebSocket. This tells the runtime that we'll be terminating the
     // WebSocket in JavaScript, not sending it elsewhere.
     webSocket.accept();
@@ -320,7 +288,7 @@ export class ChatRoom implements DurableObject {
 
     // 最終 100 メッセージを詰めておく
     const storage = await this.storage.list({ reverse: true, limit: 100 });
-    const backlog = [...storage.values()];
+    const backlog = [...storage.values()] as any[];
     backlog.reverse();
     backlog.forEach((value) => {
       session.blockedMessages.push(value);
@@ -458,31 +426,62 @@ export class ChatRoom implements DurableObject {
   }
 }
 
+type ChatSession = {
+  name?: string;
+  quit?: boolean;
+  webSocket: WebSocket;
+  blockedMessages: string[];
+};
+
+export class ChatRoom implements DurableObject {
+  private state: RoomState;
+  constructor(controller: any, env: Env) {
+    this.state = new RoomState(controller, env);
+  }
+  async fetch(request: Request) {
+    return roomRouter.handle(request, this.state).catch((error: any) => {
+      return handleError(request, error);
+    });
+  }
+}
+
 // =======================================================================================
+
+class RateLimiterState {
+  private nextAllowedTime: number;
+  constructor() {
+    this.nextAllowedTime = 0;
+  }
+  update(didAction: boolean): number {
+    const now = Date.now() / 1000;
+    this.nextAllowedTime = Math.max(now, this.nextAllowedTime);
+    if (didAction) {
+      // ５秒に１回アクションを起こして良い
+      this.nextAllowedTime += 5;
+    }
+    return Math.max(0, this.nextAllowedTime - now - 20);
+  }
+}
+
+const rateLimitRouter = Router()
+  .get("*", (request: Request, state: RateLimiterState) => {
+    const cooldown = state.update(false);
+    return new Response(String(cooldown));
+  })
+  .post("*", (request: Request, state: RateLimiterState) => {
+    const cooldown = state.update(true);
+    return new Response(String(cooldown));
+  });
 
 // IP アドレス毎にインスタンスが作られる。このレートリミットはグローバル（部屋を跨ぐ）
 export class RateLimiter implements DurableObject {
-  private nextAllowedTime: number;
+  private state: RateLimiterState;
   constructor(controller: any, env: Env) {
-    this.nextAllowedTime = 0;
+    this.state = new RateLimiterState();
   }
-
-  // POST はアクションがあった時。GET は単に取得するとき。
-  // 両方とも次のアクションまでの待ち時間を返す
   async fetch(request: Request) {
-    return await handleErrors(request, async () => {
-      let now = Date.now() / 1000;
-
-      this.nextAllowedTime = Math.max(now, this.nextAllowedTime);
-
-      if (request.method == "POST") {
-        // ５秒に１回アクションを起こして良い
-        this.nextAllowedTime += 5;
-      }
-
-      // 最初の 20 秒は素早くアクションを起こしても許容する
-      const cooldown = Math.max(0, this.nextAllowedTime - now - 20);
-      return new Response(String(cooldown));
+    return rateLimitRouter.handle(request, this.state).catch((error: any) => {
+      return handleError(request, error);
     });
   }
 }
