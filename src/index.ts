@@ -53,12 +53,14 @@ const apiRouter = Router({ base: "/api" })
     "/rooms/:roomName",
     async (request: Request & { params: { roomName: string } }, env: Env) => {
       const roomName = request.params.roomName;
-      if (!roomName.match(/^[0-9a-f]{64}$/)) {
-        return new Response("Invalid room name", { status: 400 });
-      }
       const singletonId = env.manager.idFromName("singleton");
       const managerStub = env.manager.get(singletonId);
-      const roomId = env.rooms.idFromString(roomName);
+      let roomId;
+      try {
+        roomId = env.rooms.idFromString(roomName);
+      } catch (e) {
+        return new Response("Not found.", { status: 404 });
+      }
       const res = await managerStub.fetch(
         "https://dummy-url/rooms/" + roomId.toString(),
         request
@@ -75,11 +77,12 @@ const apiRouter = Router({ base: "/api" })
       // TODO: ここでアクティブな部屋数の上限に達していたら 403
 
       const roomName = request.params.roomName;
-      if (!roomName.match(/^[0-9a-f]{64}$/)) {
-        return new Response("Invalid room name", { status: 400 });
+      let roomId;
+      try {
+        roomId = env.rooms.idFromString(roomName);
+      } catch (e) {
+        return new Response("Not found.", { status: 404 });
       }
-      const roomId = env.rooms.idFromString(roomName);
-
       const singletonId = env.manager.idFromName("singleton");
       const managerStub = env.manager.get(singletonId);
       const res = await managerStub.fetch("https://dummy-url/rooms/" + roomId);

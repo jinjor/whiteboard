@@ -50,8 +50,16 @@ describe("Whiteboard", function () {
     }
   });
   it("handles invalid rooms", async function () {
-    const res = await fetch("http://localhost:8787/api/rooms/short");
-    assert.strictEqual(res.status, 400);
+    {
+      const res = await fetch("http://localhost:8787/api/rooms/short");
+      assert.strictEqual(res.status, 404);
+    }
+    {
+      const res = await fetch(
+        "http://localhost:8787/api/rooms/" + "a".repeat(64)
+      );
+      assert.strictEqual(res.status, 404);
+    }
   });
   it("creates rooms", async function () {
     const res = await fetch("http://localhost:8787/api/rooms", {
