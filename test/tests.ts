@@ -3,6 +3,7 @@ import { spawn, ChildProcess } from "child_process";
 import fetch from "node-fetch";
 import { setTimeout } from "timers/promises";
 import kill from "tree-kill";
+import WebSocket from "ws";
 
 describe("Whiteboard", function () {
   let p: ChildProcess;
@@ -166,4 +167,57 @@ describe("Whiteboard", function () {
       assert.strictEqual(res.status, 404);
     }
   });
+  it("accepts websocket connection to a room", async function () {
+    const res = await fetch("http://localhost:8787/api/rooms", {
+      method: "POST",
+    });
+    const id = await res.text();
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(id.length, 64);
+    await useWebsocket(
+      `ws://localhost:8787/api/rooms/${id}/websocket`,
+      async () => {}
+    );
+  });
+  it("does not accept websocket connection to invalid rooms", async function () {
+    // TODO: なぜか Miniflare が 500 を返す
+    // await useWebsocket(`ws://localhost:8787/foo`, async () => {});
+  });
 });
+function useWebsocket<T>(
+  url: string,
+  f: (ws: WebSocket) => Promise<T>
+): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const ws = new WebSocket(url, {
+      perMessageDeflate: false,
+    });
+    let error: unknown;
+    let result: T | undefined;
+    ws.on("open", () => {
+      console.log("open");
+      f(ws)
+        .then((r) => {
+          result = r;
+        })
+        .catch((e) => {
+          error = e;
+        })
+        .finally(() => {
+          ws.close();
+        });
+    });
+    ws.on("error", (e) => {
+      console.log("error", e);
+      error = e;
+    });
+    ws.on("close", () => {
+      console.log("close");
+      if (error == null) {
+        resolve(result!);
+      } else {
+        reject(error);
+      }
+    });
+  });
+}

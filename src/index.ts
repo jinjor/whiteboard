@@ -46,8 +46,6 @@ const debugRouter = Router({ base: "/debug" })
   });
 const apiRouter = Router({ base: "/api" })
   .post("/rooms", async (request: Request, env: Env) => {
-    // TODO: ここでアクティブな部屋数の上限に達していたら 403
-
     const roomId = env.rooms.newUniqueId();
     const singletonId = env.manager.idFromName("singleton");
     const managerStub = env.manager.get(singletonId);
@@ -88,11 +86,9 @@ const apiRouter = Router({ base: "/api" })
       // return new Response("Not found.", { status: 404 });
     }
   )
-  .all(
+  .get(
     "/rooms/:roomName/websocket",
     async (request: Request & { params: { roomName: string } }, env: Env) => {
-      // TODO: ここでアクティブな部屋数の上限に達していたら 403
-
       const roomName = request.params.roomName;
       let roomId;
       try {
@@ -103,10 +99,11 @@ const apiRouter = Router({ base: "/api" })
       const singletonId = env.manager.idFromName("singleton");
       const managerStub = env.manager.get(singletonId);
       const res = await managerStub.fetch("https://dummy-url/rooms/" + roomId);
-
       if (res.status !== 200) {
         return new Response("Not found.", { status: 404 });
       }
+
+      // TODO: 部屋がアクティブでなければ 403
 
       // スタブ（クライアント）が即時に作られる。リモートでは ID が最初に使われた時に必要に応じて作られる。
       const roomStub = env.rooms.get(roomId);
