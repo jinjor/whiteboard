@@ -181,7 +181,43 @@ describe("Whiteboard", function () {
   });
   it("does not accept websocket connection to invalid rooms", async function () {
     // TODO: なぜか Miniflare が 500 を返す
-    // await useWebsocket(`ws://localhost:8787/foo`, async () => {});
+    assert.rejects(async () => {
+      await useWebsocket(`ws://localhost:8787/foo`, async () => {});
+    });
+    assert.rejects(async () => {
+      await useWebsocket(
+        `ws://localhost:8787/rooms/foo/websocket`,
+        async () => {}
+      );
+    });
+    const LIVE_DURATION = 1000;
+    {
+      const res = await fetch("http://localhost:8787/debug/config", {
+        method: "PATCH",
+        body: JSON.stringify({
+          LIVE_DURATION: String(LIVE_DURATION),
+        }),
+      });
+      assert.strictEqual(res.status, 200);
+    }
+    const res = await fetch("http://localhost:8787/api/rooms", {
+      method: "POST",
+    });
+    const id = await res.text();
+    assert.strictEqual(res.status, 200);
+    {
+      await setTimeout(LIVE_DURATION);
+      const res = await fetch("http://localhost:8787/debug/clean", {
+        method: "POST",
+      });
+      assert.strictEqual(res.status, 200);
+    }
+    assert.rejects(async () => {
+      await useWebsocket(
+        `ws://localhost:8787/rooms/${id}/websocket`,
+        async () => {}
+      );
+    });
   });
 });
 function useWebsocket<T>(
@@ -208,7 +244,7 @@ function useWebsocket<T>(
         });
     });
     ws.on("error", (e) => {
-      console.log("error", e);
+      console.log("error", e.message);
       error = e;
     });
     ws.on("close", () => {
