@@ -155,10 +155,30 @@ export default {
 async function clean(env: Env) {
   const singletonId = env.manager.idFromName("singleton");
   const managerStub = env.manager.get(singletonId);
-  const res = await managerStub.fetch("https://dummy-url/clean", {
+  const res = await managerStub.fetch("https://dummy-url/clean");
+  if (res.status !== 200) {
+    throw new Error("failed to clean");
+  }
+  const { patches }: { patches: RoomPatch[] } = await res.json();
+  for (const patch of patches) {
+    // TODO: 消す方法
+    if (!patch.active || !patch.alive) {
+      const roomId = env.rooms.idFromString(patch.id);
+      const roomStub = env.rooms.get(roomId);
+      const res = await roomStub.fetch("https://dummy-url/deactivate", {
+        method: "POST",
+      });
+      if (res.status !== 200) {
+        throw new Error("failed to clean");
+      }
+    }
+  }
+  return managerStub.fetch("https://dummy-url/clean", {
     method: "POST",
+    body: JSON.stringify({
+      patches,
+    }),
   });
-  // TODO: room の実体も clean する必要がある
 }
 
 // =======================================================================================
@@ -171,6 +191,11 @@ type RoomInfo = {
 const MAX_ACTIVE_ROOMS = 10;
 const LIVE_DURATION = 7 * 24 * 60 * 60 * 1000;
 const ACTIVE_DURATION = 24 * 60 * 60 * 1000;
+type RoomPatch = {
+  id: string;
+  active: boolean;
+  alive: boolean;
+};
 
 class RoomManagerState {
   private storage: DurableObjectStorage;
@@ -231,17 +256,31 @@ class RoomManagerState {
     const map = (await this.storage.list()) as Map<string, RoomInfo>;
     return [...map.values()];
   }
-  async clean(): Promise<void> {
+  async dryClean(): Promise<RoomPatch[]> {
+    const list: RoomPatch[] = [];
     for (const roomInfo of await this.listRoomInfo()) {
       const now = Date.now();
-      if (now - roomInfo.createdAt > this.LIVE_DURATION) {
+      list.push({
+        id: roomInfo.id,
+        active: now - roomInfo.createdAt < this.ACTIVE_DURATION,
+        alive: now - roomInfo.createdAt < this.LIVE_DURATION,
+      });
+    }
+    return list;
+  }
+  async clean(patches: RoomPatch[]): Promise<void> {
+    for (const patch of patches) {
+      const roomInfo = await this.getRoomInfo(patch.id);
+      if (roomInfo == null) {
+        continue;
+      }
+      if (!patch.alive) {
         await this.deleteRoomInfo(roomInfo.id);
         continue;
       }
-      if (now - roomInfo.createdAt > this.ACTIVE_DURATION) {
+      if (!patch.active) {
         roomInfo.active = false;
         await this.setRoomInfo(roomInfo);
-        continue;
       }
     }
   }
@@ -263,9 +302,14 @@ const roomManagerRouter = Router()
     await state.updateConfig(config as any);
     return new Response("null", { status: 200 });
   })
+  .get("/clean", async (request: Request, state: RoomManagerState) => {
+    const list = await state.dryClean();
+    return new Response(JSON.stringify({ patches: list }), { status: 200 });
+  })
   .post("/clean", async (request: Request, state: RoomManagerState) => {
-    await state.clean();
-    return new Response("null", { status: 200 });
+    const { patches } = await request.json();
+    await state.clean(patches);
+    return new Response(JSON.stringify(null), { status: 200 });
   })
   .get(
     "/rooms/:roomId",
@@ -310,7 +354,7 @@ export class RoomManager implements DurableObject {
     this.state = new RoomManagerState(controller.storage);
   }
   async fetch(request: Request) {
-    console.log("Root's fetch(): " + request.method, request.url);
+    console.log("RoomManager's fetch(): " + request.method, request.url);
     return roomManagerRouter.handle(request, this.state).catch((error: any) => {
       return handleError(request, error);
     });
@@ -320,6 +364,10 @@ export class RoomManager implements DurableObject {
 // =======================================================================================
 
 const roomRouter = Router()
+  .post("/deactivate", async (request: Request, state: RoomState) => {
+    await state.disconnectAllSessions();
+    return new Response("null", { status: 200 });
+  })
   .all("/websocket", async (request: Request, state: RoomState) => {
     if (request.headers.get("Upgrade") != "websocket") {
       return new Response("expected websocket", { status: 400 });
@@ -349,6 +397,13 @@ class RoomState {
     this.sessions = [];
     // 同時にメッセージが来てもタイムスタンプを単調増加にするための仕掛け
     this.lastTimestamp = 0;
+  }
+
+  async disconnectAllSessions() {
+    while (this.sessions.length > 0) {
+      const session = this.sessions.pop()!;
+      session.webSocket.close(1000);
+    }
   }
 
   // handleSession() implements our WebSocket-based chat protocol.

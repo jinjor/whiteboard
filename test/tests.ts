@@ -182,7 +182,7 @@ describe("Whiteboard", function () {
       await useWebsocket(`/foo`, async () => {});
     });
     assert.rejects(async () => {
-      await useWebsocket(`/rooms/foo/websocket`, async () => {});
+      await useWebsocket(`/api/rooms/foo/websocket`, async () => {});
     });
     const ACTIVE_DURATION = 1000;
     const LIVE_DURATION = 2000;
@@ -196,13 +196,55 @@ describe("Whiteboard", function () {
     await setTimeout(ACTIVE_DURATION);
     await clean();
     assert.rejects(async () => {
-      await useWebsocket(`/rooms/${id}/websocket`, async () => {});
+      await useWebsocket(`/api/rooms/${id}/websocket`, async () => {});
     });
     await setTimeout(LIVE_DURATION - ACTIVE_DURATION);
     await clean();
     assert.rejects(async () => {
-      await useWebsocket(`/rooms/${id}/websocket`, async () => {});
+      await useWebsocket(`/api/rooms/${id}/websocket`, async () => {});
     });
+  });
+  it("closes all connections when a room is deactivated", async function () {
+    const ACTIVE_DURATION = 1000;
+    await config({
+      ACTIVE_DURATION,
+    });
+    const res = await request("POST", "/api/rooms");
+    assert.strictEqual(res.status, 200);
+    const id = await res.text();
+    const queue = [];
+    await useWebsocket(`/api/rooms/${id}/websocket`, async () => {
+      await setTimeout(ACTIVE_DURATION);
+      await clean();
+      await setTimeout(500);
+      queue.push("b");
+    });
+    queue.push("a");
+    while (queue.length < 2) {
+      await setTimeout(100);
+    }
+    assert.deepStrictEqual(queue, ["a", "b"]);
+  });
+  it("closes all connections when a room is deleted", async function () {
+    const LIVE_DURATION = 1000; // < ACTIVE_DURATION
+    await config({
+      LIVE_DURATION,
+    });
+    const res = await request("POST", "/api/rooms");
+    assert.strictEqual(res.status, 200);
+    const id = await res.text();
+    const queue = [];
+    await useWebsocket(`/api/rooms/${id}/websocket`, async () => {
+      await setTimeout(LIVE_DURATION);
+      await clean();
+      await setTimeout(500);
+      queue.push("b");
+    });
+    queue.push("a");
+    while (queue.length < 2) {
+      await setTimeout(100);
+    }
+    assert.deepStrictEqual(queue, ["a", "b"]);
   });
 });
 function useWebsocket<T>(
@@ -215,6 +257,7 @@ function useWebsocket<T>(
     });
     let error: unknown;
     let result: T | undefined;
+    let closed = false;
     ws.on("open", () => {
       console.log("open");
       f(ws)
@@ -225,7 +268,9 @@ function useWebsocket<T>(
           error = e;
         })
         .finally(() => {
-          ws.close();
+          if (!closed) {
+            ws.close();
+          }
         });
     });
     ws.on("error", (e) => {
@@ -234,6 +279,7 @@ function useWebsocket<T>(
     });
     ws.on("close", () => {
       console.log("close");
+      closed = true;
       if (error == null) {
         resolve(result!);
       } else {
