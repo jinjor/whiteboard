@@ -6,6 +6,7 @@ import kill from "tree-kill";
 import WebSocket from "ws";
 
 describe("Whiteboard", function () {
+  this.timeout(10 * 1000);
   let p: ChildProcess;
   before(async function () {
     p = spawn("npx", ["miniflare"], {
@@ -135,12 +136,14 @@ describe("Whiteboard", function () {
     }
   });
   it("deletes outdated rooms", async function () {
-    const LIVE_DURATION = 1000;
+    const ACTIVE_DURATION = 1000;
+    const LIVE_DURATION = 2000;
     const createdRoomIds = [];
     {
       const res = await fetch("http://localhost:8787/debug/config", {
         method: "PATCH",
         body: JSON.stringify({
+          ACTIVE_DURATION: String(ACTIVE_DURATION),
           LIVE_DURATION: String(LIVE_DURATION),
         }),
       });
@@ -156,7 +159,20 @@ describe("Whiteboard", function () {
       createdRoomIds.push(id);
     }
     {
-      await setTimeout(LIVE_DURATION);
+      await setTimeout(ACTIVE_DURATION);
+      const res = await fetch("http://localhost:8787/debug/clean", {
+        method: "POST",
+      });
+      assert.strictEqual(res.status, 200);
+    }
+    for (const id of createdRoomIds) {
+      const res = await fetch("http://localhost:8787/api/rooms/" + id);
+      assert.strictEqual(res.status, 200);
+      const room = await res.json();
+      assert.strictEqual(room.active, false);
+    }
+    {
+      await setTimeout(LIVE_DURATION - ACTIVE_DURATION);
       const res = await fetch("http://localhost:8787/debug/clean", {
         method: "POST",
       });
@@ -190,11 +206,13 @@ describe("Whiteboard", function () {
         async () => {}
       );
     });
-    const LIVE_DURATION = 1000;
+    const ACTIVE_DURATION = 1000;
+    const LIVE_DURATION = 2000;
     {
       const res = await fetch("http://localhost:8787/debug/config", {
         method: "PATCH",
         body: JSON.stringify({
+          ACTIVE_DURATION: String(ACTIVE_DURATION),
           LIVE_DURATION: String(LIVE_DURATION),
         }),
       });
@@ -206,7 +224,20 @@ describe("Whiteboard", function () {
     const id = await res.text();
     assert.strictEqual(res.status, 200);
     {
-      await setTimeout(LIVE_DURATION);
+      await setTimeout(ACTIVE_DURATION);
+      const res = await fetch("http://localhost:8787/debug/clean", {
+        method: "POST",
+      });
+      assert.strictEqual(res.status, 200);
+    }
+    assert.rejects(async () => {
+      await useWebsocket(
+        `ws://localhost:8787/rooms/${id}/websocket`,
+        async () => {}
+      );
+    });
+    {
+      await setTimeout(LIVE_DURATION - ACTIVE_DURATION);
       const res = await fetch("http://localhost:8787/debug/clean", {
         method: "POST",
       });

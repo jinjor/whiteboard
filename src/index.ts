@@ -80,7 +80,10 @@ const apiRouter = Router({ base: "/api" })
         request
       );
       if (res.status === 200) {
-        return new Response(JSON.stringify({ id: roomId.toString() }));
+        const room: RoomInfo = await res.json();
+        return new Response(
+          JSON.stringify({ id: roomId.toString(), active: room.active })
+        );
       }
       return res;
       // return new Response("Not found.", { status: 404 });
