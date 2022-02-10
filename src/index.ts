@@ -165,14 +165,20 @@ type RoomInfo = {
   active: boolean;
   createdAt: number;
 };
+const MAX_ACTIVE_ROOMS = 10;
+const LIVE_DURATION = 7 * 24 * 60 * 60 * 1000;
+const ACTIVE_DURATION = 24 * 60 * 60 * 1000;
 
 class RoomManagerState {
   private storage: DurableObjectStorage;
-  private MAX_ACTIVE_ROOMS = 10;
-  private LIVE_DURATION = 7 * 24 * 60 * 60 * 1000;
-  private ACTIVE_DURATION = 24 * 60 * 60 * 1000;
+  private MAX_ACTIVE_ROOMS;
+  private LIVE_DURATION;
+  private ACTIVE_DURATION;
   constructor(storage: DurableObjectStorage) {
     this.storage = storage;
+    this.MAX_ACTIVE_ROOMS = MAX_ACTIVE_ROOMS;
+    this.LIVE_DURATION = LIVE_DURATION;
+    this.ACTIVE_DURATION = ACTIVE_DURATION;
   }
   async updateConfig(config: {
     MAX_ACTIVE_ROOMS?: number;
@@ -237,6 +243,9 @@ class RoomManagerState {
     }
   }
   async reset(): Promise<void> {
+    this.MAX_ACTIVE_ROOMS = MAX_ACTIVE_ROOMS;
+    this.LIVE_DURATION = LIVE_DURATION;
+    this.ACTIVE_DURATION = ACTIVE_DURATION;
     await this.storage.deleteAll();
   }
 }
