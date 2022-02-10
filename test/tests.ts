@@ -1,9 +1,36 @@
 import * as assert from "assert";
 import { spawn, ChildProcess } from "child_process";
-import fetch from "node-fetch";
+import fetch, { Response } from "node-fetch";
 import { setTimeout } from "timers/promises";
 import kill from "tree-kill";
 import WebSocket from "ws";
+
+const port = "8787";
+const httpRoot = `http://localhost:${port}`;
+const wsRoot = `ws://localhost:${port}`;
+async function request(
+  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE",
+  path: string,
+  body?: any
+): Promise<Response> {
+  const init: any = { method };
+  if (body != null) {
+    init.body = JSON.stringify(body);
+  }
+  return await fetch(httpRoot + path, init);
+}
+async function config(options: {
+  MAX_ACTIVE_ROOMS?: number;
+  ACTIVE_DURATION?: number;
+  LIVE_DURATION?: number;
+}): Promise<void> {
+  const res = await request("PATCH", "/debug/config", options);
+  assert.strictEqual(res.status, 200);
+}
+async function clean(): Promise<void> {
+  const res = await request("POST", "/debug/clean");
+  assert.strictEqual(res.status, 200);
+}
 
 describe("Whiteboard", function () {
   this.timeout(10 * 1000);
@@ -20,7 +47,7 @@ describe("Whiteboard", function () {
     });
     for (let i = 0; i < 10; i++) {
       try {
-        await fetch("http://localhost:8787/", { timeout: 500 });
+        await fetch(httpRoot, { timeout: 500 });
         return;
       } catch (e) {
         await setTimeout(500);
@@ -34,50 +61,44 @@ describe("Whiteboard", function () {
     }
   });
   beforeEach(async function () {
-    const res = await fetch("http://localhost:8787/debug", {
-      method: "DELETE",
-    });
+    const res = await request("DELETE", "/debug");
     assert.strictEqual(res.status, 200);
   });
   it("responds correct status", async function () {
     {
-      const res = await fetch("http://localhost:8787/");
+      const res = await request("GET", "/");
       assert.strictEqual(res.status, 200);
     }
     {
-      const res = await fetch("http://localhost:8787/foo");
+      const res = await request("GET", "/foo");
       assert.strictEqual(res.status, 404);
     }
     {
-      const res = await fetch("http://localhost:8787/rooms");
+      const res = await request("GET", "/rooms");
       assert.strictEqual(res.status, 200);
     }
     {
-      const res = await fetch("http://localhost:8787/rooms/foo");
+      const res = await request("GET", "/rooms/foo");
       assert.strictEqual(res.status, 200);
     }
   });
   it("handles invalid rooms", async function () {
     {
-      const res = await fetch("http://localhost:8787/api/rooms/short");
+      const res = await request("GET", "/api/rooms/short");
       assert.strictEqual(res.status, 404);
     }
     {
-      const res = await fetch(
-        "http://localhost:8787/api/rooms/" + "a".repeat(64)
-      );
+      const res = await request("GET", "/api/rooms/" + "a".repeat(64));
       assert.strictEqual(res.status, 404);
     }
   });
   it("creates rooms", async function () {
-    const res = await fetch("http://localhost:8787/api/rooms", {
-      method: "POST",
-    });
+    const res = await request("POST", "/api/rooms");
     const id = await res.text();
     assert.strictEqual(res.status, 200);
     assert.strictEqual(id.length, 64);
     {
-      const res = await fetch("http://localhost:8787/api/rooms/" + id);
+      const res = await request("GET", "/api/rooms/" + id);
       assert.strictEqual(res.status, 200);
       const room = await res.json();
       assert.strictEqual(room.id, id);
@@ -87,49 +108,32 @@ describe("Whiteboard", function () {
     const MAX_ACTIVE_ROOMS = 2;
     const ACTIVE_DURATION = 1000;
     const createdRoomIds = [];
-    {
-      const res = await fetch("http://localhost:8787/debug/config", {
-        method: "PATCH",
-        body: JSON.stringify({
-          MAX_ACTIVE_ROOMS: String(MAX_ACTIVE_ROOMS),
-          ACTIVE_DURATION: String(ACTIVE_DURATION),
-        }),
-      });
-      assert.strictEqual(res.status, 200);
-    }
+    await config({
+      MAX_ACTIVE_ROOMS,
+      ACTIVE_DURATION,
+    });
     for (let i = 0; i < MAX_ACTIVE_ROOMS; i++) {
-      const res = await fetch("http://localhost:8787/api/rooms", {
-        method: "POST",
-      });
+      const res = await request("POST", "/api/rooms");
       const id = await res.text();
       assert.strictEqual(res.status, 200);
       assert.strictEqual(id.length, 64);
       createdRoomIds.push(id);
     }
     {
-      const res = await fetch("http://localhost:8787/api/rooms", {
-        method: "POST",
-      });
+      const res = await request("POST", "/api/rooms");
       assert.strictEqual(res.status, 403);
     }
+    await setTimeout(ACTIVE_DURATION);
+    await clean();
     {
-      await setTimeout(ACTIVE_DURATION);
-      const res = await fetch("http://localhost:8787/debug/clean", {
-        method: "POST",
-      });
-      assert.strictEqual(res.status, 200);
-    }
-    {
-      const res = await fetch("http://localhost:8787/api/rooms", {
-        method: "POST",
-      });
+      const res = await request("POST", "/api/rooms");
       const id = await res.text();
       assert.strictEqual(res.status, 200);
       assert.strictEqual(id.length, 64);
       createdRoomIds.push(id);
     }
     for (const id of createdRoomIds) {
-      const res = await fetch("http://localhost:8787/api/rooms/" + id);
+      const res = await request("GET", "/api/rooms/" + id);
       assert.strictEqual(res.status, 200);
       const room = await res.json();
       assert.strictEqual(room.id, id);
@@ -139,124 +143,74 @@ describe("Whiteboard", function () {
     const ACTIVE_DURATION = 1000;
     const LIVE_DURATION = 2000;
     const createdRoomIds = [];
+    await config({
+      ACTIVE_DURATION,
+      LIVE_DURATION,
+    });
     {
-      const res = await fetch("http://localhost:8787/debug/config", {
-        method: "PATCH",
-        body: JSON.stringify({
-          ACTIVE_DURATION: String(ACTIVE_DURATION),
-          LIVE_DURATION: String(LIVE_DURATION),
-        }),
-      });
-      assert.strictEqual(res.status, 200);
-    }
-    {
-      const res = await fetch("http://localhost:8787/api/rooms", {
-        method: "POST",
-      });
+      const res = await request("POST", "/api/rooms");
       const id = await res.text();
       assert.strictEqual(res.status, 200);
       assert.strictEqual(id.length, 64);
       createdRoomIds.push(id);
     }
-    {
-      await setTimeout(ACTIVE_DURATION);
-      const res = await fetch("http://localhost:8787/debug/clean", {
-        method: "POST",
-      });
-      assert.strictEqual(res.status, 200);
-    }
+    await setTimeout(ACTIVE_DURATION);
+    await clean();
     for (const id of createdRoomIds) {
-      const res = await fetch("http://localhost:8787/api/rooms/" + id);
+      const res = await request("GET", "/api/rooms/" + id);
       assert.strictEqual(res.status, 200);
       const room = await res.json();
       assert.strictEqual(room.active, false);
     }
-    {
-      await setTimeout(LIVE_DURATION - ACTIVE_DURATION);
-      const res = await fetch("http://localhost:8787/debug/clean", {
-        method: "POST",
-      });
-      assert.strictEqual(res.status, 200);
-    }
+    await setTimeout(LIVE_DURATION - ACTIVE_DURATION);
+    await clean();
     for (const id of createdRoomIds) {
-      const res = await fetch("http://localhost:8787/api/rooms/" + id);
+      const res = await request("GET", "/api/rooms/" + id);
       assert.strictEqual(res.status, 404);
     }
   });
   it("accepts websocket connection to a room", async function () {
-    const res = await fetch("http://localhost:8787/api/rooms", {
-      method: "POST",
-    });
+    const res = await request("POST", "/api/rooms");
     const id = await res.text();
     assert.strictEqual(res.status, 200);
     assert.strictEqual(id.length, 64);
-    await useWebsocket(
-      `ws://localhost:8787/api/rooms/${id}/websocket`,
-      async () => {}
-    );
+    await useWebsocket(`/api/rooms/${id}/websocket`, async () => {});
   });
   it("does not accept websocket connection to invalid rooms", async function () {
     // TODO: なぜか Miniflare が 500 を返す
     assert.rejects(async () => {
-      await useWebsocket(`ws://localhost:8787/foo`, async () => {});
+      await useWebsocket(`/foo`, async () => {});
     });
     assert.rejects(async () => {
-      await useWebsocket(
-        `ws://localhost:8787/rooms/foo/websocket`,
-        async () => {}
-      );
+      await useWebsocket(`/rooms/foo/websocket`, async () => {});
     });
     const ACTIVE_DURATION = 1000;
     const LIVE_DURATION = 2000;
-    {
-      const res = await fetch("http://localhost:8787/debug/config", {
-        method: "PATCH",
-        body: JSON.stringify({
-          ACTIVE_DURATION: String(ACTIVE_DURATION),
-          LIVE_DURATION: String(LIVE_DURATION),
-        }),
-      });
-      assert.strictEqual(res.status, 200);
-    }
-    const res = await fetch("http://localhost:8787/api/rooms", {
-      method: "POST",
+    await config({
+      ACTIVE_DURATION,
+      LIVE_DURATION,
     });
+    const res = await request("POST", "/api/rooms");
     const id = await res.text();
     assert.strictEqual(res.status, 200);
-    {
-      await setTimeout(ACTIVE_DURATION);
-      const res = await fetch("http://localhost:8787/debug/clean", {
-        method: "POST",
-      });
-      assert.strictEqual(res.status, 200);
-    }
+    await setTimeout(ACTIVE_DURATION);
+    await clean();
     assert.rejects(async () => {
-      await useWebsocket(
-        `ws://localhost:8787/rooms/${id}/websocket`,
-        async () => {}
-      );
+      await useWebsocket(`/rooms/${id}/websocket`, async () => {});
     });
-    {
-      await setTimeout(LIVE_DURATION - ACTIVE_DURATION);
-      const res = await fetch("http://localhost:8787/debug/clean", {
-        method: "POST",
-      });
-      assert.strictEqual(res.status, 200);
-    }
+    await setTimeout(LIVE_DURATION - ACTIVE_DURATION);
+    await clean();
     assert.rejects(async () => {
-      await useWebsocket(
-        `ws://localhost:8787/rooms/${id}/websocket`,
-        async () => {}
-      );
+      await useWebsocket(`/rooms/${id}/websocket`, async () => {});
     });
   });
 });
 function useWebsocket<T>(
-  url: string,
+  path: string,
   f: (ws: WebSocket) => Promise<T>
 ): Promise<T> {
   return new Promise((resolve, reject) => {
-    const ws = new WebSocket(url, {
+    const ws = new WebSocket(wsRoot + path, {
       perMessageDeflate: false,
     });
     let error: unknown;
