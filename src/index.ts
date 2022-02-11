@@ -7,6 +7,9 @@ type Env = {
   manager: DurableObjectNamespace;
   rooms: DurableObjectNamespace;
   limiters: DurableObjectNamespace;
+  GITHUB_CLIENT_ID: string;
+  GITHUB_CLIENT_SECRET: string;
+  GITHUB_ORG: string;
 };
 type User = {
   id: string;
@@ -158,7 +161,24 @@ const router = Router()
 export default {
   async fetch(request: Request, env: Env) {
     console.log("Root's fetch(): " + request.method, request.url);
-
+    console.log(env);
+    let preconditionOk = true;
+    if (!env.GITHUB_CLIENT_ID) {
+      preconditionOk = false;
+      console.log("GITHUB_CLIENT_ID not found");
+    }
+    if (!env.GITHUB_CLIENT_SECRET) {
+      preconditionOk = false;
+      console.log("GITHUB_CLIENT_SECRET not found");
+    }
+    if (!env.GITHUB_ORG) {
+      preconditionOk = false;
+      console.log("GITHUB_ORG not found");
+    }
+    if (!preconditionOk) {
+      // TODO: CI が落ちないようにする
+      // return new Response("Configuration Error", { status: 500 });
+    }
     const cookie = Cookie.parse(request.headers.get("Cookie") ?? "");
     console.log("cookie:", cookie);
     if (cookie.user_id == null) {
