@@ -174,15 +174,15 @@ describe("Whiteboard", function () {
     const id = await res.text();
     assert.strictEqual(res.status, 200);
     assert.strictEqual(id.length, 64);
-    await useWebsocket(`/api/rooms/${id}/websocket`, async () => {});
+    await useWebsocket("tester", `/api/rooms/${id}/websocket`, async () => {});
   });
   it("does not accept websocket connection to invalid rooms", async function () {
     // TODO: なぜか Miniflare が 500 を返す
     assert.rejects(async () => {
-      await useWebsocket(`/foo`, async () => {});
+      await useWebsocket("a", `/foo`, async () => {});
     });
     assert.rejects(async () => {
-      await useWebsocket(`/api/rooms/foo/websocket`, async () => {});
+      await useWebsocket("a", `/api/rooms/foo/websocket`, async () => {});
     });
     const ACTIVE_DURATION = 1000;
     const LIVE_DURATION = 2000;
@@ -196,12 +196,12 @@ describe("Whiteboard", function () {
     await setTimeout(ACTIVE_DURATION);
     await clean();
     assert.rejects(async () => {
-      await useWebsocket(`/api/rooms/${id}/websocket`, async () => {});
+      await useWebsocket("a", `/api/rooms/${id}/websocket`, async () => {});
     });
     await setTimeout(LIVE_DURATION - ACTIVE_DURATION);
     await clean();
     assert.rejects(async () => {
-      await useWebsocket(`/api/rooms/${id}/websocket`, async () => {});
+      await useWebsocket("a", `/api/rooms/${id}/websocket`, async () => {});
     });
   });
   it("closes all connections when a room is deactivated", async function () {
@@ -213,7 +213,7 @@ describe("Whiteboard", function () {
     assert.strictEqual(res.status, 200);
     const id = await res.text();
     const queue = [];
-    await useWebsocket(`/api/rooms/${id}/websocket`, async () => {
+    await useWebsocket("a", `/api/rooms/${id}/websocket`, async () => {
       await setTimeout(ACTIVE_DURATION);
       await clean();
       await setTimeout(500);
@@ -234,7 +234,7 @@ describe("Whiteboard", function () {
     assert.strictEqual(res.status, 200);
     const id = await res.text();
     const queue = [];
-    await useWebsocket(`/api/rooms/${id}/websocket`, async () => {
+    await useWebsocket("a", `/api/rooms/${id}/websocket`, async () => {
       await setTimeout(LIVE_DURATION);
       await clean();
       await setTimeout(500);
@@ -246,20 +246,70 @@ describe("Whiteboard", function () {
     }
     assert.deepStrictEqual(queue, ["a", "b"]);
   });
+  it("does not allow users to make multiple connections in a room", async function () {
+    const res = await request("POST", "/api/rooms");
+    assert.strictEqual(res.status, 200);
+    const id = await res.text();
+    const queue = [];
+    await useWebsocket("a", `/api/rooms/${id}/websocket`, async () => {
+      await useWebsocket("a", `/api/rooms/${id}/websocket`, async () => {
+        await setTimeout(500);
+        queue.push("b");
+      });
+      await setTimeout(500);
+      queue.push("c");
+    });
+    queue.push("a");
+    while (queue.length < 3) {
+      await setTimeout(100);
+    }
+    assert.deepStrictEqual(queue, ["a", "b", "c"]);
+  });
+  it("allows users to make another connections in another room", async function () {
+    let id1, id2: string;
+    {
+      const res = await request("POST", "/api/rooms");
+      assert.strictEqual(res.status, 200);
+      id1 = await res.text();
+    }
+    {
+      const res = await request("POST", "/api/rooms");
+      assert.strictEqual(res.status, 200);
+      id2 = await res.text();
+    }
+    const queue = [];
+    await useWebsocket("a", `/api/rooms/${id1}/websocket`, async () => {
+      await useWebsocket("a", `/api/rooms/${id2}/websocket`, async () => {
+        await setTimeout(500);
+        queue.push("a");
+      });
+      await setTimeout(500);
+      queue.push("b");
+    });
+    queue.push("c");
+    while (queue.length < 3) {
+      await setTimeout(100);
+    }
+    assert.deepStrictEqual(queue, ["a", "b", "c"]);
+  });
 });
 function useWebsocket<T>(
+  testUserId: string,
   path: string,
   f: (ws: WebSocket) => Promise<T>
 ): Promise<T> {
   return new Promise((resolve, reject) => {
     const ws = new WebSocket(wsRoot + path, {
       perMessageDeflate: false,
+      headers: {
+        "WB-TEST-USER": testUserId,
+      },
     });
     let error: unknown;
     let result: T | undefined;
     let closed = false;
     ws.on("open", () => {
-      console.log("open");
+      console.log(`open ${testUserId}`);
       f(ws)
         .then((r) => {
           result = r;
@@ -274,11 +324,11 @@ function useWebsocket<T>(
         });
     });
     ws.on("error", (e) => {
-      console.log("error", e.message);
+      console.log(`error ${testUserId}:`, e.message);
       error = e;
     });
     ws.on("close", () => {
-      console.log("close");
+      console.log(`close ${testUserId}`);
       closed = true;
       if (error == null) {
         resolve(result!);

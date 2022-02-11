@@ -462,6 +462,13 @@ class RoomState {
       name: userId,
       quit: false,
     };
+    // 同じユーザーは複数の接続を開始できない
+    for (let i = this.sessions.length - 1; i >= 0; i--) {
+      const session = this.sessions[i];
+      if (session.name === userId) {
+        session.webSocket.close(1000); // TODO: quit メッセージが送信されてしまう
+      }
+    }
     this.sessions.push(session);
 
     // 他のユーザの名前を詰めておく
@@ -549,8 +556,6 @@ class RoomState {
       }
     });
 
-    // On "close" and "error" events, remove the WebSocket from the sessions list and broadcast
-    // a quit message.
     const closeOrErrorHandler = (evt: Event) => {
       session.quit = true;
       this.sessions = this.sessions.filter((member) => member !== session);
@@ -582,9 +587,7 @@ class RoomState {
       }
     });
     quitters.forEach((quitter) => {
-      if (quitter.name) {
-        this.broadcast({ quit: quitter.name });
-      }
+      this.broadcast({ quit: quitter.name });
     });
   }
 }
