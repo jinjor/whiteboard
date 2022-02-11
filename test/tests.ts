@@ -178,10 +178,10 @@ describe("Whiteboard", function () {
   });
   it("does not accept websocket connection to invalid rooms", async function () {
     // TODO: なぜか Miniflare が 500 を返す
-    assert.rejects(async () => {
+    await assert.rejects(async () => {
       await useWebsocket("a", `/foo`, async () => {});
     });
-    assert.rejects(async () => {
+    await assert.rejects(async () => {
       await useWebsocket("a", `/api/rooms/foo/websocket`, async () => {});
     });
     const ACTIVE_DURATION = 1000;
@@ -195,12 +195,12 @@ describe("Whiteboard", function () {
     assert.strictEqual(res.status, 200);
     await setTimeout(ACTIVE_DURATION);
     await clean();
-    assert.rejects(async () => {
+    await assert.rejects(async () => {
       await useWebsocket("a", `/api/rooms/${id}/websocket`, async () => {});
     });
     await setTimeout(LIVE_DURATION - ACTIVE_DURATION);
     await clean();
-    assert.rejects(async () => {
+    await assert.rejects(async () => {
       await useWebsocket("a", `/api/rooms/${id}/websocket`, async () => {});
     });
   });
@@ -291,6 +291,55 @@ describe("Whiteboard", function () {
       await setTimeout(100);
     }
     assert.deepStrictEqual(queue, ["a", "b", "c"]);
+  });
+  it("does not allow more than 10 users to enter a room at the same time", async function () {
+    const res = await request("POST", "/api/rooms");
+    assert.strictEqual(res.status, 200);
+    const id = await res.text();
+    const queue = [];
+
+    const success: number[] = [];
+    const failure: number[] = [];
+    const promises: Promise<void>[] = [];
+    [...Array(10).keys()].forEach((i) => {
+      // i = 0...9
+      promises.push(
+        useWebsocket(String(i), `/api/rooms/${id}/websocket`, async () => {
+          await setTimeout(2000);
+        })
+          .then(() => {
+            success.push(i);
+          })
+          .catch(() => {
+            failure.push(i);
+          })
+      );
+    });
+    await setTimeout(1000);
+    [...Array(10).keys()].forEach((i) => {
+      i += 10;
+      // i = 10...19
+      promises.push(
+        useWebsocket(String(i), `/api/rooms/${id}/websocket`, async () => {})
+          .then(() => {
+            success.push(i);
+          })
+          .catch(() => {
+            failure.push(i);
+          })
+      );
+    });
+    await Promise.all(promises);
+    assert.strictEqual(success.length, 10);
+    assert.strictEqual(failure.length, 10);
+    assert.strictEqual(
+      success.some((i) => i >= 10),
+      false
+    );
+    assert.strictEqual(
+      failure.some((i) => i < 10),
+      false
+    );
   });
 });
 function useWebsocket<T>(

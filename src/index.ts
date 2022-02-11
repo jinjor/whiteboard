@@ -404,6 +404,8 @@ export class RoomManager implements DurableObject {
 
 // =======================================================================================
 
+const MAX_ACTIVE_USERS = 10;
+
 const roomRouter = Router()
   .post("/deactivate", async (request: Request, state: RoomState) => {
     await state.disconnectAllSessions();
@@ -414,6 +416,9 @@ const roomRouter = Router()
       return new Response("expected websocket", { status: 400 });
     }
     const userId = request.headers.get("WB-USER-ID")!;
+    if (!state.canStart(userId)) {
+      return new Response("room is full", { status: 403 });
+    }
     const pair = new WebSocketPair();
 
     // We're going to take pair[1] as our end, and return pair[0] to the client.
@@ -445,8 +450,13 @@ class RoomState {
       session.webSocket.close(1000);
     }
   }
-
-  async handleSession(webSocket: WebSocket, userId: string) {
+  canStart(userId: string): boolean {
+    if (this.sessions.some((session) => session.name === userId)) {
+      return true;
+    }
+    return this.sessions.length < MAX_ACTIVE_USERS;
+  }
+  async handleSession(webSocket: WebSocket, userId: string): Promise<void> {
     webSocket.accept();
 
     const limiterId = this.env.limiters.idFromName(userId);
