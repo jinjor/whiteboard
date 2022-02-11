@@ -1,11 +1,15 @@
 // @ts-ignore
 import HTML from "./index.html";
 import { Router } from "itty-router";
+import Cookie from "cookie";
 
 type Env = {
   manager: DurableObjectNamespace;
   rooms: DurableObjectNamespace;
   limiters: DurableObjectNamespace;
+};
+type User = {
+  id: string;
 };
 
 function handleError(request: Request, error: any) {
@@ -91,7 +95,11 @@ const apiRouter = Router({ base: "/api" })
   )
   .get(
     "/rooms/:roomName/websocket",
-    async (request: Request & { params: { roomName: string } }, env: Env) => {
+    async (
+      request: Request & { params: { roomName: string } },
+      env: Env,
+      userId: string
+    ) => {
       const roomName = request.params.roomName;
       let roomId;
       try {
@@ -105,17 +113,24 @@ const apiRouter = Router({ base: "/api" })
       if (res.status !== 200) {
         return new Response("Not found.", { status: 404 });
       }
-
-      // TODO: 部屋がアクティブでなければ 403
-
+      const room: RoomInfo = await res.json();
+      if (!room.active) {
+        // TODO: テスト
+        console.log(room);
+        return new Response("Cannot connect to an inactive room.", {
+          status: 403,
+        });
+      }
       // スタブ（クライアント）が即時に作られる。リモートでは ID が最初に使われた時に必要に応じて作られる。
       const roomStub = env.rooms.get(roomId);
 
-      // TODO: 正確なインターフェイスが知りたい
-      return roomStub.fetch(
-        new URL("https://dummy-url/websocket") as any,
-        request
-      );
+      return roomStub.fetch("https://dummy-url/websocket", {
+        headers: {
+          Connection: "Upgrade",
+          Upgrade: "websocket",
+          "WB-USER-ID": userId,
+        },
+      });
     }
   );
 
@@ -143,9 +158,35 @@ const router = Router()
 export default {
   async fetch(request: Request, env: Env) {
     console.log("Root's fetch(): " + request.method, request.url);
-    return router.handle(request, env).catch((error: any) => {
-      return handleError(request, error);
-    });
+
+    const cookie = Cookie.parse(request.headers.get("Cookie") ?? "");
+    console.log("cookie:", cookie);
+    if (cookie.user_id == null) {
+      const testUserId = request.headers.get("WB-TEST-USER");
+      if (testUserId != null) {
+        cookie.user_id = testUserId;
+      }
+    }
+    if (cookie.user_id == null) {
+      // return new Response("Not authenticated.", { status: 401 });
+      cookie.user_id = "tmp";
+    }
+    const userId = cookie.user_id;
+
+    const res: Response = await router
+      .handle(request, env, userId)
+      .catch((error: any) => {
+        return handleError(request, error);
+      });
+    res.headers.set(
+      "Set-Cookie",
+      Cookie.serialize("user_id", userId, {
+        httpOnly: true,
+        maxAge: 60 * 60 * 24 * 7, // 1 week
+        sameSite: "strict",
+      })
+    );
+    return res;
   },
   async scheduled(event: { cron: string; scheduledTime: number }, env: Env) {
     await clean(env);
@@ -368,16 +409,15 @@ const roomRouter = Router()
     await state.disconnectAllSessions();
     return new Response("null", { status: 200 });
   })
-  .all("/websocket", async (request: Request, state: RoomState) => {
-    if (request.headers.get("Upgrade") != "websocket") {
+  .get("/websocket", async (request: Request, state: RoomState) => {
+    if (request.headers.get("Upgrade") !== "websocket") {
       return new Response("expected websocket", { status: 400 });
     }
-    // TODO: ip は今回多分使わない
-    const ip = request.headers.get("CF-Connecting-IP")!;
+    const userId = request.headers.get("WB-USER-ID")!;
     const pair = new WebSocketPair();
 
     // We're going to take pair[1] as our end, and return pair[0] to the client.
-    await state.handleSession(pair[1], ip);
+    await state.handleSession(pair[1], userId);
 
     // Now we return the other end of the pair to the client.
     // 101 Switching Protocols
@@ -406,30 +446,29 @@ class RoomState {
     }
   }
 
-  // handleSession() implements our WebSocket-based chat protocol.
-  async handleSession(webSocket: WebSocket, ip: string) {
-    // Accept our end of the WebSocket. This tells the runtime that we'll be terminating the
-    // WebSocket in JavaScript, not sending it elsewhere.
+  async handleSession(webSocket: WebSocket, userId: string) {
     webSocket.accept();
 
-    // Set up our rate limiter client.
-    const limiterId = this.env.limiters.idFromName(ip);
+    const limiterId = this.env.limiters.idFromName(userId);
     const limiter = new RateLimiterClient(
       () => this.env.limiters.get(limiterId),
       (err) => webSocket.close(1011, err.stack)
     );
 
     // クライアントから info が送られてくるまで blockedMessages にキューしておく
-    const session: ChatSession = { webSocket, blockedMessages: [] };
+    const session: ChatSession = {
+      webSocket,
+      blockedMessages: [],
+      name: userId,
+      quit: false,
+    };
     this.sessions.push(session);
 
     // 他のユーザの名前を詰めておく
     this.sessions.forEach((otherSession) => {
-      if (otherSession.name) {
-        session.blockedMessages.push(
-          JSON.stringify({ joined: otherSession.name })
-        );
-      }
+      session.blockedMessages.push(
+        JSON.stringify({ joined: otherSession.name })
+      );
     });
 
     // 最終 100 メッセージを詰めておく
@@ -440,8 +479,7 @@ class RoomState {
       session.blockedMessages.push(value);
     });
 
-    // Set event handlers to receive messages.
-    let receivedUserInfo = false;
+    let initialized = false;
     webSocket.addEventListener("message", async (msg: MessageEvent) => {
       try {
         if (session.quit) {
@@ -469,17 +507,7 @@ class RoomState {
         // I guess we'll use JSON.
         let data = JSON.parse(msg.data as string);
 
-        if (!receivedUserInfo) {
-          // 初回はユーザー情報を受け取る
-          session.name = "" + (data.name || "anonymous");
-
-          // 1009: Message too big
-          if (session.name.length > 32) {
-            webSocket.send(JSON.stringify({ error: "Name too long." }));
-            webSocket.close(1009, "Name too long.");
-            return;
-          }
-
+        if (!initialized) {
           // 溜めといたやつを送る
           session.blockedMessages.forEach((queued) => {
             webSocket.send(queued);
@@ -491,8 +519,7 @@ class RoomState {
 
           webSocket.send(JSON.stringify({ ready: true }));
 
-          receivedUserInfo = true;
-
+          initialized = true;
           return;
         }
 
@@ -527,9 +554,7 @@ class RoomState {
     const closeOrErrorHandler = (evt: Event) => {
       session.quit = true;
       this.sessions = this.sessions.filter((member) => member !== session);
-      if (session.name) {
-        this.broadcast({ quit: session.name });
-      }
+      this.broadcast({ quit: session.name });
     };
     webSocket.addEventListener("close", closeOrErrorHandler);
     webSocket.addEventListener("error", closeOrErrorHandler);
@@ -545,25 +570,17 @@ class RoomState {
     // Iterate over all the sessions sending them messages.
     const quitters: ChatSession[] = [];
     this.sessions = this.sessions.filter((session) => {
-      if (session.name) {
-        try {
-          session.webSocket.send(message);
-          return true;
-        } catch (err) {
-          // Whoops, this connection is dead. Remove it from the list and arrange to notify
-          // everyone below.
-          session.quit = true;
-          quitters.push(session);
-          return false;
-        }
-      } else {
-        // This session hasn't sent the initial user info message yet, so we're not sending them
-        // messages yet (no secret lurking!). Queue the message to be sent later.
-        session.blockedMessages.push(message);
+      try {
+        session.webSocket.send(message);
         return true;
+      } catch (err) {
+        // Whoops, this connection is dead. Remove it from the list and arrange to notify
+        // everyone below.
+        session.quit = true;
+        quitters.push(session);
+        return false;
       }
     });
-
     quitters.forEach((quitter) => {
       if (quitter.name) {
         this.broadcast({ quit: quitter.name });
@@ -573,8 +590,8 @@ class RoomState {
 }
 
 type ChatSession = {
-  name?: string;
-  quit?: boolean;
+  name: string;
+  quit: boolean;
   webSocket: WebSocket;
   blockedMessages: string[];
 };
