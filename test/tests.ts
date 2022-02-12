@@ -13,7 +13,12 @@ async function request(
   path: string,
   body?: any
 ): Promise<Response> {
-  const init: any = { method };
+  const init: any = {
+    method,
+    headers: {
+      "WB-TEST-USER": "test",
+    },
+  };
   if (body != null) {
     init.body = JSON.stringify(body);
   }

@@ -2,6 +2,7 @@
 import HTML from "./index.html";
 import { Router } from "itty-router";
 import Cookie from "cookie";
+import { encrypt, decrypt } from "./crypto";
 
 type Env = {
   manager: DurableObjectNamespace;
@@ -158,6 +159,133 @@ const router = Router()
   .all("/debug/*", debugRouter.handle)
   .all("*", () => new Response("Not found.", { status: 404 }));
 
+const GITHUB_SCOPE = "read:org";
+const COOKIE_SECRET = "test"; // TODO
+
+const authRouter = Router()
+  .get("/callback/github", async (request: Request, env: Env) => {
+    const cookie = Cookie.parse(request.headers.get("Cookie") ?? "");
+    const code = new URL(request.url).searchParams.get("code");
+    if (code == null) {
+      return new Response("Not found.", { status: 404 });
+    }
+    const atRes = await fetch(
+      `https://github.com/login/oauth/access_token?client_id=${env.GITHUB_CLIENT_ID}&client_secret=${env.GITHUB_CLIENT_SECRET}&code=${code}`,
+      {
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+        },
+      }
+    );
+    const { access_token, scope } = await atRes.json();
+    if (scope !== GITHUB_SCOPE) {
+      return new Response("Not found.", { status: 404 });
+    }
+    const userRes = await fetch("https://api.github.com/user", {
+      headers: {
+        Accept: "application/vnd.github.v3+json",
+        Authorization: `token ${access_token}`,
+        "User-Agent": "node.js",
+      },
+    });
+    const user: any = await userRes.json();
+    const { login } = user;
+    console.log("login:", login);
+    const membershipRes = await fetch(
+      `https://api.github.com/orgs/${env.GITHUB_ORG}/memberships/${login}`,
+      {
+        headers: {
+          Accept: "application/vnd.github.v3+json",
+          Authorization: `token ${access_token}`,
+          "User-Agent": "node.js",
+        },
+      }
+    );
+    const isMemberOfOrg = membershipRes.status === 204;
+    console.log("isMemberOfOrg:", isMemberOfOrg);
+    // const userId = isMemberOfOrg ? login : "_guest"; // "_guest" is an invalid github name
+    const userId = login; // TODO: for debug
+
+    const res = new Response(null, {
+      status: 302,
+      headers: {
+        "Set-Cookie": Cookie.serialize(
+          "session",
+          await encrypt(COOKIE_SECRET, userId),
+          {
+            path: "/",
+            httpOnly: true,
+            maxAge: 60 * 60 * 24 * 7, // 1 week
+            sameSite: "strict",
+          }
+        ),
+        Location: cookie.original_url ?? `/`,
+      },
+    });
+    return res;
+  })
+  .all("*", async (request: Request, env: Env) => {
+    const cookie = Cookie.parse(request.headers.get("Cookie") ?? "");
+    console.log("cookie:", cookie);
+    let userId;
+    if (cookie.session == null) {
+      const testUserId = request.headers.get("WB-TEST-USER");
+      if (testUserId != null) {
+        userId = testUserId;
+      } else {
+        return new Response(null, {
+          status: 302,
+          headers: {
+            "Set-Cookie": Cookie.serialize("original_url", request.url, {
+              path: "/",
+              httpOnly: true,
+              maxAge: 60,
+              sameSite: "strict",
+            }),
+            Location: `https://github.com/login/oauth/authorize?client_id=${env.GITHUB_CLIENT_ID}&scope=${GITHUB_SCOPE}`,
+          },
+        });
+      }
+    } else {
+      try {
+        userId = await decrypt(COOKIE_SECRET, cookie.session);
+      } catch (e) {
+        return new Response(null, {
+          status: 302,
+          headers: {
+            "Set-Cookie": Cookie.serialize("original_url", request.url, {
+              path: "/",
+              httpOnly: true,
+              maxAge: 60,
+              sameSite: "strict",
+            }),
+            Location: `https://github.com/login/oauth/authorize?client_id=${env.GITHUB_CLIENT_ID}&scope=${GITHUB_SCOPE}`,
+          },
+        });
+      }
+    }
+    console.log("userId:", userId);
+    if (userId === "_guest") {
+      return new Response("Not a member of org.", { status: 403 });
+    }
+    const res: Response = await router
+      .handle(request, env, userId)
+      .catch((error: any) => {
+        return handleError(request, error);
+      });
+    res.headers.set(
+      "Set-Cookie",
+      Cookie.serialize("session", await encrypt(COOKIE_SECRET, userId), {
+        path: "/",
+        httpOnly: true,
+        maxAge: 60 * 60 * 24 * 7, // 1 week
+        sameSite: "strict",
+      })
+    );
+    return res;
+  });
+
 export default {
   async fetch(request: Request, env: Env) {
     console.log("Root's fetch(): " + request.method, request.url);
@@ -179,34 +307,9 @@ export default {
       // TODO: CI が落ちないようにする
       // return new Response("Configuration Error", { status: 500 });
     }
-    const cookie = Cookie.parse(request.headers.get("Cookie") ?? "");
-    console.log("cookie:", cookie);
-    if (cookie.user_id == null) {
-      const testUserId = request.headers.get("WB-TEST-USER");
-      if (testUserId != null) {
-        cookie.user_id = testUserId;
-      }
-    }
-    if (cookie.user_id == null) {
-      // return new Response("Not authenticated.", { status: 401 });
-      cookie.user_id = "tmp";
-    }
-    const userId = cookie.user_id;
-
-    const res: Response = await router
-      .handle(request, env, userId)
-      .catch((error: any) => {
-        return handleError(request, error);
-      });
-    res.headers.set(
-      "Set-Cookie",
-      Cookie.serialize("user_id", userId, {
-        httpOnly: true,
-        maxAge: 60 * 60 * 24 * 7, // 1 week
-        sameSite: "strict",
-      })
-    );
-    return res;
+    return await authRouter.handle(request, env).catch((error: any) => {
+      return handleError(request, error);
+    });
   },
   async scheduled(event: { cron: string; scheduledTime: number }, env: Env) {
     await clean(env);
