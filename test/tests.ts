@@ -301,7 +301,6 @@ describe("Whiteboard", function () {
     const res = await request("POST", "/api/rooms");
     assert.strictEqual(res.status, 200);
     const id = await res.text();
-    const queue = [];
 
     const success: number[] = [];
     const failure: number[] = [];
@@ -345,6 +344,37 @@ describe("Whiteboard", function () {
       failure.some((i) => i < 10),
       false
     );
+  });
+  it("send `init` event first, followed by `join` event", async function () {
+    const res = await request("POST", "/api/rooms");
+    assert.strictEqual(res.status, 200);
+    const id = await res.text();
+    const received: any[] = [];
+    await useWebsocket(
+      "a",
+      `/api/rooms/${id}/websocket`,
+      async (ws: WebSocket) => {
+        ws.on("message", (event: string) => {
+          received.push(JSON.parse(event));
+        });
+        for (let i = 0; i < 10; i++) {
+          if (received.length < 2) {
+            await setTimeout(50);
+          }
+        }
+      }
+    );
+    assert.deepStrictEqual(received, [
+      {
+        kind: "init",
+        objects: {},
+        members: ["a"],
+      },
+      {
+        kind: "join",
+        name: "a",
+      },
+    ]);
   });
 });
 function useWebsocket<T>(

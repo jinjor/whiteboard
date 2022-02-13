@@ -50,12 +50,11 @@ const roomRouter = Router()
 class RoomState {
   private storage: DurableObjectStorage;
   private env: Env;
-  private sessions: ChatSession[];
+  private sessions: Session[];
   private lastTimestamp: number;
   constructor(controller: any, env: Env) {
     this.storage = controller.storage;
     this.env = env;
-    // 各クライアントの WebSocket object とメタデータ
     this.sessions = [];
     // 同時にメッセージが来てもタイムスタンプを単調増加にするための仕掛け
     this.lastTimestamp = 0;
@@ -82,10 +81,8 @@ class RoomState {
       (err) => webSocket.close(1011, err.stack)
     );
 
-    // クライアントから info が送られてくるまで blockedMessages にキューしておく
-    const session: ChatSession = {
+    const session: Session = {
       webSocket,
-      blockedMessages: [],
       name: userId,
       quit: false,
     };
@@ -98,22 +95,6 @@ class RoomState {
     }
     this.sessions.push(session);
 
-    // 他のユーザの名前を詰めておく
-    this.sessions.forEach((otherSession) => {
-      session.blockedMessages.push(
-        JSON.stringify({ joined: otherSession.name })
-      );
-    });
-
-    // 最終 100 メッセージを詰めておく
-    const storage = await this.storage.list({ reverse: true, limit: 100 });
-    const backlog = [...storage.values()] as any[];
-    backlog.reverse();
-    backlog.forEach((value) => {
-      session.blockedMessages.push(value);
-    });
-
-    let initialized = false;
     webSocket.addEventListener("message", async (msg: MessageEvent) => {
       try {
         if (session.quit) {
@@ -128,41 +109,24 @@ class RoomState {
           return;
         }
 
-        // Check if the user is over their rate limit and reject the message if so.
         if (!limiter.checkLimit()) {
           webSocket.send(
             JSON.stringify({
-              error: "Your IP is being rate-limited, please try again later.",
+              error: "You are being rate-limited, please try again later.",
             })
           );
           return;
         }
 
-        // I guess we'll use JSON.
         let data = JSON.parse(msg.data as string);
-
-        if (!initialized) {
-          // 溜めといたやつを送る
-          session.blockedMessages.forEach((queued) => {
-            webSocket.send(queued);
-          });
-          session.blockedMessages = [];
-
-          // 名前を知らせる
-          this.broadcast({ joined: session.name });
-
-          webSocket.send(JSON.stringify({ ready: true }));
-
-          initialized = true;
-          return;
-        }
-
-        // Construct sanitized message for storage and broadcast.
+        // サニタイズ
         data = { name: session.name, message: "" + data.message };
 
         // クライアントでもチェックしているが迂回された場合
         if (data.message.length > 256) {
-          webSocket.send(JSON.stringify({ error: "Message too long." }));
+          webSocket.send(
+            JSON.stringify({ kind: "error", message: "Message too long." })
+          );
           return;
         }
 
@@ -171,39 +135,47 @@ class RoomState {
         this.lastTimestamp = data.timestamp;
 
         // Broadcast the message to all other WebSockets.
-        const dataStr = JSON.stringify(data);
-        this.broadcast(dataStr);
+        this.broadcast(data);
 
         // Save message.
         const key = new Date(data.timestamp).toISOString();
-        await this.storage.put(key, dataStr);
+        await this.storage.put(key, data);
+
+        const objects = await this.storage.get("objects");
+        await this.storage.put("objects", objects);
       } catch (err: any) {
-        // stack 返しているので本番ではやめる
-        webSocket.send(JSON.stringify({ error: err.stack }));
+        console.log(err);
+        webSocket.send(
+          JSON.stringify({ kind: "error", message: "unexpected error" })
+        );
       }
     });
 
     const closeOrErrorHandler = (evt: Event) => {
       session.quit = true;
       this.sessions = this.sessions.filter((member) => member !== session);
-      this.broadcast({ quit: session.name });
+      this.broadcast({ kind: "quit", name: session.name });
     };
     webSocket.addEventListener("close", closeOrErrorHandler);
     webSocket.addEventListener("error", closeOrErrorHandler);
+
+    let objects = await this.storage.get("objects");
+    if (objects == null) {
+      objects = {};
+      await this.storage.put("objects", {});
+    }
+    const members = this.sessions.map((s) => s.name);
+    webSocket.send(
+      JSON.stringify({ kind: "init", objects: objects ?? {}, members })
+    );
+    this.broadcast({ kind: "join", name: session.name });
   }
 
-  // broadcast() broadcasts a message to all clients.
   private broadcast(message: any) {
-    // Apply JSON if we weren't given a string to start with.
-    if (typeof message !== "string") {
-      message = JSON.stringify(message);
-    }
-
-    // Iterate over all the sessions sending them messages.
-    const quitters: ChatSession[] = [];
+    const quitters: Session[] = [];
     this.sessions = this.sessions.filter((session) => {
       try {
-        session.webSocket.send(message);
+        session.webSocket.send(JSON.stringify(message));
         return true;
       } catch (err) {
         // Whoops, this connection is dead. Remove it from the list and arrange to notify
@@ -214,16 +186,15 @@ class RoomState {
       }
     });
     quitters.forEach((quitter) => {
-      this.broadcast({ quit: quitter.name });
+      this.broadcast({ kind: "quit", name: quitter.name });
     });
   }
 }
 
-type ChatSession = {
+type Session = {
   name: string;
   quit: boolean;
   webSocket: WebSocket;
-  blockedMessages: string[];
 };
 
 export class ChatRoom implements DurableObject {
