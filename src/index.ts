@@ -3,6 +3,7 @@ import HTML from "./index.html";
 import { Router } from "itty-router";
 import Cookie from "cookie";
 import { encrypt, decrypt } from "./crypto";
+import * as github from "./github";
 
 type Env = {
   manager: DurableObjectNamespace;
@@ -169,40 +170,21 @@ const authRouter = Router()
     if (code == null) {
       return new Response("Not found.", { status: 404 });
     }
-    const atRes = await fetch(
-      `https://github.com/login/oauth/access_token?client_id=${env.GITHUB_CLIENT_ID}&client_secret=${env.GITHUB_CLIENT_SECRET}&code=${code}`,
-      {
-        method: "POST",
-        headers: {
-          Accept: "application/json",
-        },
-      }
+    const { accessToken, scope } = await github.getAccessToken(
+      env.GITHUB_CLIENT_ID,
+      env.GITHUB_CLIENT_SECRET,
+      code
     );
-    const { access_token, scope } = await atRes.json();
     if (scope !== GITHUB_SCOPE) {
       return new Response("Not found.", { status: 404 });
     }
-    const userRes = await fetch("https://api.github.com/user", {
-      headers: {
-        Accept: "application/vnd.github.v3+json",
-        Authorization: `token ${access_token}`,
-        "User-Agent": "node.js",
-      },
-    });
-    const user: any = await userRes.json();
-    const { login } = user;
+    const login = await github.getUserLogin(accessToken);
     console.log("login:", login);
-    const membershipRes = await fetch(
-      `https://api.github.com/orgs/${env.GITHUB_ORG}/memberships/${login}`,
-      {
-        headers: {
-          Accept: "application/vnd.github.v3+json",
-          Authorization: `token ${access_token}`,
-          "User-Agent": "node.js",
-        },
-      }
+    const isMemberOfOrg = await github.isUserBelongsOrg(
+      accessToken,
+      login,
+      env.GITHUB_ORG
     );
-    const isMemberOfOrg = membershipRes.status === 204;
     console.log("isMemberOfOrg:", isMemberOfOrg);
     // const userId = isMemberOfOrg ? login : "_guest"; // "_guest" is an invalid github name
     const userId = login; // TODO: for debug
@@ -233,37 +215,25 @@ const authRouter = Router()
       const testUserId = request.headers.get("WB-TEST-USER");
       if (testUserId != null) {
         userId = testUserId;
-      } else {
-        return new Response(null, {
-          status: 302,
-          headers: {
-            "Set-Cookie": Cookie.serialize("original_url", request.url, {
-              path: "/",
-              httpOnly: true,
-              maxAge: 60,
-              sameSite: "strict",
-            }),
-            Location: `https://github.com/login/oauth/authorize?client_id=${env.GITHUB_CLIENT_ID}&scope=${GITHUB_SCOPE}`,
-          },
-        });
       }
     } else {
       try {
         userId = await decrypt(COOKIE_SECRET, cookie.session);
-      } catch (e) {
-        return new Response(null, {
-          status: 302,
-          headers: {
-            "Set-Cookie": Cookie.serialize("original_url", request.url, {
-              path: "/",
-              httpOnly: true,
-              maxAge: 60,
-              sameSite: "strict",
-            }),
-            Location: `https://github.com/login/oauth/authorize?client_id=${env.GITHUB_CLIENT_ID}&scope=${GITHUB_SCOPE}`,
-          },
-        });
-      }
+      } catch (e) {}
+    }
+    if (userId == null) {
+      return new Response(null, {
+        status: 302,
+        headers: {
+          "Set-Cookie": Cookie.serialize("original_url", request.url, {
+            path: "/",
+            httpOnly: true,
+            maxAge: 60,
+            sameSite: "strict",
+          }),
+          Location: github.makeFormUrl(env.GITHUB_CLIENT_ID, GITHUB_SCOPE),
+        },
+      });
     }
     console.log("userId:", userId);
     if (userId === "_guest") {
