@@ -16,6 +16,8 @@ type Env = {
   GITHUB_CLIENT_ID: string;
   GITHUB_CLIENT_SECRET: string;
   GITHUB_ORG: string;
+  COOKIE_SECRET: string;
+  ENVIRONMENT: string;
 };
 
 function handleError(request: Request, error: any) {
@@ -157,12 +159,18 @@ const router = Router()
     });
   })
   .all("/api/*", apiRouter.handle)
-  // TODO: テストの場合のみに制限
-  .all("/debug/*", debugRouter.handle)
+  .all(
+    "/debug/*",
+    (request: Request, env: Env) => {
+      if (env.ENVIRONMENT !== "test") {
+        return new Response("Not found.", { status: 404 });
+      }
+    },
+    debugRouter.handle
+  )
   .all("*", () => new Response("Not found.", { status: 404 }));
 
 const GITHUB_SCOPE = "read:org";
-const COOKIE_SECRET = "test"; // TODO
 
 const authRouter = Router()
   .get("/callback/github", async (request: Request, env: Env) => {
@@ -195,7 +203,7 @@ const authRouter = Router()
       headers: {
         "Set-Cookie": Cookie.serialize(
           "session",
-          await encrypt(COOKIE_SECRET, userId),
+          await encrypt(env.COOKIE_SECRET, userId),
           {
             path: "/",
             httpOnly: true,
@@ -219,7 +227,7 @@ const authRouter = Router()
       }
     } else {
       try {
-        userId = await decrypt(COOKIE_SECRET, cookie.session);
+        userId = await decrypt(env.COOKIE_SECRET, cookie.session);
       } catch (e) {}
     }
     if (userId == null) {
@@ -247,7 +255,7 @@ const authRouter = Router()
       });
     res.headers.set(
       "Set-Cookie",
-      Cookie.serialize("session", await encrypt(COOKIE_SECRET, userId), {
+      Cookie.serialize("session", await encrypt(env.COOKIE_SECRET, userId), {
         path: "/",
         httpOnly: true,
         maxAge: 60 * 60 * 24 * 7, // 1 week
@@ -262,6 +270,10 @@ export default {
     console.log("Root's fetch(): " + request.method, request.url);
     console.log(env);
     let preconditionOk = true;
+    if (!["prd", "dev", "test"].includes(env.ENVIRONMENT)) {
+      preconditionOk = false;
+      console.log("ENVIRONMENT not valid");
+    }
     if (!env.GITHUB_CLIENT_ID) {
       preconditionOk = false;
       console.log("GITHUB_CLIENT_ID not found");
@@ -274,9 +286,12 @@ export default {
       preconditionOk = false;
       console.log("GITHUB_ORG not found");
     }
-    if (!preconditionOk) {
-      // TODO: CI が落ちないようにする
-      // return new Response("Configuration Error", { status: 500 });
+    if (!env.COOKIE_SECRET) {
+      preconditionOk = false;
+      console.log("COOKIE_SECRET not found");
+    }
+    if (env.ENVIRONMENT !== "test" && !preconditionOk) {
+      return new Response("Configuration Error", { status: 500 });
     }
     return await authRouter.handle(request, env).catch((error: any) => {
       return handleError(request, error);

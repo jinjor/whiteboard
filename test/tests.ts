@@ -41,7 +41,7 @@ describe("Whiteboard", function () {
   this.timeout(10 * 1000);
   let p: ChildProcess;
   before(async function () {
-    p = spawn("npx", ["miniflare"], {
+    p = spawn("npx", ["miniflare", "-e", ".env.test"], {
       stdio: "inherit",
     });
     p.on("error", (err) => {
