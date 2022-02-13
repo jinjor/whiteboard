@@ -54,8 +54,7 @@
             return;
           }
           addLog("Found room: " + roomName);
-          const userName = "Jinjor";
-          join(hostName, roomName, userName);
+          join(hostName, roomName);
           break;
         default:
           addLog("Not a room.");
@@ -64,7 +63,7 @@
     })();
 
     let currentWebSocket = null;
-    function join(hostName, roomName, userName) {
+    function join(hostName, roomName) {
       const ws = new WebSocket(
         // TODO: wss に
         // "wss://" + hostName + "/api/rooms/" + roomName + "/websocket"
@@ -72,21 +71,10 @@
       );
       ws.addEventListener("open", (event) => {
         currentWebSocket = ws;
-        ws.send(JSON.stringify({ name: userName }));
       });
       ws.addEventListener("message", (event) => {
         const data = JSON.parse(event.data);
-        if (data.error != null) {
-          addLog(data.error);
-        } else if (data.joined) {
-          addLog(data.joined + " joined.");
-        } else if (data.quit) {
-          addLog(data.joined + " quitted.");
-        } else if (data.ready) {
-          addLog("ready");
-        } else {
-          addLog(data.timestamp + " " + data.name + ": " + data.message);
-        }
+        addLog(JSON.stringify(data));
       });
       ws.addEventListener("close", (event) => {
         addLog("WebSocket closed: " + event.code + " " + event.reason);
@@ -105,7 +93,12 @@
 
     document.body.onclick = () => {
       if (currentWebSocket) {
-        currentWebSocket.send(JSON.stringify({ message: "clicked" }));
+        currentWebSocket.send(
+          JSON.stringify({
+            id: String(Date.now()).padStart(32, "0"),
+            message: "clicked",
+          })
+        );
       }
     };
   </script>

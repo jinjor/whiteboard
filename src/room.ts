@@ -117,32 +117,47 @@ class RoomState {
           );
           return;
         }
-
-        let data = JSON.parse(msg.data as string);
-        // サニタイズ
-        data = { name: session.name, message: "" + data.message };
-
-        // クライアントでもチェックしているが迂回された場合
-        if (data.message.length > 256) {
+        const received = JSON.parse(msg.data as string);
+        // バリデーション
+        const id = received.id;
+        if (id == null || id.length !== 32) {
           webSocket.send(
-            JSON.stringify({ kind: "error", message: "Message too long." })
+            JSON.stringify({ kind: "error", message: "invalid message" })
           );
           return;
         }
-
         // タイムスタンプを単調増加に
-        data.timestamp = Math.max(Date.now(), this.lastTimestamp + 1);
-        this.lastTimestamp = data.timestamp;
+        const timestamp = Math.max(Date.now(), this.lastTimestamp + 1);
+        this.lastTimestamp = timestamp;
 
-        // Broadcast the message to all other WebSockets.
-        this.broadcast(data);
+        const data = {
+          timestamp,
+          name: session.name,
+          kind: "add_text",
+          id,
+          text: "foo",
+          x: 100,
+          y: 100,
+        };
+        const objects: any = await this.storage.get("objects");
 
-        // Save message.
-        const key = new Date(data.timestamp).toISOString();
-        await this.storage.put(key, data);
-
-        const objects = await this.storage.get("objects");
+        switch (data.kind) {
+          case "add_text": {
+            objects[data.id] = {
+              id: data.id,
+              kind: "text",
+              text: data.text,
+              x: data.x,
+              y: data.y,
+              revision: 1,
+              lastEditedAt: data.timestamp,
+              lastEditedBy: data.name,
+            };
+            break;
+          }
+        }
         await this.storage.put("objects", objects);
+        this.broadcast(data);
       } catch (err: any) {
         console.log(err);
         webSocket.send(
