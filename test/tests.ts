@@ -37,6 +37,14 @@ async function clean(): Promise<void> {
   assert.strictEqual(res.status, 200);
 }
 
+async function createRoom(): Promise<string> {
+  const res1 = await request("POST", "/api/rooms");
+  assert.strictEqual(res1.status, 200);
+  const id = await res1.text();
+  assert.strictEqual(id.length, 64);
+  return id;
+}
+
 describe("Whiteboard", function () {
   this.timeout(10 * 1000);
   let p: ChildProcess;
@@ -98,10 +106,7 @@ describe("Whiteboard", function () {
     }
   });
   it("creates rooms", async function () {
-    const res = await request("POST", "/api/rooms");
-    const id = await res.text();
-    assert.strictEqual(res.status, 200);
-    assert.strictEqual(id.length, 64);
+    const id = await createRoom();
     {
       const res = await request("GET", "/api/rooms/" + id);
       assert.strictEqual(res.status, 200);
@@ -118,10 +123,7 @@ describe("Whiteboard", function () {
       ACTIVE_DURATION,
     });
     for (let i = 0; i < MAX_ACTIVE_ROOMS; i++) {
-      const res = await request("POST", "/api/rooms");
-      const id = await res.text();
-      assert.strictEqual(res.status, 200);
-      assert.strictEqual(id.length, 64);
+      const id = await createRoom();
       createdRoomIds.push(id);
     }
     {
@@ -131,10 +133,7 @@ describe("Whiteboard", function () {
     await setTimeout(ACTIVE_DURATION);
     await clean();
     {
-      const res = await request("POST", "/api/rooms");
-      const id = await res.text();
-      assert.strictEqual(res.status, 200);
-      assert.strictEqual(id.length, 64);
+      const id = await createRoom();
       createdRoomIds.push(id);
     }
     for (const id of createdRoomIds) {
@@ -153,10 +152,7 @@ describe("Whiteboard", function () {
       LIVE_DURATION,
     });
     {
-      const res = await request("POST", "/api/rooms");
-      const id = await res.text();
-      assert.strictEqual(res.status, 200);
-      assert.strictEqual(id.length, 64);
+      const id = await createRoom();
       createdRoomIds.push(id);
     }
     await setTimeout(ACTIVE_DURATION);
@@ -175,10 +171,7 @@ describe("Whiteboard", function () {
     }
   });
   it("accepts websocket connection to a room", async function () {
-    const res = await request("POST", "/api/rooms");
-    const id = await res.text();
-    assert.strictEqual(res.status, 200);
-    assert.strictEqual(id.length, 64);
+    const id = await createRoom();
     await useWebsocket("tester", `/api/rooms/${id}/websocket`, async () => {});
   });
   it("does not accept websocket connection to invalid rooms", async function () {
@@ -195,9 +188,7 @@ describe("Whiteboard", function () {
       ACTIVE_DURATION,
       LIVE_DURATION,
     });
-    const res = await request("POST", "/api/rooms");
-    const id = await res.text();
-    assert.strictEqual(res.status, 200);
+    const id = await createRoom();
     await setTimeout(ACTIVE_DURATION);
     await clean();
     await assert.rejects(async () => {
@@ -214,9 +205,7 @@ describe("Whiteboard", function () {
     await config({
       ACTIVE_DURATION,
     });
-    const res = await request("POST", "/api/rooms");
-    assert.strictEqual(res.status, 200);
-    const id = await res.text();
+    const id = await createRoom();
     const queue = [];
     await useWebsocket("a", `/api/rooms/${id}/websocket`, async () => {
       await setTimeout(ACTIVE_DURATION);
@@ -235,9 +224,7 @@ describe("Whiteboard", function () {
     await config({
       LIVE_DURATION,
     });
-    const res = await request("POST", "/api/rooms");
-    assert.strictEqual(res.status, 200);
-    const id = await res.text();
+    const id = await createRoom();
     const queue = [];
     await useWebsocket("a", `/api/rooms/${id}/websocket`, async () => {
       await setTimeout(LIVE_DURATION);
@@ -252,9 +239,7 @@ describe("Whiteboard", function () {
     assert.deepStrictEqual(queue, ["a", "b"]);
   });
   it("does not allow users to make multiple connections in a room", async function () {
-    const res = await request("POST", "/api/rooms");
-    assert.strictEqual(res.status, 200);
-    const id = await res.text();
+    const id = await createRoom();
     const queue = [];
     await useWebsocket("a", `/api/rooms/${id}/websocket`, async () => {
       await useWebsocket("a", `/api/rooms/${id}/websocket`, async () => {
@@ -271,17 +256,8 @@ describe("Whiteboard", function () {
     assert.deepStrictEqual(queue, ["a", "b", "c"]);
   });
   it("allows users to make another connections in another room", async function () {
-    let id1, id2: string;
-    {
-      const res = await request("POST", "/api/rooms");
-      assert.strictEqual(res.status, 200);
-      id1 = await res.text();
-    }
-    {
-      const res = await request("POST", "/api/rooms");
-      assert.strictEqual(res.status, 200);
-      id2 = await res.text();
-    }
+    const id1 = await createRoom();
+    const id2 = await createRoom();
     const queue = [];
     await useWebsocket("a", `/api/rooms/${id1}/websocket`, async () => {
       await useWebsocket("a", `/api/rooms/${id2}/websocket`, async () => {
@@ -298,9 +274,7 @@ describe("Whiteboard", function () {
     assert.deepStrictEqual(queue, ["a", "b", "c"]);
   });
   it("does not allow more than 10 users to enter a room at the same time", async function () {
-    const res = await request("POST", "/api/rooms");
-    assert.strictEqual(res.status, 200);
-    const id = await res.text();
+    const id = await createRoom();
 
     const success: number[] = [];
     const failure: number[] = [];
@@ -345,10 +319,8 @@ describe("Whiteboard", function () {
       false
     );
   });
-  it("send `init` event first, followed by `join` event", async function () {
-    const res = await request("POST", "/api/rooms");
-    assert.strictEqual(res.status, 200);
-    const id = await res.text();
+  it("send `init` event first, not followed by `join` event", async function () {
+    const id = await createRoom();
     const received: any[] = [];
     await useWebsocket(
       "a",
@@ -357,11 +329,7 @@ describe("Whiteboard", function () {
         ws.on("message", (event: string) => {
           received.push(JSON.parse(event));
         });
-        for (let i = 0; i < 10; i++) {
-          if (received.length < 2) {
-            await setTimeout(50);
-          }
-        }
+        await setTimeout(500);
       }
     );
     assert.deepStrictEqual(received, [
@@ -370,11 +338,110 @@ describe("Whiteboard", function () {
         objects: {},
         members: ["a"],
       },
+    ]);
+  });
+  it("correctly tracks members", async function () {
+    const id1 = await createRoom();
+    const p1 = useWebsocket(
+      "a",
+      `/api/rooms/${id1}/websocket`,
+      async (ws: WebSocket) => {
+        const received: any[] = [];
+        ws.on("message", (event: string) => {
+          received.push(JSON.parse(event));
+        });
+        await setTimeout(1000);
+        return received;
+      }
+    );
+    await setTimeout(500);
+    const p2 = useWebsocket(
+      "b",
+      `/api/rooms/${id1}/websocket`,
+      async (ws: WebSocket) => {
+        const received: any[] = [];
+        ws.on("message", (event: string) => {
+          received.push(JSON.parse(event));
+        });
+        await setTimeout(1000);
+        return received;
+      }
+    );
+    const [mes1, mes2] = await Promise.all([p1, p2]);
+    assert.deepStrictEqual(mes1, [
+      {
+        kind: "init",
+        objects: {},
+        members: ["a"],
+      },
       {
         kind: "join",
+        name: "b",
+      },
+    ]);
+    assert.deepStrictEqual(mes2, [
+      {
+        kind: "init",
+        objects: {},
+        members: ["a", "b"],
+      },
+      {
+        kind: "quit",
         name: "a",
       },
     ]);
+  });
+  it("broadcasts updates to everyone in the room except for their sender", async function () {
+    const id1 = await createRoom();
+    const id2 = await createRoom();
+    const p1 = useWebsocket(
+      "a",
+      `/api/rooms/${id1}/websocket`,
+      async (ws: WebSocket) => {
+        const received: any[] = [];
+        ws.on("message", (event: string) => {
+          received.push(JSON.parse(event));
+        });
+        await setTimeout(500);
+        ws.send(
+          JSON.stringify({
+            kind: "add_text",
+            id: "a".repeat(32),
+          })
+        );
+        await setTimeout(500);
+        return received;
+      }
+    );
+    const p2 = useWebsocket(
+      "b",
+      `/api/rooms/${id1}/websocket`,
+      async (ws: WebSocket) => {
+        const received: any[] = [];
+        ws.on("message", (event: string) => {
+          received.push(JSON.parse(event));
+        });
+        await setTimeout(1000);
+        return received;
+      }
+    );
+    const p3 = useWebsocket(
+      "b",
+      `/api/rooms/${id2}/websocket`,
+      async (ws: WebSocket) => {
+        const received: any[] = [];
+        ws.on("message", (event: string) => {
+          received.push(JSON.parse(event));
+        });
+        await setTimeout(1000);
+        return received;
+      }
+    );
+    const [mes1, mes2, mes3] = await Promise.all([p1, p2, p3]);
+    console.log(mes1, mes2, mes3);
+    assert.strictEqual(mes1.filter((m) => m.kind === "new_object").length, 0);
+    assert.strictEqual(mes2.filter((m) => m.kind === "new_object").length, 1);
+    assert.strictEqual(mes3.filter((m) => m.kind === "new_object").length, 0);
   });
 });
 function useWebsocket<T>(

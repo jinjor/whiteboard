@@ -72,6 +72,12 @@ class RoomState {
     }
     return this.sessions.length < MAX_ACTIVE_USERS;
   }
+  private newUniqueTimestamp(): number {
+    // 単調増加になるように細工する
+    const timestamp = Math.max(Date.now(), this.lastTimestamp + 1);
+    this.lastTimestamp = timestamp;
+    return timestamp;
+  }
   async handleSession(webSocket: WebSocket, userId: string): Promise<void> {
     webSocket.accept();
 
@@ -117,47 +123,39 @@ class RoomState {
           );
           return;
         }
-        const received = JSON.parse(msg.data as string);
-        // バリデーション
-        const id = received.id;
-        if (id == null || id.length !== 32) {
-          webSocket.send(
-            JSON.stringify({ kind: "error", message: "invalid message" })
-          );
-          return;
-        }
-        // タイムスタンプを単調増加に
-        const timestamp = Math.max(Date.now(), this.lastTimestamp + 1);
-        this.lastTimestamp = timestamp;
+        const event = JSON.parse(msg.data as string);
+        console.log("event", event);
 
-        const data = {
-          timestamp,
-          name: session.name,
-          kind: "add_text",
-          id,
-          text: "foo",
-          x: 100,
-          y: 100,
-        };
-        const objects: any = await this.storage.get("objects");
-
-        switch (data.kind) {
+        switch (event.kind) {
           case "add_text": {
-            objects[data.id] = {
-              id: data.id,
+            // バリデーション
+            const objectId = event.id;
+            if (objectId == null || objectId.length !== 32) {
+              webSocket.send(
+                JSON.stringify({ kind: "error", message: "invalid message" })
+              );
+              return;
+            }
+            const timestamp = this.newUniqueTimestamp();
+            const newObject = {
+              id: event.id,
               kind: "text",
-              text: data.text,
-              x: data.x,
-              y: data.y,
-              revision: 1,
-              lastEditedAt: data.timestamp,
-              lastEditedBy: data.name,
+              text: event.text,
+              x: event.x,
+              y: event.y,
+              lastEditedAt: timestamp,
+              lastEditedBy: session.name,
             };
+            const objects: any = await this.storage.get("objects");
+            objects[event.id] = newObject;
+            await this.storage.put("objects", objects);
+            this.broadcast(session.name, {
+              kind: "new_object",
+              object: newObject,
+            });
             break;
           }
         }
-        await this.storage.put("objects", objects);
-        this.broadcast(data);
       } catch (err: any) {
         console.log(err);
         webSocket.send(
@@ -169,7 +167,7 @@ class RoomState {
     const closeOrErrorHandler = (evt: Event) => {
       session.quit = true;
       this.sessions = this.sessions.filter((member) => member !== session);
-      this.broadcast({ kind: "quit", name: session.name });
+      this.broadcast(session.name, { kind: "quit", name: session.name });
     };
     webSocket.addEventListener("close", closeOrErrorHandler);
     webSocket.addEventListener("error", closeOrErrorHandler);
@@ -183,14 +181,16 @@ class RoomState {
     webSocket.send(
       JSON.stringify({ kind: "init", objects: objects ?? {}, members })
     );
-    this.broadcast({ kind: "join", name: session.name });
+    this.broadcast(session.name, { kind: "join", name: session.name });
   }
 
-  private broadcast(message: any) {
+  private broadcast(sender: string, message: any) {
     const quitters: Session[] = [];
     this.sessions = this.sessions.filter((session) => {
       try {
-        session.webSocket.send(JSON.stringify(message));
+        if (session.name !== sender) {
+          session.webSocket.send(JSON.stringify(message));
+        }
         return true;
       } catch (err) {
         // Whoops, this connection is dead. Remove it from the list and arrange to notify
@@ -201,7 +201,7 @@ class RoomState {
       }
     });
     quitters.forEach((quitter) => {
-      this.broadcast({ kind: "quit", name: quitter.name });
+      this.broadcast(quitter.name, { kind: "quit", name: quitter.name });
     });
   }
 }
