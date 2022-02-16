@@ -487,6 +487,38 @@ describe("Whiteboard", function () {
     assert.strictEqual(mes2.filter((m) => m.kind === "new_object").length, 1);
     assert.strictEqual(mes3.filter((m) => m.kind === "new_object").length, 0);
   });
+  it("updates objects at server-side", async function () {
+    const roomId = await createRoom();
+    const objectId = "a".repeat(32);
+    await useWebsocket(
+      "a",
+      `/api/rooms/${roomId}/websocket`,
+      async (ws: WebSocket) => {
+        const received: any[] = [];
+        ws.send(
+          JSON.stringify({
+            kind: "add_text",
+            id: objectId,
+          })
+        );
+        return received;
+      }
+    );
+    const mes = await useWebsocket(
+      "a",
+      `/api/rooms/${roomId}/websocket`,
+      async (ws: WebSocket) => {
+        const received: any[] = [];
+        ws.on("message", (event: string) => {
+          received.push(JSON.parse(event));
+        });
+        await setTimeout(500);
+        return received;
+      }
+    );
+    console.log(mes[0]);
+    assert.strictEqual(mes[0].objects[objectId].id, objectId);
+  });
 });
 function useWebsocket<T>(
   testUserId: string,
