@@ -84,7 +84,10 @@ class RoomState {
     const limiterId = this.env.limiters.idFromName(userId);
     const limiter = new RateLimiterClient(
       () => this.env.limiters.get(limiterId),
-      (err) => webSocket.close(1011, err.stack)
+      (err) => {
+        console.log(err);
+        webSocket.close(1011);
+      }
     );
 
     const session: Session = {
@@ -96,7 +99,9 @@ class RoomState {
     for (let i = this.sessions.length - 1; i >= 0; i--) {
       const session = this.sessions[i];
       if (session.name === userId) {
-        session.webSocket.close(1000); // TODO: quit メッセージが送信されてしまう
+        session.webSocket.send(JSON.stringify({ kind: "connection_stolen" }));
+        session.webSocket.close(1000); // カスタム close でもいいかも
+        this.sessions.splice(i, 1);
       }
     }
     this.sessions.push(session);

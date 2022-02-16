@@ -391,6 +391,50 @@ describe("Whiteboard", function () {
       },
     ]);
   });
+  it("sends `connection_stoken` message", async function () {
+    const id1 = await createRoom();
+    const mes1: any[] = [];
+    const p1 = useWebsocket(
+      "a",
+      `/api/rooms/${id1}/websocket`,
+      async (ws: WebSocket) => {
+        ws.on("message", (event: string) => {
+          mes1.push(JSON.parse(event));
+        });
+        await setTimeout(1000);
+      }
+    );
+    await setTimeout(500);
+    const mes2: any[] = [];
+    const p2 = useWebsocket(
+      "a",
+      `/api/rooms/${id1}/websocket`,
+      async (ws: WebSocket) => {
+        ws.on("message", (event: string) => {
+          mes2.push(JSON.parse(event));
+        });
+        await setTimeout(1000);
+      }
+    );
+    await Promise.all([p1, p2]);
+    assert.deepStrictEqual(mes1, [
+      {
+        kind: "init",
+        objects: {},
+        members: ["a"],
+      },
+      {
+        kind: "connection_stolen",
+      },
+    ]);
+    assert.deepStrictEqual(mes2, [
+      {
+        kind: "init",
+        objects: {},
+        members: ["a"],
+      },
+    ]);
+  });
   it("broadcasts updates to everyone in the room except for their sender", async function () {
     const id1 = await createRoom();
     const id2 = await createRoom();
