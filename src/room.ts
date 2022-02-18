@@ -1,5 +1,15 @@
 import { Router } from "itty-router";
 import { RateLimiterClient } from "./rate-limiter";
+import { RequestEvent } from "./schema";
+import { Validator } from "@cfworker/json-schema";
+// @ts-ignore
+import schemaJson from "./schema.json";
+
+const eventValidator = new Validator(schemaJson.definitions.RequestEvent);
+function validateEvent(event: any): event is RequestEvent {
+  const result = eventValidator.validate(event);
+  return result.valid;
+}
 
 type Env = {
   limiters: DurableObjectNamespace;
@@ -130,6 +140,9 @@ class RoomState {
         }
         const event = JSON.parse(msg.data as string);
         console.log("event", event);
+        if (!validateEvent(event)) {
+          // return;
+        }
 
         switch (event.kind) {
           case "add_text": {

@@ -8,7 +8,7 @@ account_id = "7e155f728b0311833218e72046aaa90a"
 format = "modules"
 dir = "dist"
 main = "./index.mjs"
-rules = [{type = "Data", globs = ["**/*.html"]}]
+rules = [{type = "Data", globs = ["**/*.html", "**/*.json"]}]
 
 [triggers]
 crons = ["* * * * *"]

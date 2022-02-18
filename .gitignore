@@ -1,4 +1,5 @@
 node_modules
 dist
+src/schema.json
 test/*.js*
 .env
