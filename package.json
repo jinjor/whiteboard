@@ -1,6 +1,8 @@
 {
   "name": "whiteboard",
   "scripts": {
+    "generate-schema": "typescript-json-schema --strictNullChecks src/schema.d.ts '*' --out src/schema.json && npm run format",
+    "format": "prettier 'src/**/*.{ts,json,html}' 'test/**/*.{ts,json}' --write",
     "build": "esbuild --tsconfig=src/tsconfig.json src/index.ts --bundle --sourcemap --loader:.html=binary --format=esm --outfile=dist/index.mjs",
     "test": "npm run build && tsc -p test/tsconfig.json && mocha -r source-map-support/register"
   },
@@ -22,6 +24,7 @@
     "miniflare": "^2.2.0",
     "mocha": "^9.2.0",
     "node-fetch": "^2.6.7",
+    "prettier": "^2.5.1",
     "source-map-support": "^0.5.21",
     "tree-kill": "^1.2.2",
     "typescript": "^4.6.0-dev.20220201",
