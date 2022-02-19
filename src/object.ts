@@ -1,4 +1,11 @@
-import { RequestEvent, ObjectId, Object_, ResponseEvent } from "./schema";
+import {
+  RequestEvent,
+  ObjectId,
+  Object_,
+  ResponseEvent,
+  ObjectBody,
+} from "./schema";
+import deepEqual from "deep-equal";
 
 export type Objects = Record<ObjectId, Object_>;
 
@@ -22,6 +29,29 @@ export function applyEvent(
         event: {
           kind: "upsert",
           object: newObject,
+        },
+        to: "others",
+      });
+      break;
+    }
+    case "delete": {
+      const objectId = event.object.id;
+      if (objects[objectId] == null) {
+        console.log(objects);
+        break;
+      }
+      const oldObject: ObjectBody = { ...objects[objectId] };
+      delete (oldObject as any).lastEditedAt;
+      delete (oldObject as any).lastEditedBy;
+      if (!deepEqual(oldObject, event.object)) {
+        console.log(oldObject, event.object);
+        break;
+      }
+      delete objects[objectId];
+      events.push({
+        event: {
+          kind: "delete",
+          id: objectId,
         },
         to: "others",
       });

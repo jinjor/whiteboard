@@ -9,10 +9,11 @@ class RateLimiterState {
     const now = Date.now() / 1000;
     this.nextAllowedTime = Math.max(now, this.nextAllowedTime);
     if (didAction) {
-      // ５秒に１回アクションを起こして良い
-      this.nextAllowedTime += 5;
+      // TODO: 設定可能にする
+      // １秒に１回アクションを起こして良い
+      this.nextAllowedTime += 1;
     }
-    return Math.max(0, this.nextAllowedTime - now - 20);
+    return Math.max(0, this.nextAllowedTime - now - 40);
   }
 }
 

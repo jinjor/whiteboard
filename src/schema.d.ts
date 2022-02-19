@@ -43,13 +43,17 @@ export type PatchEventBody = {
 };
 export type DeleteEventBody = {
   kind: "delete";
-  id: ObjectId;
+  object: ObjectBody;
 };
 export type UpsertEventBody = {
   kind: "upsert";
   object: Object_;
 };
+export type DeletedEventBody = {
+  kind: "delete";
+  id: ObjectId;
+};
 export type RequestEventBody = AddEventBody | PatchEventBody | DeleteEventBody;
-export type ResponseEventBody = UpsertEventBody;
+export type ResponseEventBody = UpsertEventBody | DeletedEventBody;
 export type RequestEvent = RequestEventHead & RequestEventBody;
 export type ResponseEvent = ResponseEventBody;

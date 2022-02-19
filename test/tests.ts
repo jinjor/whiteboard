@@ -435,7 +435,30 @@ describe("Whiteboard", function () {
       },
     ]);
   });
-  it("broadcasts updates to everyone in the room except for their sender", async function () {
+  it("closes connection when receiving invalid data", async function () {
+    const roomId = await createRoom();
+    await assert.rejects(
+      useWebsocket(
+        "a",
+        `/api/rooms/${roomId}/websocket`,
+        async (ws: WebSocket) => {
+          ws.send(
+            JSON.stringify({
+              kind: "add",
+              object: {
+                id: "a".repeat(32),
+                kind: "text",
+                text: "foo",
+                position: { x: 0 }, // missing `y`
+              },
+            })
+          );
+          await setTimeout(100);
+        }
+      )
+    );
+  });
+  it("broadcasts addition to everyone in the room except for their sender", async function () {
     const id1 = await createRoom();
     const id2 = await createRoom();
     const senderId = "a";
@@ -498,30 +521,135 @@ describe("Whiteboard", function () {
       senderId
     );
   });
-  it("updates objects at server-side", async function () {
-    const roomId = await createRoom();
-    const objectId = "a".repeat(32);
-    const userId = "a";
-    await useWebsocket(
-      userId,
-      `/api/rooms/${roomId}/websocket`,
-      async (ws: WebSocket) => {
-        ws.send(
-          JSON.stringify({
+  describe("`add` event", function () {
+    const event = {
+      kind: "add",
+      object: {
+        id: "a".repeat(32),
+        kind: "text",
+        text: "foo",
+        position: { x: 0, y: 0 },
+      },
+    };
+    it("broadcasts updates and updates objects at server-side", async function () {
+      await assertReceivedEditingEventsAndFinalObjects([event], {
+        events: [
+          {
+            kind: "upsert",
+            object: event.object,
+          },
+        ],
+        objects: {
+          [event.object.id]: event.object,
+        },
+      });
+    });
+    it("does nothing if conflicts found", async function () {
+      await assertReceivedEditingEventsAndFinalObjects(
+        [
+          event,
+          {
             kind: "add",
             object: {
-              id: objectId,
+              id: event.object.id,
               kind: "text",
-              text: "a",
-              position: { x: 0, y: 0 },
+              text: "foo",
+              position: { x: 1, y: 1 },
             },
-          })
-        );
-        await setTimeout(100);
-      }
-    );
-    const mes = await useWebsocket(
-      userId,
+          },
+        ],
+        {
+          events: [
+            {
+              kind: "upsert",
+              object: event.object,
+            },
+          ],
+          objects: {
+            [event.object.id]: event.object,
+          },
+        }
+      );
+    });
+  });
+  describe("`delete` event", function () {
+    const addEvent = {
+      kind: "add",
+      object: {
+        id: "a".repeat(32),
+        kind: "text",
+        text: "foo",
+        position: { x: 0, y: 0 },
+      },
+    };
+    const deleteEvent = {
+      kind: "delete",
+      object: addEvent.object,
+    };
+    it("broadcasts updates and updates objects at server-side", async function () {
+      await assertReceivedEditingEventsAndFinalObjects(
+        [addEvent, deleteEvent],
+        {
+          events: [
+            {
+              kind: "upsert",
+              object: addEvent.object,
+            },
+            {
+              kind: "delete",
+              id: addEvent.object.id,
+            },
+          ],
+          objects: {},
+        }
+      );
+    });
+    it("does nothing if conflicts found", async function () {
+      await assertReceivedEditingEventsAndFinalObjects([deleteEvent], {
+        events: [],
+        objects: {},
+      });
+    });
+    it("does nothing if conflicts found (another case)", async function () {
+      await assertReceivedEditingEventsAndFinalObjects(
+        [
+          addEvent,
+          {
+            kind: "delete",
+            object: {
+              id: "a".repeat(32),
+              kind: "text",
+              text: "foo",
+              position: { x: 0, y: 1 },
+            },
+          },
+        ],
+        {
+          events: [
+            {
+              kind: "upsert",
+              object: addEvent.object,
+            },
+          ],
+          objects: {
+            [addEvent.object.id]: addEvent.object,
+          },
+        }
+      );
+    });
+  });
+
+  function filterEditingEvents(events: any[]) {
+    return events.filter((m) => ["upsert", "delete"].includes(m.kind));
+  }
+  async function sendEditingEventsToAnother(
+    roomId: string,
+    senderId: string,
+    receiverId: string,
+    events: any[]
+  ): Promise<any[]> {
+    const p1 = useWebsocket(
+      senderId,
       `/api/rooms/${roomId}/websocket`,
       async (ws: WebSocket) => {
         const received: any[] = [];
@@ -529,51 +657,15 @@ describe("Whiteboard", function () {
           received.push(JSON.parse(event));
         });
         await setTimeout(500);
+        for (const event of events) {
+          ws.send(JSON.stringify(event));
+          await setTimeout(10); // なぜか必要？
+        }
+        await setTimeout(500);
         return received;
       }
     );
-    const object = mes[0].objects[objectId];
-    assert.strictEqual(object.id, objectId);
-    assert.strictEqual(object.lastEditedBy, userId);
-  });
-  it("does not allow adding two objects with same id", async function () {
-    const roomId = await createRoom();
-    const objectId = "a".repeat(32);
-    const firstText = "foo";
-    const secondText = "bar";
-    const senderId = "a";
-    const receiverId = "b";
-    const sender = useWebsocket(
-      senderId,
-      `/api/rooms/${roomId}/websocket`,
-      async (ws: WebSocket) => {
-        ws.send(
-          JSON.stringify({
-            kind: "add",
-            object: {
-              id: objectId,
-              kind: "text",
-              text: firstText,
-              position: { x: 0, y: 0 },
-            },
-          })
-        );
-        await setTimeout(100);
-        ws.send(
-          JSON.stringify({
-            kind: "add",
-            object: {
-              id: objectId,
-              kind: "text",
-              text: secondText,
-              position: { x: 0, y: 0 },
-            },
-          })
-        );
-        await setTimeout(100);
-      }
-    );
-    const receiver = useWebsocket(
+    const p2 = useWebsocket(
       receiverId,
       `/api/rooms/${roomId}/websocket`,
       async (ws: WebSocket) => {
@@ -581,53 +673,70 @@ describe("Whiteboard", function () {
         ws.on("message", (event: string) => {
           received.push(JSON.parse(event));
         });
-        await setTimeout(500);
+        await setTimeout(1000);
         return received;
       }
     );
-    const [, received] = await Promise.all([sender, receiver]);
+    return await Promise.all([p1, p2]);
+  }
+  async function getCurrentObjects(
+    roomId: string,
+    userId: string
+  ): Promise<any> {
     const mes = await useWebsocket(
-      senderId,
+      userId,
       `/api/rooms/${roomId}/websocket`,
       async (ws: WebSocket) => {
         const received: any[] = [];
         ws.on("message", (event: string) => {
           received.push(JSON.parse(event));
         });
-        await setTimeout(500);
+        await setTimeout(1000);
         return received;
       }
     );
-    const upsertEvents = received.filter((m) => m.kind === "upsert");
-    assert.strictEqual(upsertEvents.length, 1);
-    assert.strictEqual(upsertEvents[0].object.text, firstText);
-    assert.strictEqual(upsertEvents[0].object.lastEditedBy, senderId);
-    assert.strictEqual(mes[0].objects[objectId].text, firstText);
-    assert.strictEqual(mes[0].objects[objectId].lastEditedBy, senderId);
-  });
-  it("closes connection when receiving invalid data", async function () {
+    return mes[0].objects;
+  }
+  function removeMetaInfoFromObjects(objects: any): void {
+    Object.keys(objects).forEach((key) => {
+      const object = objects[key];
+      delete object.lastEditedAt;
+      delete object.lastEditedBy;
+    });
+  }
+  async function assertReceivedEditingEventsAndFinalObjects(
+    events: any[],
+    expected: {
+      events: any[];
+      objects: any;
+    }
+  ) {
     const roomId = await createRoom();
-    await assert.rejects(
-      useWebsocket(
-        "a",
-        `/api/rooms/${roomId}/websocket`,
-        async (ws: WebSocket) => {
-          ws.send(
-            JSON.stringify({
-              kind: "add",
-              object: {
-                id: "a".repeat(32),
-                kind: "text",
-                text: "foo",
-                position: { x: 0 }, // missing `y`
-              },
-            })
-          );
-          await setTimeout(100);
-        }
-      )
+    const senderId = "a";
+    const receiverId = "b";
+    const [mes1, mes2] = await sendEditingEventsToAnother(
+      roomId,
+      senderId,
+      receiverId,
+      events
     );
-  });
+    const edits1 = filterEditingEvents(mes1);
+    const edits2 = filterEditingEvents(mes2);
+    assert.strictEqual(edits1.length, 0);
+    assert.strictEqual(edits2.length, expected.events.length);
+    for (let i = 0; i < edits2.length; i++) {
+      const editEvent = edits2[i];
+      if (editEvent.object != null) {
+        assert.strictEqual(editEvent.object.lastEditedBy, senderId);
+        delete editEvent.object.lastEditedAt;
+        delete editEvent.object.lastEditedBy;
+      }
+      assert.deepStrictEqual(edits2[i], expected.events[i]);
+    }
+    const objects = await getCurrentObjects(roomId, receiverId);
+    removeMetaInfoFromObjects(objects);
+    assert.deepStrictEqual(objects, expected.objects);
+  }
 });
 function useWebsocket<T>(
   testUserId: string,
