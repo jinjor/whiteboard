@@ -1,14 +1,28 @@
-import { Event_, ObjectId, Object_, ResponseEvent } from "./schema";
+import { RequestEvent, ObjectId, Object_, ResponseEvent } from "./schema";
 
-type Objects = Record<ObjectId, Object_>;
+export type Objects = Record<ObjectId, Object_>;
 
 export function applyEvent(
-  event: Event_,
+  event: RequestEvent,
   objects: Objects
 ): { event: ResponseEvent; to: "self" | "others" }[] {
+  const events: ReturnType<typeof applyEvent> = [];
   switch (event.kind) {
     case "add": {
+      const newObject = {
+        ...event.object,
+        lastEditedAt: event.uniqueTimestamp,
+        lastEditedBy: event.requestedBy,
+      };
+      objects[newObject.id] = newObject;
+      events.push({
+        event: {
+          kind: "upsert",
+          object: newObject,
+        },
+        to: "others",
+      });
     }
   }
-  return [];
+  return events;
 }

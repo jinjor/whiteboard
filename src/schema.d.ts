@@ -1,3 +1,7 @@
+/**
+ * @minLength 32
+ * @maxLength 32
+ */
 export type ObjectId = string;
 export type UserId = string;
 export type Timestamp = number;
@@ -11,17 +15,19 @@ export type Position = {
   y: number;
 };
 export type TextBody = {
+  id: ObjectId;
   kind: "text";
   position: Position;
   text: string;
 };
 export type PathBody = {
+  id: ObjectId;
   kind: "path";
   points: Position[];
 };
 export type ObjectBody = TextBody | PathBody;
 export type Object_ = ObjectHead & ObjectBody;
-export type EventHead = {
+export type RequestEventHead = {
   requestedBy: UserId;
   uniqueTimestamp: Timestamp;
 };
@@ -39,7 +45,11 @@ export type DeleteEventBody = {
   kind: "delete";
   id: ObjectId;
 };
-export type EventBody = AddEventBody | PatchEventBody | DeleteEventBody;
-export type Event_ = EventHead & EventBody;
-export type RequestEvent = Event_;
-export type ResponseEvent = Event_; // TODO
+export type UpsertEventBody = {
+  kind: "upsert";
+  object: Object_;
+};
+export type RequestEventBody = AddEventBody | PatchEventBody | DeleteEventBody;
+export type ResponseEventBody = UpsertEventBody;
+export type RequestEvent = RequestEventHead & RequestEventBody;
+export type ResponseEvent = ResponseEventBody;

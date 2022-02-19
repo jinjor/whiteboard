@@ -449,8 +449,13 @@ describe("Whiteboard", function () {
         await setTimeout(500);
         ws.send(
           JSON.stringify({
-            kind: "add_text",
-            id: "a".repeat(32),
+            kind: "add",
+            object: {
+              id: "a".repeat(32),
+              kind: "text",
+              text: "a",
+              position: { x: 0, y: 0 },
+            },
           })
         );
         await setTimeout(500);
@@ -483,9 +488,9 @@ describe("Whiteboard", function () {
     );
     const [mes1, mes2, mes3] = await Promise.all([p1, p2, p3]);
     console.log(mes1, mes2, mes3);
-    assert.strictEqual(mes1.filter((m) => m.kind === "new_object").length, 0);
-    assert.strictEqual(mes2.filter((m) => m.kind === "new_object").length, 1);
-    assert.strictEqual(mes3.filter((m) => m.kind === "new_object").length, 0);
+    assert.strictEqual(mes1.filter((m) => m.kind === "upsert").length, 0);
+    assert.strictEqual(mes2.filter((m) => m.kind === "upsert").length, 1);
+    assert.strictEqual(mes3.filter((m) => m.kind === "upsert").length, 0);
   });
   it("updates objects at server-side", async function () {
     const roomId = await createRoom();
@@ -497,8 +502,13 @@ describe("Whiteboard", function () {
         const received: any[] = [];
         ws.send(
           JSON.stringify({
-            kind: "add_text",
-            id: objectId,
+            kind: "add",
+            object: {
+              id: objectId,
+              kind: "text",
+              text: "a",
+              position: { x: 0, y: 0 },
+            },
           })
         );
         return received;

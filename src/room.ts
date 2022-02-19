@@ -1,12 +1,13 @@
 import { Router } from "itty-router";
 import { RateLimiterClient } from "./rate-limiter";
-import { RequestEvent } from "./schema";
+import { RequestEventBody } from "./schema";
 import { Validator } from "@cfworker/json-schema";
 // @ts-ignore
 import schemaJson from "./schema.json";
+import { applyEvent, Objects } from "./object";
 
-const eventValidator = new Validator(schemaJson.definitions.RequestEvent);
-function validateEvent(event: any): event is RequestEvent {
+const eventValidator = new Validator(schemaJson.definitions.RequestEventBody);
+function validateEvent(event: any): event is RequestEventBody {
   const result = eventValidator.validate(event);
   return result.valid;
 }
@@ -141,37 +142,24 @@ class RoomState {
         const event = JSON.parse(msg.data as string);
         console.log("event", event);
         if (!validateEvent(event)) {
-          // return;
+          return;
         }
-
-        switch (event.kind) {
-          case "add_text": {
-            // バリデーション
-            const objectId = event.id;
-            if (objectId == null || objectId.length !== 32) {
-              webSocket.send(
-                JSON.stringify({ kind: "error", message: "invalid message" })
-              );
-              return;
+        const timestamp = this.newUniqueTimestamp();
+        const objects: Objects = (await this.storage.get("objects"))!;
+        const events = applyEvent(
+          { ...event, uniqueTimestamp: timestamp, requestedBy: session.name },
+          objects
+        );
+        await this.storage.put("objects", objects);
+        for (const e of events) {
+          switch (e.to) {
+            case "self": {
+              break;
             }
-            const timestamp = this.newUniqueTimestamp();
-            const newObject = {
-              id: event.id,
-              kind: "text",
-              text: event.text,
-              x: event.x,
-              y: event.y,
-              lastEditedAt: timestamp,
-              lastEditedBy: session.name,
-            };
-            const objects: any = await this.storage.get("objects");
-            objects[event.id] = newObject;
-            await this.storage.put("objects", objects);
-            this.broadcast(session.name, {
-              kind: "new_object",
-              object: newObject,
-            });
-            break;
+            case "others": {
+              this.broadcast(session.name, e.event);
+              break;
+            }
           }
         }
       } catch (err: any) {
@@ -190,11 +178,8 @@ class RoomState {
     webSocket.addEventListener("close", closeOrErrorHandler);
     webSocket.addEventListener("error", closeOrErrorHandler);
 
-    let objects = await this.storage.get("objects");
-    if (objects == null) {
-      objects = {};
-      await this.storage.put("objects", {});
-    }
+    const objects: Objects = (await this.storage.get("objects")) ?? {};
+    await this.storage.put("objects", objects);
     const members = this.sessions.map((s) => s.name);
     webSocket.send(
       JSON.stringify({ kind: "init", objects: objects ?? {}, members })
