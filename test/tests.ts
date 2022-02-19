@@ -592,6 +592,29 @@ describe("Whiteboard", function () {
     assert.strictEqual(upsertEvents[0].object.text, firstText);
     assert.strictEqual(mes[0].objects[objectId].text, firstText);
   });
+  it("closes connection when receiving invalid data", async function () {
+    const roomId = await createRoom();
+    await assert.rejects(
+      useWebsocket(
+        "a",
+        `/api/rooms/${roomId}/websocket`,
+        async (ws: WebSocket) => {
+          ws.send(
+            JSON.stringify({
+              kind: "add",
+              object: {
+                id: "a".repeat(32),
+                kind: "text",
+                text: "foo",
+                position: { x: 0 }, // missing `y`
+              },
+            })
+          );
+          await setTimeout(100);
+        }
+      )
+    );
+  });
 });
 function useWebsocket<T>(
   testUserId: string,
@@ -619,7 +642,7 @@ function useWebsocket<T>(
         })
         .finally(() => {
           if (!closed) {
-            ws.close();
+            ws.close(1000);
           }
         });
     });
@@ -627,9 +650,12 @@ function useWebsocket<T>(
       console.log(`error ${testUserId}:`, e.message);
       error = e;
     });
-    ws.on("close", () => {
-      console.log(`close ${testUserId}`);
+    ws.on("close", (code: number) => {
+      console.log(`close ${testUserId}:`, code);
       closed = true;
+      if (code !== 1000) {
+        error = new Error(JSON.stringify({ code }));
+      }
       if (error == null) {
         resolve(result!);
       } else {

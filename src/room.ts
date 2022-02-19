@@ -142,6 +142,8 @@ class RoomState {
         const event = JSON.parse(msg.data as string);
         console.log("event", event);
         if (!validateEvent(event)) {
+          console.log("invalid data:", event);
+          webSocket.close(1003);
           return;
         }
         const timestamp = this.newUniqueTimestamp();
