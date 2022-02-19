@@ -438,8 +438,10 @@ describe("Whiteboard", function () {
   it("broadcasts updates to everyone in the room except for their sender", async function () {
     const id1 = await createRoom();
     const id2 = await createRoom();
+    const senderId = "a";
+    const receiverId = "b";
     const p1 = useWebsocket(
-      "a",
+      senderId,
       `/api/rooms/${id1}/websocket`,
       async (ws: WebSocket) => {
         const received: any[] = [];
@@ -463,7 +465,7 @@ describe("Whiteboard", function () {
       }
     );
     const p2 = useWebsocket(
-      "b",
+      receiverId,
       `/api/rooms/${id1}/websocket`,
       async (ws: WebSocket) => {
         const received: any[] = [];
@@ -475,7 +477,7 @@ describe("Whiteboard", function () {
       }
     );
     const p3 = useWebsocket(
-      "b",
+      receiverId,
       `/api/rooms/${id2}/websocket`,
       async (ws: WebSocket) => {
         const received: any[] = [];
@@ -491,12 +493,17 @@ describe("Whiteboard", function () {
     assert.strictEqual(mes1.filter((m) => m.kind === "upsert").length, 0);
     assert.strictEqual(mes2.filter((m) => m.kind === "upsert").length, 1);
     assert.strictEqual(mes3.filter((m) => m.kind === "upsert").length, 0);
+    assert.strictEqual(
+      mes2.find((m) => m.kind === "upsert")?.object.lastEditedBy,
+      senderId
+    );
   });
   it("updates objects at server-side", async function () {
     const roomId = await createRoom();
     const objectId = "a".repeat(32);
+    const userId = "a";
     await useWebsocket(
-      "a",
+      userId,
       `/api/rooms/${roomId}/websocket`,
       async (ws: WebSocket) => {
         ws.send(
@@ -514,7 +521,7 @@ describe("Whiteboard", function () {
       }
     );
     const mes = await useWebsocket(
-      "a",
+      userId,
       `/api/rooms/${roomId}/websocket`,
       async (ws: WebSocket) => {
         const received: any[] = [];
@@ -525,15 +532,19 @@ describe("Whiteboard", function () {
         return received;
       }
     );
-    assert.strictEqual(mes[0].objects[objectId].id, objectId);
+    const object = mes[0].objects[objectId];
+    assert.strictEqual(object.id, objectId);
+    assert.strictEqual(object.lastEditedBy, userId);
   });
   it("does not allow adding two objects with same id", async function () {
     const roomId = await createRoom();
     const objectId = "a".repeat(32);
     const firstText = "foo";
     const secondText = "bar";
+    const senderId = "a";
+    const receiverId = "b";
     const sender = useWebsocket(
-      "a",
+      senderId,
       `/api/rooms/${roomId}/websocket`,
       async (ws: WebSocket) => {
         ws.send(
@@ -563,7 +574,7 @@ describe("Whiteboard", function () {
       }
     );
     const receiver = useWebsocket(
-      "b",
+      receiverId,
       `/api/rooms/${roomId}/websocket`,
       async (ws: WebSocket) => {
         const received: any[] = [];
@@ -576,7 +587,7 @@ describe("Whiteboard", function () {
     );
     const [, received] = await Promise.all([sender, receiver]);
     const mes = await useWebsocket(
-      "a",
+      senderId,
       `/api/rooms/${roomId}/websocket`,
       async (ws: WebSocket) => {
         const received: any[] = [];
@@ -590,7 +601,9 @@ describe("Whiteboard", function () {
     const upsertEvents = received.filter((m) => m.kind === "upsert");
     assert.strictEqual(upsertEvents.length, 1);
     assert.strictEqual(upsertEvents[0].object.text, firstText);
+    assert.strictEqual(upsertEvents[0].object.lastEditedBy, senderId);
     assert.strictEqual(mes[0].objects[objectId].text, firstText);
+    assert.strictEqual(mes[0].objects[objectId].lastEditedBy, senderId);
   });
   it("closes connection when receiving invalid data", async function () {
     const roomId = await createRoom();
