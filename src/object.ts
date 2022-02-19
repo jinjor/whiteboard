@@ -9,6 +9,9 @@ export function applyEvent(
   const events: ReturnType<typeof applyEvent> = [];
   switch (event.kind) {
     case "add": {
+      if (objects[event.object.id] != null) {
+        break;
+      }
       const newObject = {
         ...event.object,
         lastEditedAt: event.uniqueTimestamp,
@@ -22,6 +25,7 @@ export function applyEvent(
         },
         to: "others",
       });
+      break;
     }
   }
   return events;

@@ -499,7 +499,6 @@ describe("Whiteboard", function () {
       "a",
       `/api/rooms/${roomId}/websocket`,
       async (ws: WebSocket) => {
-        const received: any[] = [];
         ws.send(
           JSON.stringify({
             kind: "add",
@@ -511,7 +510,7 @@ describe("Whiteboard", function () {
             },
           })
         );
-        return received;
+        await setTimeout(100);
       }
     );
     const mes = await useWebsocket(
@@ -526,8 +525,72 @@ describe("Whiteboard", function () {
         return received;
       }
     );
-    console.log(mes[0]);
     assert.strictEqual(mes[0].objects[objectId].id, objectId);
+  });
+  it("does not allow adding two objects with same id", async function () {
+    const roomId = await createRoom();
+    const objectId = "a".repeat(32);
+    const firstText = "foo";
+    const secondText = "bar";
+    const sender = useWebsocket(
+      "a",
+      `/api/rooms/${roomId}/websocket`,
+      async (ws: WebSocket) => {
+        ws.send(
+          JSON.stringify({
+            kind: "add",
+            object: {
+              id: objectId,
+              kind: "text",
+              text: firstText,
+              position: { x: 0, y: 0 },
+            },
+          })
+        );
+        await setTimeout(100);
+        ws.send(
+          JSON.stringify({
+            kind: "add",
+            object: {
+              id: objectId,
+              kind: "text",
+              text: secondText,
+              position: { x: 0, y: 0 },
+            },
+          })
+        );
+        await setTimeout(100);
+      }
+    );
+    const receiver = useWebsocket(
+      "b",
+      `/api/rooms/${roomId}/websocket`,
+      async (ws: WebSocket) => {
+        const received: any[] = [];
+        ws.on("message", (event: string) => {
+          received.push(JSON.parse(event));
+        });
+        await setTimeout(500);
+        return received;
+      }
+    );
+    const [, received] = await Promise.all([sender, receiver]);
+    const mes = await useWebsocket(
+      "a",
+      `/api/rooms/${roomId}/websocket`,
+      async (ws: WebSocket) => {
+        const received: any[] = [];
+        ws.on("message", (event: string) => {
+          received.push(JSON.parse(event));
+        });
+        await setTimeout(500);
+        return received;
+      }
+    );
+    const upsertEvents = received.filter((m) => m.kind === "upsert");
+    assert.strictEqual(upsertEvents.length, 1);
+    assert.strictEqual(upsertEvents[0].object.text, firstText);
+    assert.strictEqual(mes[0].objects[objectId].text, firstText);
   });
 });
 function useWebsocket<T>(
