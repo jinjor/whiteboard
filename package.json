@@ -11,6 +11,7 @@
   "license": "ISC",
   "devDependencies": {
     "@cfworker/json-schema": "^1.12.1",
+    "@cloudflare/kv-asset-handler": "^0.2.0",
     "@cloudflare/workers-types": "^3.3.1",
     "@cloudflare/wrangler": "^1.19.7",
     "@types/cookie": "^0.4.1",

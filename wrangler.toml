@@ -10,6 +10,10 @@ dir = "dist"
 main = "./index.mjs"
 rules = [{type = "Data", globs = ["**/*.html", "**/*.json"]}]
 
+[site]
+bucket = "./assets"
+entry-point = "./dist"
+
 [triggers]
 crons = ["* * * * *"]
 

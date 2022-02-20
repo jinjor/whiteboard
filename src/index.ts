@@ -8,6 +8,11 @@ import { RoomInfo, RoomPatch } from "./room-manager";
 export { RateLimiter } from "./rate-limiter";
 export { ChatRoom } from "./room";
 export { RoomManager } from "./room-manager";
+import {
+  getAssetFromKV,
+  MethodNotAllowedError,
+  NotFoundError,
+} from "@cloudflare/kv-asset-handler";
 
 type Env = {
   manager: DurableObjectNamespace;
@@ -91,6 +96,7 @@ const apiRouter = Router({ base: "/api" })
     async (
       request: Request & { params: { roomName: string } },
       env: Env,
+      context: ExecutionContext,
       userId: string
     ) => {
       const roomName = request.params.roomName;
@@ -128,6 +134,35 @@ const apiRouter = Router({ base: "/api" })
   );
 
 const router = Router()
+  .get(
+    "/assets/*",
+    async (request: Request, env: Env, context: ExecutionContext) => {
+      try {
+        return await getAssetFromKV(
+          {
+            request,
+            waitUntil(promise) {
+              return context.waitUntil(promise);
+            },
+          },
+          {
+            ASSET_NAMESPACE: (env as any).__STATIC_CONTENT,
+            // [mf:wrn] Cache operations will have no impact if you deploy to a workers.dev subdomain!
+            cacheControl: {
+              bypassCache: true,
+            },
+            mapRequestToAsset: (req) =>
+              new Request(req.url.replace("/assets/", "/"), req),
+          }
+        );
+      } catch (e) {
+        if (e instanceof NotFoundError || e instanceof MethodNotAllowedError) {
+          return new Response("Not found.", { status: 404 });
+        }
+        throw e;
+      }
+    }
+  )
   .get("/", () => {
     return new Response(HTML.slice(0), {
       headers: { "Content-Type": "text/html;charset=UTF-8" },
@@ -201,7 +236,7 @@ const authRouter = Router()
     });
     return res;
   })
-  .all("*", async (request: Request, env: Env) => {
+  .all("*", async (request: Request, env: Env, context: ExecutionContext) => {
     const cookie = Cookie.parse(request.headers.get("Cookie") ?? "");
     console.log("cookie:", cookie);
     let userId;
@@ -234,7 +269,7 @@ const authRouter = Router()
       return new Response("Not a member of org.", { status: 403 });
     }
     const res: Response = await router
-      .handle(request, env, userId)
+      .handle(request, env, context, userId)
       .catch((error: any) => {
         console.log(error.stack);
         return new Response("unexpected error", { status: 500 });
@@ -252,7 +287,7 @@ const authRouter = Router()
   });
 
 export default {
-  async fetch(request: Request, env: Env) {
+  async fetch(request: Request, env: Env, context: ExecutionContext) {
     console.log("Root's fetch(): " + request.method, request.url);
     console.log(env);
     let preconditionOk = true;
@@ -279,10 +314,12 @@ export default {
     if (env.ENVIRONMENT !== "test" && !preconditionOk) {
       return new Response("Configuration Error", { status: 500 });
     }
-    return await authRouter.handle(request, env).catch((error: any) => {
-      console.log(error.stack);
-      return new Response("unexpected error", { status: 500 });
-    });
+    return await authRouter
+      .handle(request, env, context)
+      .catch((error: any) => {
+        console.log(error.stack);
+        return new Response("unexpected error", { status: 500 });
+      });
   },
   async scheduled(event: { cron: string; scheduledTime: number }, env: Env) {
     await clean(env);
