@@ -391,7 +391,7 @@ describe("Whiteboard", function () {
       },
     ]);
   });
-  it("sends `connection_stoken` message", async function () {
+  it("closes websocket with 1001 when another connection from same user is requested", async function () {
     const id1 = await createRoom();
     const mes1: any[] = [];
     const p1 = useWebsocket(
@@ -403,7 +403,10 @@ describe("Whiteboard", function () {
         });
         await setTimeout(1000);
       }
-    );
+    ).catch((e) => {
+      const { code } = JSON.parse(e.message);
+      return code;
+    });
     await setTimeout(500);
     const mes2: any[] = [];
     const p2 = useWebsocket(
@@ -416,15 +419,12 @@ describe("Whiteboard", function () {
         await setTimeout(1000);
       }
     );
-    await Promise.all([p1, p2]);
+    const [code] = await Promise.all([p1, p2]);
     assert.deepStrictEqual(mes1, [
       {
         kind: "init",
         objects: {},
         members: ["a"],
-      },
-      {
-        kind: "connection_stolen",
       },
     ]);
     assert.deepStrictEqual(mes2, [
@@ -434,6 +434,7 @@ describe("Whiteboard", function () {
         members: ["a"],
       },
     ]);
+    assert.strictEqual(code, 1001);
   });
   it("closes connection when receiving invalid data", async function () {
     const roomId = await createRoom();

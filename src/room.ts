@@ -100,8 +100,7 @@ class RoomState {
     for (let i = this.sessions.length - 1; i >= 0; i--) {
       const session = this.sessions[i];
       if (session.name === userId) {
-        session.webSocket.send(JSON.stringify({ kind: "connection_stolen" }));
-        session.webSocket.close(1000); // カスタム close でもいいかも
+        session.webSocket.close(1001);
         this.sessions.splice(i, 1);
       }
     }
@@ -155,7 +154,7 @@ class RoomState {
       } catch (err: any) {
         console.log(err);
         if (err instanceof InvalidEvent) {
-          webSocket.close(1003);
+          webSocket.close(1007);
           return;
         }
         webSocket.send(
