@@ -6,8 +6,24 @@ import {
   ObjectBody,
 } from "./schema";
 import deepEqual from "deep-equal";
+import { RequestEventBody } from "./schema";
+import { Validator } from "@cfworker/json-schema";
+// @ts-ignore
+import schemaJson from "./schema.json";
+
+const eventValidator = new Validator(schemaJson.definitions.RequestEventBody);
+export function validateEvent(event: any): event is RequestEventBody {
+  const result = eventValidator.validate(event);
+  return result.valid;
+}
+const objectValidator = new Validator(schemaJson.definitions.Object_);
+function validateObject(object: any): object is Object_ {
+  const result = objectValidator.validate(object);
+  return result.valid;
+}
 
 export type Objects = Record<ObjectId, Object_>;
+export class InvalidEvent extends Error {}
 
 export function applyEvent(
   event: RequestEvent,
@@ -24,6 +40,40 @@ export function applyEvent(
         lastEditedAt: event.uniqueTimestamp,
         lastEditedBy: event.requestedBy,
       };
+      objects[newObject.id] = newObject;
+      events.push({
+        event: {
+          kind: "upsert",
+          object: newObject,
+        },
+        to: "others",
+      });
+      break;
+    }
+    case "patch": {
+      const objectId = event.id;
+      if (objects[objectId] == null) {
+        console.log(objects);
+        break;
+      }
+      const oldObject: ObjectBody = { ...objects[objectId] };
+      const oldValue = (oldObject as any)[event.key];
+      if (oldValue == null) {
+        throw new InvalidEvent();
+      }
+      if (!deepEqual(oldValue, event.value.old)) {
+        console.log(oldObject, event.value.old);
+        break;
+      }
+      const newObject = {
+        ...oldObject,
+        [event.key]: event.value.new,
+        lastEditedAt: event.uniqueTimestamp,
+        lastEditedBy: event.requestedBy,
+      };
+      if (!validateObject(newObject)) {
+        throw new InvalidEvent();
+      }
       objects[newObject.id] = newObject;
       events.push({
         event: {

@@ -638,6 +638,152 @@ describe("Whiteboard", function () {
       );
     });
   });
+  describe("`patch` event", function () {
+    const addEvent = {
+      kind: "add",
+      object: {
+        id: "a".repeat(32),
+        kind: "text",
+        text: "foo",
+        position: { x: 0, y: 0 },
+      },
+    };
+    const patchEvent = {
+      kind: "patch",
+      id: addEvent.object.id,
+      key: "text",
+      value: { old: addEvent.object.text, new: "hello" },
+    };
+    it("broadcasts updates and updates objects at server-side", async function () {
+      await assertReceivedEditingEventsAndFinalObjects([addEvent, patchEvent], {
+        events: [
+          {
+            kind: "upsert",
+            object: addEvent.object,
+          },
+          {
+            kind: "upsert",
+            object: {
+              ...addEvent.object,
+              [patchEvent.key]: patchEvent.value.new,
+            },
+          },
+        ],
+        objects: {
+          [addEvent.object.id]: {
+            ...addEvent.object,
+            [patchEvent.key]: patchEvent.value.new,
+          },
+        },
+      });
+    });
+    it("does nothing if conflicts found", async function () {
+      await assertReceivedEditingEventsAndFinalObjects([patchEvent], {
+        events: [],
+        objects: {},
+      });
+    });
+    it("does nothing if conflicts found (another case)", async function () {
+      await assertReceivedEditingEventsAndFinalObjects(
+        [
+          addEvent,
+          {
+            kind: "patch",
+            id: addEvent.object.id,
+            key: "text",
+            value: { old: "bar", new: "hello" },
+          },
+        ],
+        {
+          events: [
+            {
+              kind: "upsert",
+              object: addEvent.object,
+            },
+          ],
+          objects: {
+            [addEvent.object.id]: addEvent.object,
+          },
+        }
+      );
+    });
+    it("handles invalid patch (unknown key)", async function () {
+      const roomId = await createRoom();
+      await useWebsocket(
+        "a",
+        `/api/rooms/${roomId}/websocket`,
+        async (ws: WebSocket) => {
+          ws.send(
+            JSON.stringify({
+              kind: "add",
+              object: {
+                id: "a".repeat(32),
+                kind: "text",
+                text: "foo",
+                position: { x: 0, y: 0 },
+              },
+            })
+          );
+          await setTimeout(100);
+        }
+      );
+      await assert.rejects(
+        useWebsocket(
+          "a",
+          `/api/rooms/${roomId}/websocket`,
+          async (ws: WebSocket) => {
+            ws.send(
+              JSON.stringify({
+                kind: "patch",
+                id: "a".repeat(32),
+                key: "unknown",
+                value: { old: 0, new: 1 },
+              })
+            );
+            await setTimeout(100);
+          }
+        )
+      );
+    });
+    it("handles invalid patch (invalid new value)", async function () {
+      const roomId = await createRoom();
+      await useWebsocket(
+        "a",
+        `/api/rooms/${roomId}/websocket`,
+        async (ws: WebSocket) => {
+          ws.send(
+            JSON.stringify({
+              kind: "add",
+              object: {
+                id: "a".repeat(32),
+                kind: "text",
+                text: "foo",
+                position: { x: 0, y: 0 },
+              },
+            })
+          );
+          await setTimeout(100);
+        }
+      );
+      await assert.rejects(
+        useWebsocket(
+          "a",
+          `/api/rooms/${roomId}/websocket`,
+          async (ws: WebSocket) => {
+            ws.send(
+              JSON.stringify({
+                kind: "patch",
+                id: "a".repeat(32),
+                key: "text",
+                value: { old: "foo", new: 1 },
+              })
+            );
+            await setTimeout(100);
+          }
+        )
+      );
+    });
+  });
 
   function filterEditingEvents(events: any[]) {
     return events.filter((m) => ["upsert", "delete"].includes(m.kind));

@@ -39,7 +39,7 @@ export type PatchEventBody = {
   kind: "patch";
   id: ObjectId;
   key: string;
-  value: any;
+  value: { old: any; new: any };
 };
 export type DeleteEventBody = {
   kind: "delete";

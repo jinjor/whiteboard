@@ -1,16 +1,6 @@
 import { Router } from "itty-router";
 import { RateLimiterClient } from "./rate-limiter";
-import { RequestEventBody } from "./schema";
-import { Validator } from "@cfworker/json-schema";
-// @ts-ignore
-import schemaJson from "./schema.json";
-import { applyEvent, Objects } from "./object";
-
-const eventValidator = new Validator(schemaJson.definitions.RequestEventBody);
-function validateEvent(event: any): event is RequestEventBody {
-  const result = eventValidator.validate(event);
-  return result.valid;
-}
+import { applyEvent, InvalidEvent, Objects, validateEvent } from "./object";
 
 type Env = {
   limiters: DurableObjectNamespace;
@@ -142,9 +132,7 @@ class RoomState {
         const event = JSON.parse(msg.data as string);
         console.log("event", event);
         if (!validateEvent(event)) {
-          console.log("invalid data:", event);
-          webSocket.close(1003);
-          return;
+          throw new InvalidEvent();
         }
         const timestamp = this.newUniqueTimestamp();
         const objects: Objects = (await this.storage.get("objects"))!;
@@ -166,6 +154,10 @@ class RoomState {
         }
       } catch (err: any) {
         console.log(err);
+        if (err instanceof InvalidEvent) {
+          webSocket.close(1003);
+          return;
+        }
         webSocket.send(
           JSON.stringify({ kind: "error", message: "unexpected error" })
         );
