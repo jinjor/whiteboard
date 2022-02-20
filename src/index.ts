@@ -20,21 +20,6 @@ type Env = {
   ENVIRONMENT: string;
 };
 
-function handleError(request: Request, error: any) {
-  console.log(error.stack);
-  if (request.headers.get("Upgrade") == "websocket") {
-    // Annoyingly, if we return an HTTP error in response to a WebSocket request, Chrome devtools
-    // won't show us the response body! So... let's send a WebSocket response with an error
-    // frame instead.
-    const pair = new WebSocketPair();
-    pair[1].accept();
-    pair[1].send(JSON.stringify({ error: error.stack }));
-    pair[1].close(1011, "Uncaught exception during session setup");
-    return new Response(null, { status: 101, webSocket: pair[0] });
-  }
-  // stack 表示するため本番では消したい
-  return new Response(error.stack, { status: 500 });
-}
 const debugRouter = Router({ base: "/debug" })
   .patch("/config", async (request: Request, env: Env) => {
     const config = await request.json();
@@ -251,7 +236,8 @@ const authRouter = Router()
     const res: Response = await router
       .handle(request, env, userId)
       .catch((error: any) => {
-        return handleError(request, error);
+        console.log(error.stack);
+        return new Response("unexpected error", { status: 500 });
       });
     res.headers.set(
       "Set-Cookie",
@@ -294,7 +280,8 @@ export default {
       return new Response("Configuration Error", { status: 500 });
     }
     return await authRouter.handle(request, env).catch((error: any) => {
-      return handleError(request, error);
+      console.log(error.stack);
+      return new Response("unexpected error", { status: 500 });
     });
   },
   async scheduled(event: { cron: string; scheduledTime: number }, env: Env) {

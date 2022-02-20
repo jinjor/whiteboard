@@ -6,22 +6,6 @@ type Env = {
   limiters: DurableObjectNamespace;
 };
 
-function handleError(request: Request, error: any) {
-  console.log(error.stack);
-  if (request.headers.get("Upgrade") == "websocket") {
-    // Annoyingly, if we return an HTTP error in response to a WebSocket request, Chrome devtools
-    // won't show us the response body! So... let's send a WebSocket response with an error
-    // frame instead.
-    const pair = new WebSocketPair();
-    pair[1].accept();
-    pair[1].send(JSON.stringify({ error: error.stack }));
-    pair[1].close(1011, "Uncaught exception during session setup");
-    return new Response(null, { status: 101, webSocket: pair[0] });
-  }
-  // stack 表示するため本番では消したい
-  return new Response(error.stack, { status: 500 });
-}
-
 const MAX_ACTIVE_USERS = 10;
 
 const roomRouter = Router()
@@ -38,15 +22,17 @@ const roomRouter = Router()
       return new Response("room is full", { status: 403 });
     }
     const pair = new WebSocketPair();
-
-    // We're going to take pair[1] as our end, and return pair[0] to the client.
     await state.handleSession(pair[1], userId);
-
-    // Now we return the other end of the pair to the client.
     // 101 Switching Protocols
     return new Response(null, { status: 101, webSocket: pair[0] });
   })
   .all("*", () => new Response("Not found.", { status: 404 }));
+
+type Session = {
+  name: string;
+  quit: boolean;
+  webSocket: WebSocket;
+};
 
 class RoomState {
   private storage: DurableObjectStorage;
@@ -109,17 +95,8 @@ class RoomState {
     webSocket.addEventListener("message", async (msg: MessageEvent) => {
       try {
         if (session.quit) {
-          // Whoops, when trying to send to this WebSocket in the past, it threw an exception and
-          // we marked it broken. But somehow we got another message? I guess try sending a
-          // close(), which might throw, in which case we'll try to send an error, which will also
-          // throw, and whatever, at least we won't accept the message. (This probably can't
-          // actually happen. This is defensive coding.)
-          // 何を言ってるのかよく分からないが、とにかく普通ここには来ないらしい
-          // 1011: Internal Error
-          webSocket.close(1011, "WebSocket broken.");
-          return;
+          throw new Error("unexpected session.quit");
         }
-
         if (!limiter.checkLimit()) {
           webSocket.send(
             JSON.stringify({
@@ -151,25 +128,23 @@ class RoomState {
             }
           }
         }
-      } catch (err: any) {
-        console.log(err);
-        if (err instanceof InvalidEvent) {
+      } catch (e: unknown) {
+        if (e instanceof InvalidEvent) {
           webSocket.close(1007);
           return;
         }
-        webSocket.send(
-          JSON.stringify({ kind: "error", message: "unexpected error" })
-        );
+        console.log(e);
+        webSocket.close(1011, "Something went wrong.");
       }
     });
-
-    const closeOrErrorHandler = (evt: Event) => {
+    webSocket.addEventListener("error", (e) => {
+      console.log(e);
+    });
+    webSocket.addEventListener("close", () => {
       session.quit = true;
       this.sessions = this.sessions.filter((member) => member !== session);
       this.broadcast(session.name, { kind: "quit", name: session.name });
-    };
-    webSocket.addEventListener("close", closeOrErrorHandler);
-    webSocket.addEventListener("error", closeOrErrorHandler);
+    });
 
     const objects: Objects = (await this.storage.get("objects")) ?? {};
     await this.storage.put("objects", objects);
@@ -202,12 +177,6 @@ class RoomState {
   }
 }
 
-type Session = {
-  name: string;
-  quit: boolean;
-  webSocket: WebSocket;
-};
-
 export class ChatRoom implements DurableObject {
   private state: RoomState;
   constructor(controller: any, env: Env) {
@@ -215,7 +184,8 @@ export class ChatRoom implements DurableObject {
   }
   async fetch(request: Request) {
     return roomRouter.handle(request, this.state).catch((error: any) => {
-      return handleError(request, error);
+      console.log(error.stack);
+      return new Response("unexpected error", { status: 500 });
     });
   }
 }
