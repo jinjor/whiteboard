@@ -248,7 +248,7 @@ describe("Whiteboard", function () {
       });
       await setTimeout(500);
       queue.push("c");
-    });
+    }).catch(() => {});
     queue.push("a");
     while (queue.length < 3) {
       await setTimeout(100);
@@ -436,28 +436,30 @@ describe("Whiteboard", function () {
     ]);
     assert.strictEqual(code, 1001);
   });
-  it("closes connection when receiving invalid data", async function () {
+  it("closes connection with 1007 when receiving invalid data", async function () {
     const roomId = await createRoom();
-    await assert.rejects(
-      useWebsocket(
-        "a",
-        `/api/rooms/${roomId}/websocket`,
-        async (ws: WebSocket) => {
-          ws.send(
-            JSON.stringify({
-              kind: "add",
-              object: {
-                id: "a".repeat(32),
-                kind: "text",
-                text: "foo",
-                position: { x: 0 }, // missing `y`
-              },
-            })
-          );
-          await setTimeout(100);
-        }
-      )
-    );
+    const code = await useWebsocket(
+      "a",
+      `/api/rooms/${roomId}/websocket`,
+      async (ws: WebSocket) => {
+        ws.send(
+          JSON.stringify({
+            kind: "add",
+            object: {
+              id: "a".repeat(32),
+              kind: "text",
+              text: "foo",
+              position: { x: 0 }, // missing `y`
+            },
+          })
+        );
+        await setTimeout(100);
+      }
+    ).catch((e) => {
+      const { code } = JSON.parse(e.message);
+      return code;
+    });
+    assert.strictEqual(code, 1007);
   });
   it("broadcasts addition to everyone in the room except for their sender", async function () {
     const id1 = await createRoom();
@@ -728,23 +730,25 @@ describe("Whiteboard", function () {
           await setTimeout(100);
         }
       );
-      await assert.rejects(
-        useWebsocket(
-          "a",
-          `/api/rooms/${roomId}/websocket`,
-          async (ws: WebSocket) => {
-            ws.send(
-              JSON.stringify({
-                kind: "patch",
-                id: "a".repeat(32),
-                key: "unknown",
-                value: { old: 0, new: 1 },
-              })
-            );
-            await setTimeout(100);
-          }
-        )
-      );
+      const code = await useWebsocket(
+        "a",
+        `/api/rooms/${roomId}/websocket`,
+        async (ws: WebSocket) => {
+          ws.send(
+            JSON.stringify({
+              kind: "patch",
+              id: "a".repeat(32),
+              key: "unknown",
+              value: { old: 0, new: 1 },
+            })
+          );
+          await setTimeout(100);
+        }
+      ).catch((e) => {
+        const { code } = JSON.parse(e.message);
+        return code;
+      });
+      assert.strictEqual(code, 1007);
     });
     it("handles invalid patch (invalid new value)", async function () {
       const roomId = await createRoom();
@@ -766,23 +770,25 @@ describe("Whiteboard", function () {
           await setTimeout(100);
         }
       );
-      await assert.rejects(
-        useWebsocket(
-          "a",
-          `/api/rooms/${roomId}/websocket`,
-          async (ws: WebSocket) => {
-            ws.send(
-              JSON.stringify({
-                kind: "patch",
-                id: "a".repeat(32),
-                key: "text",
-                value: { old: "foo", new: 1 },
-              })
-            );
-            await setTimeout(100);
-          }
-        )
-      );
+      const code = await useWebsocket(
+        "a",
+        `/api/rooms/${roomId}/websocket`,
+        async (ws: WebSocket) => {
+          ws.send(
+            JSON.stringify({
+              kind: "patch",
+              id: "a".repeat(32),
+              key: "text",
+              value: { old: "foo", new: 1 },
+            })
+          );
+          await setTimeout(100);
+        }
+      ).catch((e) => {
+        const { code } = JSON.parse(e.message);
+        return code;
+      });
+      assert.strictEqual(code, 1007);
     });
   });
 
