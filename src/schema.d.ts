@@ -27,6 +27,7 @@ export type PathBody = {
 };
 export type ObjectBody = TextBody | PathBody;
 export type Object_ = ObjectHead & ObjectBody;
+export type Objects = Record<ObjectId, Object_>;
 export type RequestEventHead = {
   requestedBy: UserId;
   uniqueTimestamp: Timestamp;
@@ -45,6 +46,11 @@ export type DeleteEventBody = {
   kind: "delete";
   object: ObjectBody;
 };
+export type InitEventBody = {
+  kind: "init";
+  objects: Objects;
+  members: UserId[];
+};
 export type UpsertEventBody = {
   kind: "upsert";
   object: Object_;
@@ -54,6 +60,9 @@ export type DeletedEventBody = {
   id: ObjectId;
 };
 export type RequestEventBody = AddEventBody | PatchEventBody | DeleteEventBody;
-export type ResponseEventBody = UpsertEventBody | DeletedEventBody;
+export type ResponseEventBody =
+  | InitEventBody
+  | UpsertEventBody
+  | DeletedEventBody;
 export type RequestEvent = RequestEventHead & RequestEventBody;
 export type ResponseEvent = ResponseEventBody;

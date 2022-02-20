@@ -1,3 +1,5 @@
+import { ResponseEvent } from "../schema";
+
 (async () => {
   const hostName = window.location.host || "edge-chat-demo.jinjor.workers.dev";
 
@@ -27,8 +29,8 @@
               addLog("Failed to create room: " + roomName);
               return;
             }
-            const roomName = await await res.text();
-            location.href = "/rooms/" + roomName;
+            const roomName_ = await res.text();
+            location.href = "/rooms/" + roomName_;
           };
           document.body.append(button);
         }
@@ -43,8 +45,8 @@
   }
 })();
 
-let currentWebSocket = null;
-function join(hostName, roomName) {
+let currentWebSocket: WebSocket;
+function join(hostName: string, roomName: string) {
   const ws = new WebSocket(
     // TODO: wss に
     // "wss://" + hostName + "/api/rooms/" + roomName + "/websocket"
@@ -54,7 +56,7 @@ function join(hostName, roomName) {
     currentWebSocket = ws;
   });
   ws.addEventListener("message", (event) => {
-    const data = JSON.parse(event.data);
+    const data: ResponseEvent = JSON.parse(event.data);
     addLog(JSON.stringify(data));
   });
   ws.addEventListener("close", (event) => {
@@ -66,7 +68,7 @@ function join(hostName, roomName) {
     // TODO: rejoin
   });
 }
-function addLog(message) {
+function addLog(message: string) {
   const div = document.createElement("div");
   div.innerText = message;
   document.body.append(div);

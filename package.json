@@ -3,7 +3,9 @@
   "scripts": {
     "generate-schema": "typescript-json-schema --required --strictNullChecks src/schema.d.ts '*' --out src/schema.json && npm run format",
     "format": "prettier 'src/**/*.{ts,json,html}' 'test/**/*.{ts,json}' --write",
-    "build": "esbuild --tsconfig=src/tsconfig.json src/index.ts --bundle --sourcemap --loader:.html=binary --format=esm --outfile=dist/index.mjs",
+    "build": "npm run build:backend && npm run build:frontend",
+    "build:backend": "esbuild --tsconfig=src/backend/tsconfig.json src/backend/index.ts --bundle --sourcemap --loader:.html=binary --format=esm --outfile=dist/index.mjs",
+    "build:frontend": "esbuild --tsconfig=src/frontend/tsconfig.json src/frontend/index.ts --bundle --sourcemap --outfile=assets/script.js",
     "test": "npm run build && tsc -p test/tsconfig.json && mocha -r source-map-support/register"
   },
   "keywords": [],

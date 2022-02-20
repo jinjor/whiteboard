@@ -1,6 +1,7 @@
 import { Router } from "itty-router";
 import { RateLimiterClient } from "./rate-limiter";
-import { applyEvent, InvalidEvent, Objects, validateEvent } from "./object";
+import { applyEvent, InvalidEvent, validateEvent } from "./object";
+import { Objects } from "../schema";
 
 type Env = {
   limiters: DurableObjectNamespace;

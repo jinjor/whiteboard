@@ -1,15 +1,15 @@
 import {
   RequestEvent,
-  ObjectId,
+  Objects,
   Object_,
   ResponseEvent,
   ObjectBody,
-} from "./schema";
+  RequestEventBody,
+} from "../schema";
 import deepEqual from "deep-equal";
-import { RequestEventBody } from "./schema";
 import { Validator } from "@cfworker/json-schema";
 // @ts-ignore
-import schemaJson from "./schema.json";
+import schemaJson from "../schema.json";
 
 const eventValidator = new Validator(schemaJson.definitions.RequestEventBody);
 export function validateEvent(event: any): event is RequestEventBody {
@@ -22,7 +22,6 @@ function validateObject(object: any): object is Object_ {
   return result.valid;
 }
 
-export type Objects = Record<ObjectId, Object_>;
 export class InvalidEvent extends Error {}
 
 export function applyEvent(
