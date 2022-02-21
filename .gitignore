@@ -1,5 +1,5 @@
 node_modules
-assets/**/*.js*
+assets
 dist
 src/schema.json
 test/*.js*
