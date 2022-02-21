@@ -1,5 +1,4 @@
 // @ts-ignore
-import HTML from "./index.html";
 import { Router } from "itty-router";
 import Cookie from "cookie";
 import { encrypt, decrypt } from "./crypto";
@@ -24,6 +23,42 @@ type Env = {
   COOKIE_SECRET: string;
   ENVIRONMENT: string;
 };
+
+async function getAsset(
+  request: Request,
+  env: Env,
+  context: ExecutionContext,
+  modifyPath: (path: string) => string
+): Promise<Response> {
+  try {
+    return await getAssetFromKV(
+      {
+        request,
+        waitUntil(promise) {
+          return context.waitUntil(promise);
+        },
+      },
+      {
+        ASSET_NAMESPACE: (env as any).__STATIC_CONTENT,
+        // [mf:wrn] Cache operations will have no impact if you deploy to a workers.dev subdomain!
+        cacheControl: {
+          bypassCache: true,
+        },
+        mapRequestToAsset: (req) => {
+          const url = new URL(req.url);
+          url.pathname = modifyPath(url.pathname);
+          console.log(url);
+          return new Request(url.toString(), req);
+        },
+      }
+    );
+  } catch (e) {
+    if (e instanceof NotFoundError || e instanceof MethodNotAllowedError) {
+      return new Response("Not found.", { status: 404 });
+    }
+    throw e;
+  }
+}
 
 const debugRouter = Router({ base: "/debug" })
   .patch("/config", async (request: Request, env: Env) => {
@@ -134,60 +169,25 @@ const apiRouter = Router({ base: "/api" })
   );
 
 const router = Router()
-  .get(
-    "/assets/*",
-    async (request: Request, env: Env, context: ExecutionContext) => {
-      try {
-        return await getAssetFromKV(
-          {
-            request,
-            waitUntil(promise) {
-              return context.waitUntil(promise);
-            },
-          },
-          {
-            ASSET_NAMESPACE: (env as any).__STATIC_CONTENT,
-            // [mf:wrn] Cache operations will have no impact if you deploy to a workers.dev subdomain!
-            cacheControl: {
-              bypassCache: true,
-            },
-            mapRequestToAsset: (req) =>
-              new Request(req.url.replace("/assets/", "/"), req),
-          }
-        );
-      } catch (e) {
-        if (e instanceof NotFoundError || e instanceof MethodNotAllowedError) {
-          return new Response("Not found.", { status: 404 });
-        }
-        throw e;
-      }
-    }
-  )
-  .get("/", () => {
-    return new Response(HTML.slice(0), {
-      headers: { "Content-Type": "text/html;charset=UTF-8" },
-    });
-  })
-  .get("/rooms", () => {
-    return new Response(HTML.slice(0), {
-      headers: { "Content-Type": "text/html;charset=UTF-8" },
-    });
-  })
-  .get("/rooms/:roomName", () => {
-    return new Response(HTML.slice(0), {
-      headers: { "Content-Type": "text/html;charset=UTF-8" },
-    });
-  })
-  .all("/api/*", apiRouter.handle)
   .all(
     "/debug/*",
-    (request: Request, env: Env) => {
+    (req: Request, env: Env) => {
       if (env.ENVIRONMENT !== "test") {
         return new Response("Not found.", { status: 404 });
       }
     },
     debugRouter.handle
   )
+  .all("/api/*", apiRouter.handle)
+  .get("/assets/*", async (req: Request, env: Env, ctx: ExecutionContext) => {
+    return getAsset(req, env, ctx, (path) => path.replace("/assets/", "/"));
+  })
+  .get("/", async (req: Request, env: Env, ctx: ExecutionContext) => {
+    return getAsset(req, env, ctx, () => "/index.html");
+  })
+  .get("/rooms/:id", async (req: Request, env: Env, ctx: ExecutionContext) => {
+    return getAsset(req, env, ctx, () => "/room.html");
+  })
   .all("*", () => new Response("Not found.", { status: 404 }));
 
 const GITHUB_SCOPE = "read:org";
