@@ -8,13 +8,14 @@ account_id = "7e155f728b0311833218e72046aaa90a"
 format = "modules"
 dir = "dist"
 main = "./index.mjs"
-rules = [{type = "Data", globs = ["**/*.html", "**/*.json"]}]
+rules = [{type = "Text", globs = ["**/*.json"]}]
 
 [site]
 bucket = "./assets"
 entry-point = "./dist"
 
 [triggers]
+# TODO: 本番はもっと低頻度でいい
 crons = ["* * * * *"]
 
 [durable_objects]
@@ -24,11 +25,10 @@ bindings = [
   { name = "limiters", class_name = "RateLimiter" }
 ]
 
-# Indicate that you want the ChatRoom and RateLimiter classes to be callable as Durable Objects.
 [[migrations]]
-tag = "v1" # Should be unique for each entry
+tag = "v1"
 new_classes = ["ChatRoom", "RateLimiter"]
 
 [[migrations]]
-tag = "v2" # Should be unique for each entry
+tag = "v2"
 new_classes = ["RoomManager"]
