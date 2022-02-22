@@ -88,7 +88,7 @@ describe("Whiteboard", function () {
     }
     {
       const res = await request("GET", "/rooms");
-      assert.strictEqual(res.status, 200);
+      assert.strictEqual(res.status, 404);
     }
     {
       const res = await request("GET", "/rooms/foo");
