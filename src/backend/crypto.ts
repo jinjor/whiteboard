@@ -68,3 +68,12 @@ export async function decrypt(secret: string, text: string): Promise<string> {
   const key = await makeKey(secret);
   return aesDecrypt(key, text);
 }
+
+export async function digest(text: string): Promise<string> {
+  const buf = await crypto.subtle.digest(
+    "SHA-1",
+    new TextEncoder().encode(text)
+  );
+  const hashArray = Array.from(new Uint8Array(buf));
+  return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+}

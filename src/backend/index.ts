@@ -1,7 +1,7 @@
 // @ts-ignore
 import { Router } from "itty-router";
 import Cookie from "cookie";
-import { encrypt, decrypt } from "./crypto";
+import { encrypt, decrypt, digest } from "./crypto";
 import * as github from "./github";
 import { RoomInfo, RoomPatch } from "./room-manager";
 export { RateLimiter } from "./rate-limiter";
@@ -17,12 +17,23 @@ type Env = {
   manager: DurableObjectNamespace;
   rooms: DurableObjectNamespace;
   limiters: DurableObjectNamespace;
-  GITHUB_CLIENT_ID: string;
-  GITHUB_CLIENT_SECRET: string;
-  GITHUB_ORG: string;
-  COOKIE_SECRET: string;
-  ENVIRONMENT: string;
-};
+
+  DEBUG_API: "true" | "false";
+} & (
+  | {
+      AUTH_TYPE: "header";
+    }
+  | {
+      AUTH_TYPE: "user_agent";
+    }
+  | {
+      AUTH_TYPE: "github";
+      GITHUB_CLIENT_ID: string;
+      GITHUB_CLIENT_SECRET: string;
+      GITHUB_ORG: string;
+      COOKIE_SECRET: string;
+    }
+);
 
 async function getAsset(
   request: Request,
@@ -172,7 +183,7 @@ const router = Router()
   .all(
     "/debug/*",
     (req: Request, env: Env) => {
-      if (env.ENVIRONMENT !== "test") {
+      if (env.DEBUG_API !== "true") {
         return new Response("Not found.", { status: 404 });
       }
     },
@@ -194,6 +205,9 @@ const GITHUB_SCOPE = "read:org";
 
 const authRouter = Router()
   .get("/callback/github", async (request: Request, env: Env) => {
+    if (env.AUTH_TYPE !== "github") {
+      return new Response("Not found.", { status: 404 });
+    }
     const cookie = Cookie.parse(request.headers.get("Cookie") ?? "");
     const code = new URL(request.url).searchParams.get("code");
     if (code == null) {
@@ -237,52 +251,61 @@ const authRouter = Router()
     return res;
   })
   .all("*", async (request: Request, env: Env, context: ExecutionContext) => {
-    const cookie = Cookie.parse(request.headers.get("Cookie") ?? "");
-    console.log("cookie:", cookie);
     let userId;
-    if (cookie.session == null) {
-      const testUserId = request.headers.get("WB-TEST-USER");
-      if (testUserId != null) {
-        userId = testUserId;
+    if (env.AUTH_TYPE === "header") {
+      userId = request.headers.get("WB-TEST-USER");
+      if (userId == null) {
+        throw new Error("missing WB-TEST-USER");
       }
-    } else {
-      try {
-        userId = await decrypt(env.COOKIE_SECRET, cookie.session);
-      } catch (e) {}
-    }
-    if (userId == null) {
-      return new Response(null, {
-        status: 302,
-        headers: {
-          "Set-Cookie": Cookie.serialize("original_url", request.url, {
-            path: "/",
-            httpOnly: true,
-            maxAge: 60,
-            sameSite: "strict",
-          }),
-          Location: github.makeFormUrl(env.GITHUB_CLIENT_ID, GITHUB_SCOPE),
-        },
-      });
+    } else if (env.AUTH_TYPE === "user_agent") {
+      const userAgent = request.headers.get("User-Agent");
+      if (!userAgent) {
+        throw new Error("assertion error");
+      }
+      const hash = await digest(userAgent);
+      userId = "UA_" + hash.slice(0, 7);
+    } else if (env.AUTH_TYPE === "github") {
+      const cookie = Cookie.parse(request.headers.get("Cookie") ?? "");
+      console.log("cookie:", cookie);
+      if (cookie.session != null) {
+        try {
+          userId = await decrypt(env.COOKIE_SECRET, cookie.session);
+        } catch (e) {}
+      }
+      if (userId == null) {
+        return new Response(null, {
+          status: 302,
+          headers: {
+            "Set-Cookie": Cookie.serialize("original_url", request.url, {
+              path: "/",
+              httpOnly: true,
+              maxAge: 60,
+              sameSite: "strict",
+            }),
+            Location: github.makeFormUrl(env.GITHUB_CLIENT_ID, GITHUB_SCOPE),
+          },
+        });
+      }
+      if (userId === "_guest") {
+        return new Response("Not a member of org.", { status: 403 });
+      }
     }
     console.log("userId:", userId);
-    if (userId === "_guest") {
-      return new Response("Not a member of org.", { status: 403 });
+    if (userId == null) {
+      throw new Error("assertion error");
     }
-    const res: Response = await router
-      .handle(request, env, context, userId)
-      .catch((error: any) => {
-        console.log(error.stack);
-        return new Response("unexpected error", { status: 500 });
-      });
-    res.headers.set(
-      "Set-Cookie",
-      Cookie.serialize("session", await encrypt(env.COOKIE_SECRET, userId), {
-        path: "/",
-        httpOnly: true,
-        maxAge: 60 * 60 * 24 * 7, // 1 week
-        sameSite: "strict",
-      })
-    );
+    const res: Response = await router.handle(request, env, context, userId);
+    if (env.AUTH_TYPE === "github") {
+      res.headers.set(
+        "Set-Cookie",
+        Cookie.serialize("session", await encrypt(env.COOKIE_SECRET, userId), {
+          path: "/",
+          httpOnly: true,
+          maxAge: 60 * 60 * 24 * 7, // 1 week
+          sameSite: "strict",
+        })
+      );
+    }
     return res;
   });
 
@@ -291,27 +314,33 @@ export default {
     console.log("Root's fetch(): " + request.method, request.url);
     console.log(env);
     let preconditionOk = true;
-    if (!["prd", "dev", "test"].includes(env.ENVIRONMENT)) {
+    if (!["true", "false"].includes(env.DEBUG_API)) {
       preconditionOk = false;
-      console.log("ENVIRONMENT not valid");
+      console.log("DEBUG_API not valid");
     }
-    if (!env.GITHUB_CLIENT_ID) {
+    if (!["header", "user_agent", "github"].includes(env.AUTH_TYPE)) {
       preconditionOk = false;
-      console.log("GITHUB_CLIENT_ID not found");
+      console.log("AUTH_TYPE not valid");
     }
-    if (!env.GITHUB_CLIENT_SECRET) {
-      preconditionOk = false;
-      console.log("GITHUB_CLIENT_SECRET not found");
+    if (env.AUTH_TYPE === "github") {
+      if (!env.GITHUB_CLIENT_ID) {
+        preconditionOk = false;
+        console.log("GITHUB_CLIENT_ID not found");
+      }
+      if (!env.GITHUB_CLIENT_SECRET) {
+        preconditionOk = false;
+        console.log("GITHUB_CLIENT_SECRET not found");
+      }
+      if (!env.GITHUB_ORG) {
+        preconditionOk = false;
+        console.log("GITHUB_ORG not found");
+      }
+      if (!env.COOKIE_SECRET) {
+        preconditionOk = false;
+        console.log("COOKIE_SECRET not found");
+      }
     }
-    if (!env.GITHUB_ORG) {
-      preconditionOk = false;
-      console.log("GITHUB_ORG not found");
-    }
-    if (!env.COOKIE_SECRET) {
-      preconditionOk = false;
-      console.log("COOKIE_SECRET not found");
-    }
-    if (env.ENVIRONMENT !== "test" && !preconditionOk) {
+    if (!preconditionOk) {
       return new Response("Configuration Error", { status: 500 });
     }
     return await authRouter
