@@ -6,8 +6,19 @@
       content="width=device-width, initial-scale=1.0, user-scalable=no"
     />
     <link rel="stylesheet" href="/assets/style.css" />
+    <style>
+      .hidden {
+        display: none;
+      }
+      svg {
+        width: 100vw;
+        height: 100vh;
+      }
+    </style>
   </head>
   <body>
+    <input id="input" class="hidden" />
+    <svg id="board"></svg>
     <script src="/assets/room.js"></script>
   </body>
 </html>
