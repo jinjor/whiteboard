@@ -1,11 +1,18 @@
 import { ObjectId, PatchEventBody, Position, ResponseEvent } from "../schema";
 
+type PixelPosition = Position & { pos: "p" };
+type NormalizedPosition = Position & { pos: "n" };
+
+type Size = { width: number; height: number };
 type Patch = PatchEventBody;
 type Drag =
-  | { kind: "select"; start: Position }
-  | { kind: "draw"; path: Position[] }
-  | { kind: "move"; start: Position };
+  | { kind: "select"; start: NormalizedPosition }
+  | { kind: "draw"; path: NormalizedPosition[] }
+  | { kind: "move"; start: NormalizedPosition };
 type State = {
+  svgEl: HTMLElement;
+  inputEl: HTMLInputElement;
+  boardSize: Size;
   websocket: WebSocket | null;
   undos: Patch[];
   redos: Patch[];
@@ -63,25 +70,25 @@ function connect(pageInfo: PageInfo, state: State) {
 function generateObjectId(): string {
   return String(Date.now()).padStart(32, "0");
 }
-function startDrawing(state: State, pos: Position): void {
+function startDrawing(state: State, pos: NormalizedPosition): void {
   state.drag = { kind: "draw", path: [pos] };
 }
-function continueDrawing(state: State, pos: Position): void {}
-function stopDrawing(state: State, pos: Position): void {}
+function continueDrawing(state: State, pos: NormalizedPosition): void {}
+function stopDrawing(state: State, pos: NormalizedPosition): void {}
 
-function startSelecting(state: State, pos: Position): void {
+function startSelecting(state: State, pos: NormalizedPosition): void {
   state.drag = { kind: "select", start: pos };
 }
-function continueSelecting(state: State, pos: Position): void {}
-function stopSelecting(state: State, pos: Position): void {}
+function continueSelecting(state: State, pos: NormalizedPosition): void {}
+function stopSelecting(state: State, pos: NormalizedPosition): void {}
 
-function startMoving(state: State, pos: Position): void {
+function startMoving(state: State, pos: NormalizedPosition): void {
   state.drag = { kind: "select", start: pos };
 }
-function continueMoving(state: State, pos: Position): void {}
-function stopMoving(state: State, pos: Position): void {}
+function continueMoving(state: State, pos: NormalizedPosition): void {}
+function stopMoving(state: State, pos: NormalizedPosition): void {}
 
-function createText(state: State, pos: Position): void {}
+function createText(state: State, pos: NormalizedPosition): void {}
 function startEditingText(state: State): void {}
 function stopEditingText(state: State, text: string): void {
   if (text.length > 0) {
@@ -109,78 +116,110 @@ function listenToKeyboardEvents(
 ): () => void {
   return () => {};
 }
-function listenToInputEvents(
+function getBoardSize(svgElement: HTMLElement): Size {
+  const rect = svgElement.getBoundingClientRect();
+  return { width: rect.width, height: rect.height };
+}
+function getPixelPosition(e: MouseEvent): PixelPosition {
+  return {
+    pos: "p",
+    x: e.offsetX,
+    y: e.offsetY,
+  };
+}
+function toNormalizedPosition(
   state: State,
-  inputElement: HTMLInputElement
-): () => void {
-  inputElement.onkeydown = (e: KeyboardEvent) => {
+  ppos: PixelPosition
+): NormalizedPosition {
+  return {
+    pos: "n",
+    x: ppos.x / state.boardSize.width,
+    y: ppos.y / state.boardSize.height,
+  };
+}
+function listtenToWindowEvents(state: State): () => void {
+  window.onresize = () => {
+    state.boardSize = getBoardSize(state.svgEl);
+  };
+  return () => {
+    window.onresize = null;
+  };
+}
+function listenToInputEvents(state: State): () => void {
+  state.inputEl.onkeydown = (e: KeyboardEvent) => {
     e.stopPropagation();
     if (e.key === "Enter") {
       e.preventDefault();
-      const text = inputElement.value;
+      const text = state.inputEl.value;
       stopEditingText(state, text);
-      inputElement.value = "";
-      inputElement.classList.add("hidden");
+      state.inputEl.value = "";
+      state.inputEl.classList.add("hidden");
     }
   };
   return () => {
-    inputElement.oninput = null;
-    inputElement.onkeydown = null;
+    state.inputEl.oninput = null;
+    state.inputEl.onkeydown = null;
   };
 }
-function listenToBoardEvents(
-  state: State,
-  svgElement: HTMLElement,
-  inputElement: HTMLInputElement
-): () => void {
-  svgElement.ondblclick = (e: MouseEvent) => {
-    createText(state, { x: 0, y: 0 });
-    inputElement.classList.remove("hidden");
-    inputElement.focus();
+function listenToBoardEvents(state: State): () => void {
+  state.svgEl.ondblclick = (e: MouseEvent) => {
+    const pos = getPixelPosition(e);
+    const npos = toNormalizedPosition(state, pos);
+    createText(state, npos);
+    state.inputEl.classList.remove("hidden");
+    state.inputEl.focus();
   };
-  svgElement.onmousedown = (e: MouseEvent) => {
+  state.svgEl.onmousedown = (e: MouseEvent) => {
+    const pos = getPixelPosition(e);
+    const npos = toNormalizedPosition(state, pos);
     if (e.button === 0) {
       if (state.selected.length > 0) {
-        return startMoving(state, { x: 0, y: 0 });
+        return startMoving(state, npos);
       }
-      return startDrawing(state, { x: 0, y: 0 });
+      return startDrawing(state, npos);
     } else {
-      return startSelecting(state, { x: 0, y: 0 });
+      return startSelecting(state, npos);
     }
   };
-  svgElement.onmouseup = (e: MouseEvent) => {
+  state.svgEl.onmouseup = (e: MouseEvent) => {
+    const pos = getPixelPosition(e);
+    const npos = toNormalizedPosition(state, pos);
     if (e.button === 0) {
       if (state.selected.length > 0) {
-        return stopMoving(state, { x: 0, y: 0 });
+        return stopMoving(state, npos);
       }
-      return stopDrawing(state, { x: 0, y: 0 });
+      return stopDrawing(state, npos);
     } else {
-      return stopMoving(state, { x: 0, y: 0 });
+      return stopMoving(state, npos);
     }
   };
   return () => {
-    svgElement.ondblclick = null;
-    svgElement.onmousedown = null;
-    svgElement.onmouseup = null;
+    state.svgEl.ondblclick = null;
+    state.svgEl.onmousedown = null;
+    state.svgEl.onmouseup = null;
   };
 }
 
 (async () => {
   const pageInfo = getPageInfo();
-  const state: State = {
-    websocket: null,
-    undos: [],
-    redos: [],
-    drag: null,
-    selected: [],
-  };
   const roomExists = await isRoomPresent(pageInfo.roomId);
   if (roomExists) {
-    connect(pageInfo, state);
     const svgElement = document.getElementById("board")!;
     const inputElement = document.getElementById("input")! as HTMLInputElement;
-    listenToBoardEvents(state, svgElement, inputElement);
-    listenToInputEvents(state, inputElement);
+    const state: State = {
+      svgEl: svgElement,
+      inputEl: inputElement,
+      boardSize: getBoardSize(svgElement),
+      websocket: null,
+      undos: [],
+      redos: [],
+      drag: null,
+      selected: [],
+    };
+    listenToBoardEvents(state);
+    listenToInputEvents(state);
+    listtenToWindowEvents(state);
+    connect(pageInfo, state);
   } else {
     // show error
   }
