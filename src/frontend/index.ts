@@ -1,5 +1,5 @@
 (async () => {
-  if (location.hostname === "localhost") {
+  if (location.protocol === "http:") {
     const button = document.createElement("button");
     button.textContent = "Create Room for Debug";
     button.onclick = async () => {

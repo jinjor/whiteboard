@@ -23,7 +23,7 @@ type State = {
   svgEl: HTMLElement;
   inputEl: HTMLInputElement;
   selectorEl: HTMLElement;
-  boardSize: Size;
+  boardRect: { position: PixelPosition; size: Size };
   websocket: WebSocket | null;
   undos: Patch[];
   redos: Patch[];
@@ -37,10 +37,10 @@ type PageInfo = {
 };
 
 function getPageInfo(): PageInfo {
-  const { host, hostname, pathname } = window.location;
+  const { host, protocol, pathname } = window.location;
   const splitted = pathname.split("/");
   const roomName = splitted[2];
-  const wsProtocol = hostname === "localhost" ? "ws" : "wss";
+  const wsProtocol = protocol === "http:" ? "ws" : "wss";
   return {
     roomId: roomName,
     wsRoot: `${wsProtocol}://${host}`,
@@ -247,22 +247,35 @@ function listenToKeyboardEvents(
 ): () => void {
   return () => {};
 }
-function getBoardSize(svgElement: HTMLElement): Size {
+function getBoardRect(svgElement: HTMLElement): {
+  size: Size;
+  position: PixelPosition;
+} {
   const rect = svgElement.getBoundingClientRect();
-  return { width: rect.width, height: rect.height };
+  return {
+    size: { width: rect.width, height: rect.height },
+    position: { pos: "p", x: rect.left, y: rect.top },
+  };
 }
-function getPixelPosition(e: MouseEvent): PixelPosition {
+function getPixelPositionFromMouse(e: MouseEvent): PixelPosition {
   return {
     pos: "p",
     x: e.offsetX,
     y: e.offsetY,
   };
 }
+function getPixelPositionFromTouch(state: State, touch: Touch): PixelPosition {
+  return {
+    pos: "p",
+    x: touch.pageX - state.boardRect.position.x,
+    y: touch.pageY - state.boardRect.position.y,
+  };
+}
 function toNormalizedPosition(
   state: State,
   ppos: PixelPosition
 ): NormalizedPosition {
-  const { width, height } = state.boardSize;
+  const { width, height } = state.boardRect.size;
   const viewBoxWidth = 1;
   const viewBoxHeight = 1;
   const actualRatioPerExpectedRatio =
@@ -284,10 +297,19 @@ function toPixelPosition(
   state: State,
   npos: NormalizedPosition
 ): PixelPosition {
+  const { width, height } = state.boardRect.size;
+  const viewBoxWidth = 1;
+  const viewBoxHeight = 1;
+  const actualRatioPerExpectedRatio =
+    width / height / (viewBoxWidth / viewBoxHeight);
+  const scaleX = Math.max(actualRatioPerExpectedRatio, 1);
+  const scaleY = Math.max(1 / actualRatioPerExpectedRatio, 1);
+  const offsetX = viewBoxWidth * ((1 - scaleX) / 2);
+  const offsetY = viewBoxHeight * ((1 - scaleY) / 2);
   return {
     pos: "p",
-    x: npos.x * state.boardSize.width,
-    y: npos.y * state.boardSize.height,
+    x: ((npos.x - offsetX) / scaleX) * width,
+    y: ((npos.y - offsetY) / scaleY) * height,
   };
 }
 function updateInputElementPosition(state: State): void {
@@ -299,7 +321,7 @@ function updateInputElementPosition(state: State): void {
 }
 function listtenToWindowEvents(state: State): () => void {
   window.onresize = () => {
-    state.boardSize = getBoardSize(state.svgEl);
+    state.boardRect = getBoardRect(state.svgEl);
     updateInputElementPosition(state);
   };
   return () => {
@@ -324,7 +346,8 @@ function listenToInputEvents(state: State): () => void {
 }
 function listenToBoardEvents(state: State): () => void {
   state.svgEl.ondblclick = (e: MouseEvent) => {
-    const pos = getPixelPosition(e);
+    e.preventDefault();
+    const pos = getPixelPositionFromMouse(e);
     const npos = toNormalizedPosition(state, pos);
     createText(state, npos);
     updateInputElementPosition(state);
@@ -332,7 +355,8 @@ function listenToBoardEvents(state: State): () => void {
     state.inputEl.focus();
   };
   state.svgEl.onmousedown = (e: MouseEvent) => {
-    const pos = getPixelPosition(e);
+    e.preventDefault();
+    const pos = getPixelPositionFromMouse(e);
     const npos = toNormalizedPosition(state, pos);
     if (e.button === 0) {
       if (state.selected.length > 0) {
@@ -343,8 +367,18 @@ function listenToBoardEvents(state: State): () => void {
       return startSelecting(state, npos);
     }
   };
+  state.svgEl.ontouchstart = (e: TouchEvent) => {
+    e.preventDefault();
+    const pos = getPixelPositionFromTouch(state, e.touches[0]);
+    const npos = toNormalizedPosition(state, pos);
+    if (state.selected.length > 0) {
+      return startMoving(state, npos);
+    }
+    return startDrawing(state, npos);
+  };
   state.svgEl.onmousemove = (e: MouseEvent) => {
-    const pos = getPixelPosition(e);
+    e.preventDefault();
+    const pos = getPixelPositionFromMouse(e);
     const npos = toNormalizedPosition(state, pos);
     if (e.button === 0) {
       if (state.selected.length > 0) {
@@ -355,8 +389,18 @@ function listenToBoardEvents(state: State): () => void {
       return continueMoving(state, npos);
     }
   };
+  state.svgEl.ontouchmove = (e: TouchEvent) => {
+    e.preventDefault();
+    const pos = getPixelPositionFromTouch(state, e.touches[0]);
+    const npos = toNormalizedPosition(state, pos);
+    if (state.selected.length > 0) {
+      return continueMoving(state, npos);
+    }
+    return continueDrawing(state, npos);
+  };
   state.svgEl.onmouseup = (e: MouseEvent) => {
-    const pos = getPixelPosition(e);
+    e.preventDefault();
+    const pos = getPixelPositionFromMouse(e);
     const npos = toNormalizedPosition(state, pos);
     if (e.button === 0) {
       if (state.selected.length > 0) {
@@ -367,10 +411,23 @@ function listenToBoardEvents(state: State): () => void {
       return stopMoving(state, npos);
     }
   };
+  state.svgEl.ontouchend = (e: TouchEvent) => {
+    e.preventDefault();
+    const pos = getPixelPositionFromTouch(state, e.changedTouches[0]);
+    const npos = toNormalizedPosition(state, pos);
+    if (state.selected.length > 0) {
+      return stopMoving(state, npos);
+    }
+    return stopDrawing(state, npos);
+  };
   return () => {
     state.svgEl.ondblclick = null;
     state.svgEl.onmousedown = null;
+    state.svgEl.ontouchstart = null;
+    state.svgEl.onmousemove = null;
+    state.svgEl.ontouchmove = null;
     state.svgEl.onmouseup = null;
+    state.svgEl.ontouchend = null;
   };
 }
 
@@ -385,7 +442,7 @@ function listenToBoardEvents(state: State): () => void {
       svgEl,
       inputEl,
       selectorEl,
-      boardSize: getBoardSize(svgEl),
+      boardRect: getBoardRect(svgEl),
       websocket: null,
       undos: [],
       redos: [],
@@ -402,7 +459,7 @@ function listenToBoardEvents(state: State): () => void {
     });
   } else {
     // show error
-    if (location.hostname === "localhost") {
+    if (location.protocol === "http:") {
       const button = document.createElement("button");
       button.textContent = "Create Room for Debug";
       button.onclick = async () => {

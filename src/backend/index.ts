@@ -58,7 +58,6 @@ async function getAsset(
         mapRequestToAsset: (req) => {
           const url = new URL(req.url);
           url.pathname = modifyPath(url.pathname);
-          console.log(url);
           return new Request(url.toString(), req);
         },
       }
@@ -312,7 +311,7 @@ const authRouter = Router()
 export default {
   async fetch(request: Request, env: Env, context: ExecutionContext) {
     console.log("Root's fetch(): " + request.method, request.url);
-    console.log(env);
+    console.log("AUTH_TYPE: " + env.AUTH_TYPE);
     let preconditionOk = true;
     if (!["true", "false"].includes(env.DEBUG_API)) {
       preconditionOk = false;
