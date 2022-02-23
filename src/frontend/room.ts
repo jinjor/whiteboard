@@ -114,7 +114,7 @@ function upsertText(state: State, text: TextBody) {
     element = document.createElementNS("http://www.w3.org/2000/svg", "text");
     element.id = text.id;
     element.setAttributeNS(null, "clip-path", "url(#clip)");
-    element.setAttributeNS(null, "font-size", String(0.04));
+    element.setAttributeNS(null, "font-size", String(0.02));
   }
   element.textContent = text.text;
   element.setAttributeNS(null, "x", String(text.position.x));
@@ -131,7 +131,7 @@ function upsertPath(state: State, path: PathBody) {
     element.setAttributeNS(null, "clip-path", "url(#clip)");
     element.setAttributeNS(null, "fill", "none");
     element.setAttributeNS(null, "stroke", "black");
-    element.setAttributeNS(null, "stroke-width", String(0.005));
+    element.setAttributeNS(null, "stroke-width", String(0.002));
   }
   const d = makeD(path.points);
   element.setAttributeNS(null, "d", d);
@@ -202,9 +202,36 @@ function stopDrawing(state: State, pos: NormalizedPosition): void {
 
 function startSelecting(state: State, pos: NormalizedPosition): void {
   state.editing = { kind: "select", start: pos };
+  state.selectorEl.setAttributeNS(null, "x", String(pos.x));
+  state.selectorEl.setAttributeNS(null, "y", String(pos.y));
+  state.selectorEl.setAttributeNS(null, "width", String(0));
+  state.selectorEl.setAttributeNS(null, "height", String(0));
+  state.selectorEl.setAttributeNS(null, "stroke", "red");
 }
-function continueSelecting(state: State, pos: NormalizedPosition): void {}
-function stopSelecting(state: State, pos: NormalizedPosition): void {}
+function continueSelecting(state: State, pos: NormalizedPosition): void {
+  if (state.editing.kind === "select") {
+    const start = state.editing.start;
+    const x = Math.min(pos.x, start.x);
+    const y = Math.min(pos.y, start.y);
+    const width = Math.abs(pos.x - start.x);
+    const height = Math.abs(pos.y - start.y);
+    state.selectorEl.setAttributeNS(null, "x", String(x));
+    state.selectorEl.setAttributeNS(null, "y", String(y));
+    state.selectorEl.setAttributeNS(null, "width", String(width));
+    state.selectorEl.setAttributeNS(null, "height", String(height));
+  }
+}
+function stopSelecting(state: State, pos: NormalizedPosition): void {
+  if (state.editing.kind === "select") {
+    const start = state.editing.start;
+    const x = Math.min(pos.x, start.x);
+    const y = Math.min(pos.y, start.y);
+    const width = Math.abs(pos.x - start.x);
+    const height = Math.abs(pos.y - start.y);
+  }
+  state.editing = { kind: "none" };
+  state.selectorEl.setAttributeNS(null, "stroke", "none");
+}
 
 function startMoving(state: State, pos: NormalizedPosition): void {
   state.editing = { kind: "select", start: pos };
@@ -214,9 +241,13 @@ function stopMoving(state: State, pos: NormalizedPosition): void {}
 
 function createText(state: State, pos: NormalizedPosition): void {
   state.editing = { kind: "text", position: pos };
+  updateInputElementPosition(state);
+  state.inputEl.classList.remove("hidden");
+  state.inputEl.focus();
 }
 function startEditingText(state: State): void {}
-function stopEditingText(state: State, text: string): void {
+function stopEditingText(state: State): void {
+  const text = state.inputEl.value;
   if (state.editing.kind === "text") {
     if (text.length > 0) {
       if (state.websocket != null) {
@@ -237,6 +268,8 @@ function stopEditingText(state: State, text: string): void {
     }
   }
   state.editing = { kind: "none" };
+  state.inputEl.value = "";
+  state.inputEl.classList.add("hidden");
 }
 
 function undo(state: State): void {}
@@ -333,10 +366,7 @@ function listenToInputEvents(state: State): () => void {
     e.stopPropagation();
     if (e.key === "Enter") {
       e.preventDefault();
-      const text = state.inputEl.value;
-      stopEditingText(state, text);
-      state.inputEl.value = "";
-      state.inputEl.classList.add("hidden");
+      stopEditingText(state);
     }
   };
   return () => {
@@ -350,9 +380,12 @@ function listenToBoardEvents(state: State): () => void {
     const pos = getPixelPositionFromMouse(e);
     const npos = toNormalizedPosition(state, pos);
     createText(state, npos);
-    updateInputElementPosition(state);
-    state.inputEl.classList.remove("hidden");
-    state.inputEl.focus();
+  };
+  state.svgEl.oncontextmenu = (e: MouseEvent) => {
+    if (e.ctrlKey) {
+      return;
+    }
+    e.preventDefault();
   };
   state.svgEl.onmousedown = (e: MouseEvent) => {
     e.preventDefault();
@@ -380,35 +413,48 @@ function listenToBoardEvents(state: State): () => void {
     e.preventDefault();
     const pos = getPixelPositionFromMouse(e);
     const npos = toNormalizedPosition(state, pos);
-    if (e.button === 0) {
-      if (state.selected.length > 0) {
+    switch (state.editing.kind) {
+      case "move": {
         return continueMoving(state, npos);
       }
-      return continueDrawing(state, npos);
-    } else {
-      return continueMoving(state, npos);
+      case "path": {
+        return continueDrawing(state, npos);
+      }
+      case "select": {
+        return continueSelecting(state, npos);
+      }
     }
   };
   state.svgEl.ontouchmove = (e: TouchEvent) => {
     e.preventDefault();
     const pos = getPixelPositionFromTouch(state, e.touches[0]);
     const npos = toNormalizedPosition(state, pos);
-    if (state.selected.length > 0) {
-      return continueMoving(state, npos);
+    switch (state.editing.kind) {
+      case "move": {
+        return stopMoving(state, npos);
+      }
+      case "path": {
+        return stopDrawing(state, npos);
+      }
+      case "select": {
+        return stopSelecting(state, npos);
+      }
     }
-    return continueDrawing(state, npos);
   };
   state.svgEl.onmouseup = (e: MouseEvent) => {
     e.preventDefault();
     const pos = getPixelPositionFromMouse(e);
     const npos = toNormalizedPosition(state, pos);
-    if (e.button === 0) {
-      if (state.selected.length > 0) {
+    switch (state.editing.kind) {
+      case "move": {
         return stopMoving(state, npos);
       }
-      return stopDrawing(state, npos);
-    } else {
-      return stopMoving(state, npos);
+      case "path": {
+        return stopDrawing(state, npos);
+      }
+      case "select": {
+        return stopSelecting(state, npos);
+      }
     }
   };
   state.svgEl.ontouchend = (e: TouchEvent) => {
