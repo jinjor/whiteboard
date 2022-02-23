@@ -1,7 +1,7 @@
 {
   "name": "whiteboard",
   "scripts": {
-    "generate-schema": "typescript-json-schema --required --strictNullChecks src/schema.d.ts '*' --out src/schema.json && npm run format",
+    "generate-schema": "typescript-json-schema --required --strictNullChecks --noExtraProps src/schema.d.ts '*' --out src/schema.json && npm run format",
     "format": "prettier 'src/**/*.{ts,json,html}' 'test/**/*.{ts,json}' --write",
     "build": "npm run build:backend && npm run build:frontend",
     "build:backend": "esbuild --tsconfig=src/backend/tsconfig.json src/backend/index.ts --bundle --sourcemap --loader:.html=binary --format=esm --outfile=dist/index.mjs",

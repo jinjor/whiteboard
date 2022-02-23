@@ -1,15 +1,22 @@
+import { ObjectId, PatchEventBody, Position, ResponseEvent } from "../schema";
 import {
-  ObjectBody,
-  ObjectId,
-  PatchEventBody,
-  PathBody,
-  Position,
-  ResponseEvent,
-  TextBody,
-} from "../schema";
-
-type PixelPosition = Position & { pos: "p" };
-type NormalizedPosition = Position & { pos: "n" };
+  deleteObject,
+  getD,
+  getPosition,
+  Input,
+  listenToBoardEvents,
+  makeD,
+  parseD,
+  PixelPosition,
+  Selector,
+  setD,
+  setPosition,
+  setSelected,
+  toPixelPosition,
+  upsertObject,
+  upsertPath,
+  upsertText,
+} from "./board";
 
 type Size = { width: number; height: number };
 class Rectangle {
@@ -32,25 +39,25 @@ type ObjectForSelect =
       kind: "text";
       id: ObjectId;
       bbox: Rectangle;
-      position: NormalizedPosition;
+      position: Position;
     }
   | {
       kind: "path";
       id: ObjectId;
       bbox: Rectangle;
-      points: NormalizedPosition[];
+      points: Position[];
     };
 
 type EditingState =
   | { kind: "none" }
-  | { kind: "select"; start: NormalizedPosition; objects: ObjectForSelect[] }
-  | { kind: "move"; start: NormalizedPosition }
-  | { kind: "path"; points: NormalizedPosition[]; id: ObjectId }
-  | { kind: "text"; position: NormalizedPosition };
+  | { kind: "select"; start: Position; objects: ObjectForSelect[] }
+  | { kind: "move"; start: Position }
+  | { kind: "path"; points: Position[]; id: ObjectId }
+  | { kind: "text"; position: Position };
 type State = {
   svgEl: HTMLElement;
-  inputEl: HTMLInputElement;
-  selectorEl: HTMLElement;
+  input: Input;
+  selector: Selector;
   boardRect: { position: PixelPosition; size: Size };
   websocket: WebSocket | null;
   undos: Patch[];
@@ -97,16 +104,16 @@ function connect(pageInfo: PageInfo, state: State, disableEditing: () => void) {
     switch (data.kind) {
       case "init": {
         for (const key of Object.keys(data.objects)) {
-          upsertObject(state, data.objects[key]);
+          upsertObject(state.svgEl, data.objects[key]);
         }
         break;
       }
       case "upsert": {
-        upsertObject(state, data.object);
+        upsertObject(state.svgEl, data.object);
         break;
       }
       case "delete": {
-        deleteObject(state, data.id);
+        deleteObject(state.svgEl, data.id);
         break;
       }
     }
@@ -124,70 +131,15 @@ function connect(pageInfo: PageInfo, state: State, disableEditing: () => void) {
     // TODO: reconnect
   });
 }
-function upsertObject(state: State, object: ObjectBody) {
-  switch (object.kind) {
-    case "text": {
-      upsertText(state, object);
-      break;
-    }
-    case "path": {
-      upsertPath(state, object);
-      break;
-    }
-  }
-}
-function upsertText(state: State, text: TextBody) {
-  let element = document.getElementById(text.id) as unknown as SVGTextElement;
-  if (element == null) {
-    element = document.createElementNS("http://www.w3.org/2000/svg", "text");
-    element.id = text.id;
-    element.classList.add("object");
-    element.setAttributeNS(null, "clip-path", "url(#clip)");
-    element.setAttributeNS(null, "font-size", String(0.02));
-  }
-  element.textContent = text.text;
-  element.setAttributeNS(null, "x", String(text.position.x));
-  element.setAttributeNS(null, "y", String(text.position.y));
-  state.svgEl.append(element);
-}
-function upsertPath(state: State, path: PathBody) {
-  let element = document.getElementById(
-    path.id
-  ) as unknown as SVGPathElement | null;
-  if (element == null) {
-    element = document.createElementNS("http://www.w3.org/2000/svg", "path");
-    element.id = path.id;
-    element.classList.add("object");
-    element.setAttributeNS(null, "clip-path", "url(#clip)");
-    element.setAttributeNS(null, "fill", "none");
-    element.setAttributeNS(null, "stroke", "black");
-    element.setAttributeNS(null, "stroke-width", String(0.002));
-  }
-  element.setAttributeNS(null, "d", path.d);
-  state.svgEl.append(element);
-}
-function makeD(points: Position[]) {
-  const [init, ...rest] = points;
-  const m = `${init.x.toFixed(4)},${init.y.toFixed(4)}`;
-  if (rest.length <= 0) {
-    return `M${m}`;
-  }
-  const l = rest.map((r) => `${r.x.toFixed(4)},${r.y.toFixed(4)}`).join(" ");
-  return `M${m}L${l}`;
-}
-function deleteObject(state: State, id: string) {
-  document.getElementById(id)?.remove();
-}
-
 function generateObjectId(): ObjectId {
   return String(Date.now()).padStart(32, "0");
 }
-function startDrawing(state: State, pos: NormalizedPosition): void {
+function startDrawing(state: State, pos: Position): void {
   const id = generateObjectId();
   const points = [pos];
   state.editing = { kind: "path", points, id };
 }
-function continueDrawing(state: State, pos: NormalizedPosition): void {
+function continueDrawing(state: State, pos: Position): void {
   if (state.editing.kind === "path") {
     const id = state.editing.id;
     let element = document.getElementById(
@@ -197,13 +149,13 @@ function continueDrawing(state: State, pos: NormalizedPosition): void {
     const d = makeD(state.editing.points);
     if (element == null) {
       const object = { id, kind: "path", d } as const;
-      upsertPath(state, object);
+      upsertPath(state.svgEl, object);
     } else {
-      element.setAttributeNS(null, "d", d);
+      setD(element, d);
     }
   }
 }
-function stopDrawing(state: State, pos: NormalizedPosition): void {
+function stopDrawing(state: State, pos: Position): void {
   if (state.editing.kind === "path") {
     const points = state.editing.points;
     state.editing.points = [];
@@ -218,7 +170,7 @@ function stopDrawing(state: State, pos: NormalizedPosition): void {
           kind: "add",
           object,
         };
-        upsertPath(state, object);
+        upsertPath(state.svgEl, object);
         state.websocket.send(JSON.stringify(event));
       }
     }
@@ -226,7 +178,7 @@ function stopDrawing(state: State, pos: NormalizedPosition): void {
   state.editing = { kind: "none" };
 }
 
-function startSelecting(state: State, pos: NormalizedPosition): void {
+function startSelecting(state: State, pos: Position): void {
   const elements = document.getElementsByClassName(
     "object"
   ) as unknown as SVGElement[];
@@ -236,11 +188,7 @@ function startSelecting(state: State, pos: NormalizedPosition): void {
     const bbox = new Rectangle(x, y, width, height);
     switch (element.tagName) {
       case "text": {
-        const position = {
-          pos: "n",
-          x: parseFloat(element.getAttributeNS(null, "x")!),
-          y: parseFloat(element.getAttributeNS(null, "y")!),
-        } as const;
+        const position = getPosition(element);
         objects.push({
           kind: "text",
           id: element.id,
@@ -250,20 +198,8 @@ function startSelecting(state: State, pos: NormalizedPosition): void {
         break;
       }
       case "path": {
-        const d = element.getAttributeNS(null, "d")!;
-        const points = d
-          .slice(1) // remove M
-          .replace("L", " ")
-          .split(" ")
-          .map((s) => s.split(","))
-          .map(
-            ([x, y]) =>
-              ({
-                pos: "n",
-                x: parseFloat(x),
-                y: parseFloat(y),
-              } as const)
-          );
+        const d = getD(element);
+        const points = parseD(d);
         objects.push({
           kind: "path",
           id: element.id,
@@ -275,20 +211,17 @@ function startSelecting(state: State, pos: NormalizedPosition): void {
     }
   }
   state.editing = { kind: "select", start: pos, objects };
-  state.selectorEl.setAttributeNS(null, "x", String(pos.x));
-  state.selectorEl.setAttributeNS(null, "y", String(pos.y));
-  state.selectorEl.setAttributeNS(null, "width", String(0));
-  state.selectorEl.setAttributeNS(null, "height", String(0));
-  state.selectorEl.setAttributeNS(null, "stroke", "red");
+  state.selector.setRectangle(pos.x, pos.y, 0, 0);
+  state.selector.show();
 }
 function isObjectSelected(object: ObjectForSelect, rect: Rectangle): boolean {
   const orect = object.bbox;
-  const fillyContained =
+  const fullyContained =
     orect.x > rect.x &&
     orect.right < rect.right &&
     orect.y > rect.y &&
     orect.bottom < rect.bottom;
-  if (fillyContained) {
+  if (fullyContained) {
     return true;
   }
   const fullySeparated =
@@ -311,7 +244,24 @@ function isObjectSelected(object: ObjectForSelect, rect: Rectangle): boolean {
   }
   return false;
 }
-function continueSelecting(state: State, pos: NormalizedPosition): void {
+function getPointsInObject(object: ObjectForSelect): Position[] {
+  switch (object.kind) {
+    case "text": {
+      const orect = object.bbox;
+      return [
+        { x: orect.x, y: orect.y },
+        { x: orect.x, y: orect.bottom },
+        { x: orect.right, y: orect.y },
+        { x: orect.right, y: orect.bottom },
+      ];
+    }
+    case "path": {
+      return object.points;
+    }
+  }
+}
+
+function continueSelecting(state: State, pos: Position): void {
   state.selected = [];
   if (state.editing.kind === "select") {
     const start = state.editing.start;
@@ -319,47 +269,37 @@ function continueSelecting(state: State, pos: NormalizedPosition): void {
     const y = Math.min(pos.y, start.y);
     const width = Math.abs(pos.x - start.x);
     const height = Math.abs(pos.y - start.y);
-    state.selectorEl.setAttributeNS(null, "x", String(x));
-    state.selectorEl.setAttributeNS(null, "y", String(y));
-    state.selectorEl.setAttributeNS(null, "width", String(width));
-    state.selectorEl.setAttributeNS(null, "height", String(height));
+    state.selector.setRectangle(x, y, width, height);
+    const rect = new Rectangle(x, y, width, height);
     for (const object of state.editing.objects) {
-      const selected = isObjectSelected(
-        object,
-        new Rectangle(x, y, width, height)
-      );
-      const element = document.getElementById(object.id)!;
+      const selected = isObjectSelected(object, rect);
       if (selected) {
         state.selected.push(object);
       }
-      const color = selected ? "red" : "black";
-      const key = object.kind === "text" ? "fill" : "stroke";
-      element.setAttributeNS(null, key, color);
+      const element = document.getElementById(object.id)!;
+      setSelected(element, selected);
     }
   }
 }
-function stopSelecting(state: State, pos: NormalizedPosition): void {
+function stopSelecting(state: State, pos: Position): void {
   state.editing = { kind: "none" };
-  state.selectorEl.setAttributeNS(null, "stroke", "none");
+  state.selector.hide();
 }
 
-function startMoving(state: State, pos: NormalizedPosition): void {
+function startMoving(state: State, pos: Position): void {
   state.editing = { kind: "move", start: pos };
 }
-function continueMoving(state: State, pos: NormalizedPosition): void {
+function continueMoving(state: State, pos: Position): void {
   if (state.editing.kind === "move") {
     const dx = pos.x - state.editing.start.x;
     const dy = pos.y - state.editing.start.y;
     for (const object of state.selected) {
-      const element = document.getElementById(
-        object.id
-      )! as unknown as SVGElement;
+      const element = document.getElementById(object.id)!;
       switch (object.kind) {
         case "text": {
           const x = object.position.x + dx;
           const y = object.position.y + dy;
-          element.setAttributeNS(null, "x", String(x));
-          element.setAttributeNS(null, "y", String(y));
+          setPosition(element, { x, y });
           break;
         }
         case "path": {
@@ -368,14 +308,14 @@ function continueMoving(state: State, pos: NormalizedPosition): void {
             y: p.y + dy,
           }));
           const d = makeD(points);
-          element.setAttributeNS(null, "d", d);
+          setD(element, d);
           break;
         }
       }
     }
   }
 }
-function stopMoving(state: State, pos: NormalizedPosition): void {
+function stopMoving(state: State, pos: Position): void {
   if (state.editing.kind === "move") {
     if (state.websocket != null) {
       const dx = pos.x - state.editing.start.x;
@@ -385,7 +325,7 @@ function stopMoving(state: State, pos: NormalizedPosition): void {
           case "text": {
             const x = object.position.x + dx;
             const y = object.position.y + dy;
-            const oldPosision = { x: object.position.x, y: object.position.y };
+            const oldPosision = object.position;
             const newPosision = { x, y };
             const event: PatchEventBody = {
               kind: "patch",
@@ -393,7 +333,7 @@ function stopMoving(state: State, pos: NormalizedPosition): void {
               key: "position",
               value: { old: oldPosision, new: newPosision },
             };
-            patchTextPosision(object.id, { pos: "n", x, y });
+            patchTextPosision(object.id, newPosision);
             state.websocket.send(JSON.stringify(event));
             break;
           }
@@ -423,32 +363,29 @@ function stopMoving(state: State, pos: NormalizedPosition): void {
   }
   for (const object of state.selected) {
     const element = document.getElementById(object.id)!;
-    const key = object.kind === "text" ? "fill" : "stroke";
-    element.setAttributeNS(null, key, "black");
+    setSelected(element, false);
   }
-  state.editing = { kind: "none" };
   state.selected = [];
+  state.editing = { kind: "none" };
 }
-function patchTextPosision(id: ObjectId, position: NormalizedPosition): void {
-  const element = document.getElementById(id)! as unknown as SVGPathElement;
-  element.setAttributeNS(null, "x", String(position.x));
-  element.setAttributeNS(null, "y", String(position.y));
+function patchTextPosision(id: ObjectId, position: Position): void {
+  const element = document.getElementById(id)!;
+  setPosition(element, position);
 }
 function patchPathD(id: ObjectId, d: string): void {
-  const element = document.getElementById(id)! as unknown as SVGPathElement;
-  element.setAttributeNS(null, "d", d);
+  const element = document.getElementById(id)!;
+  setD(element, d);
 }
 
-function createText(state: State, pos: NormalizedPosition): void {
+function createText(state: State, pos: Position): void {
   state.editing = { kind: "text", position: pos };
   updateInputElementPosition(state);
-  state.inputEl.classList.remove("hidden");
-  state.inputEl.focus();
+  state.input.showAndFocus();
 }
 function startEditingText(state: State): void {}
 function stopEditingText(state: State): void {
-  const text = state.inputEl.value;
   if (state.editing.kind === "text") {
+    const text = state.input.getText();
     if (text.length > 0) {
       if (state.websocket != null) {
         const position = state.editing.position;
@@ -462,14 +399,13 @@ function stopEditingText(state: State): void {
           kind: "add",
           object,
         };
-        upsertText(state, object);
+        upsertText(state.svgEl, object);
         state.websocket.send(JSON.stringify(event));
       }
     }
   }
   state.editing = { kind: "none" };
-  state.inputEl.value = "";
-  state.inputEl.classList.add("hidden");
+  state.input.hideAndReset();
 }
 
 function undo(state: State): void {}
@@ -487,66 +423,13 @@ function getBoardRect(svgElement: HTMLElement): {
   const rect = svgElement.getBoundingClientRect();
   return {
     size: { width: rect.width, height: rect.height },
-    position: { pos: "p", x: rect.left, y: rect.top },
-  };
-}
-function getPixelPositionFromMouse(e: MouseEvent): PixelPosition {
-  return {
-    pos: "p",
-    x: e.offsetX,
-    y: e.offsetY,
-  };
-}
-function getPixelPositionFromTouch(state: State, touch: Touch): PixelPosition {
-  return {
-    pos: "p",
-    x: touch.pageX - state.boardRect.position.x,
-    y: touch.pageY - state.boardRect.position.y,
-  };
-}
-function toNormalizedPosition(
-  state: State,
-  ppos: PixelPosition
-): NormalizedPosition {
-  const { width, height } = state.boardRect.size;
-  const viewBoxWidth = 1;
-  const viewBoxHeight = 1;
-  const actualRatioPerExpectedRatio =
-    width / height / (viewBoxWidth / viewBoxHeight);
-  const scaleX = Math.max(actualRatioPerExpectedRatio, 1);
-  const scaleY = Math.max(1 / actualRatioPerExpectedRatio, 1);
-  const offsetX = viewBoxWidth * ((1 - scaleX) / 2);
-  const offsetY = viewBoxHeight * ((1 - scaleY) / 2);
-  return {
-    pos: "n",
-    x: (ppos.x / width) * scaleX + offsetX,
-    y: (ppos.y / height) * scaleY + offsetY,
-  };
-}
-function toPixelPosition(
-  state: State,
-  npos: NormalizedPosition
-): PixelPosition {
-  const { width, height } = state.boardRect.size;
-  const viewBoxWidth = 1;
-  const viewBoxHeight = 1;
-  const actualRatioPerExpectedRatio =
-    width / height / (viewBoxWidth / viewBoxHeight);
-  const scaleX = Math.max(actualRatioPerExpectedRatio, 1);
-  const scaleY = Math.max(1 / actualRatioPerExpectedRatio, 1);
-  const offsetX = viewBoxWidth * ((1 - scaleX) / 2);
-  const offsetY = viewBoxHeight * ((1 - scaleY) / 2);
-  return {
-    pos: "p",
-    x: ((npos.x - offsetX) / scaleX) * width,
-    y: ((npos.y - offsetY) / scaleY) * height,
+    position: { px: rect.left, py: rect.top },
   };
 }
 function updateInputElementPosition(state: State): void {
   if (state.editing.kind === "text") {
-    const ppos = toPixelPosition(state, state.editing.position);
-    state.inputEl.style.left = `${ppos.x}px`;
-    state.inputEl.style.top = `${ppos.y}px`;
+    const ppos = toPixelPosition(state.boardRect.size, state.editing.position);
+    state.input.setPosition(ppos);
   }
 }
 function listtenToWindowEvents(state: State): () => void {
@@ -559,119 +442,83 @@ function listtenToWindowEvents(state: State): () => void {
   };
 }
 function listenToInputEvents(state: State): () => void {
-  state.inputEl.onkeydown = (e: KeyboardEvent) => {
-    e.stopPropagation();
-    if (e.key === "Enter") {
-      e.preventDefault();
+  state.input.listen({
+    enter: () => {
       stopEditingText(state);
-    }
-  };
-  return () => {
-    state.inputEl.oninput = null;
-    state.inputEl.onkeydown = null;
-  };
+    },
+  });
+  return () => state.input.unlisten();
 }
-function listenToBoardEvents(state: State): () => void {
-  state.svgEl.ondblclick = (e: MouseEvent) => {
-    e.preventDefault();
-    const pos = getPixelPositionFromMouse(e);
-    const npos = toNormalizedPosition(state, pos);
-    createText(state, npos);
-  };
-  state.svgEl.oncontextmenu = (e: MouseEvent) => {
-    if (e.ctrlKey) {
-      return;
-    }
-    e.preventDefault();
-  };
-  state.svgEl.onmousedown = (e: MouseEvent) => {
-    e.preventDefault();
-    const pos = getPixelPositionFromMouse(e);
-    const npos = toNormalizedPosition(state, pos);
-    if (e.button === 0) {
+function listenToBoard(state: State): () => void {
+  return listenToBoardEvents(state.svgEl, {
+    getBoardRect: () => {
+      return state.boardRect;
+    },
+    doubleClick: (npos) => {
+      createText(state, npos);
+    },
+    mouseDown: (npos, isRight) => {
+      if (isRight) {
+        return startSelecting(state, npos);
+      } else {
+        if (state.selected.length > 0) {
+          return startMoving(state, npos);
+        }
+        return startDrawing(state, npos);
+      }
+    },
+    touchStart: (npos) => {
       if (state.selected.length > 0) {
         return startMoving(state, npos);
       }
       return startDrawing(state, npos);
-    } else {
-      return startSelecting(state, npos);
-    }
-  };
-  state.svgEl.ontouchstart = (e: TouchEvent) => {
-    e.preventDefault();
-    const pos = getPixelPositionFromTouch(state, e.touches[0]);
-    const npos = toNormalizedPosition(state, pos);
-    if (state.selected.length > 0) {
-      return startMoving(state, npos);
-    }
-    return startDrawing(state, npos);
-  };
-  state.svgEl.onmousemove = (e: MouseEvent) => {
-    e.preventDefault();
-    const pos = getPixelPositionFromMouse(e);
-    const npos = toNormalizedPosition(state, pos);
-    switch (state.editing.kind) {
-      case "move": {
-        return continueMoving(state, npos);
+    },
+    mouseMove: (npos) => {
+      switch (state.editing.kind) {
+        case "move": {
+          return continueMoving(state, npos);
+        }
+        case "path": {
+          return continueDrawing(state, npos);
+        }
+        case "select": {
+          return continueSelecting(state, npos);
+        }
       }
-      case "path": {
-        return continueDrawing(state, npos);
+    },
+    touchMove: (npos) => {
+      switch (state.editing.kind) {
+        case "move": {
+          return stopMoving(state, npos);
+        }
+        case "path": {
+          return stopDrawing(state, npos);
+        }
+        case "select": {
+          return stopSelecting(state, npos);
+        }
       }
-      case "select": {
-        return continueSelecting(state, npos);
+    },
+    mouseUp: (npos) => {
+      switch (state.editing.kind) {
+        case "move": {
+          return stopMoving(state, npos);
+        }
+        case "path": {
+          return stopDrawing(state, npos);
+        }
+        case "select": {
+          return stopSelecting(state, npos);
+        }
       }
-    }
-  };
-  state.svgEl.ontouchmove = (e: TouchEvent) => {
-    e.preventDefault();
-    const pos = getPixelPositionFromTouch(state, e.touches[0]);
-    const npos = toNormalizedPosition(state, pos);
-    switch (state.editing.kind) {
-      case "move": {
+    },
+    touchEnd: (npos) => {
+      if (state.selected.length > 0) {
         return stopMoving(state, npos);
       }
-      case "path": {
-        return stopDrawing(state, npos);
-      }
-      case "select": {
-        return stopSelecting(state, npos);
-      }
-    }
-  };
-  state.svgEl.onmouseup = (e: MouseEvent) => {
-    e.preventDefault();
-    const pos = getPixelPositionFromMouse(e);
-    const npos = toNormalizedPosition(state, pos);
-    switch (state.editing.kind) {
-      case "move": {
-        return stopMoving(state, npos);
-      }
-      case "path": {
-        return stopDrawing(state, npos);
-      }
-      case "select": {
-        return stopSelecting(state, npos);
-      }
-    }
-  };
-  state.svgEl.ontouchend = (e: TouchEvent) => {
-    e.preventDefault();
-    const pos = getPixelPositionFromTouch(state, e.changedTouches[0]);
-    const npos = toNormalizedPosition(state, pos);
-    if (state.selected.length > 0) {
-      return stopMoving(state, npos);
-    }
-    return stopDrawing(state, npos);
-  };
-  return () => {
-    state.svgEl.ondblclick = null;
-    state.svgEl.onmousedown = null;
-    state.svgEl.ontouchstart = null;
-    state.svgEl.onmousemove = null;
-    state.svgEl.ontouchmove = null;
-    state.svgEl.onmouseup = null;
-    state.svgEl.ontouchend = null;
-  };
+      return stopDrawing(state, npos);
+    },
+  });
 }
 
 (async () => {
@@ -683,8 +530,8 @@ function listenToBoardEvents(state: State): () => void {
     const inputEl = document.getElementById("input")! as HTMLInputElement;
     const state: State = {
       svgEl,
-      inputEl,
-      selectorEl,
+      input: new Input(inputEl),
+      selector: new Selector(selectorEl),
       boardRect: getBoardRect(svgEl),
       websocket: null,
       undos: [],
@@ -692,7 +539,7 @@ function listenToBoardEvents(state: State): () => void {
       editing: { kind: "none" },
       selected: [],
     };
-    const unlistenBoard = listenToBoardEvents(state);
+    const unlistenBoard = listenToBoard(state);
     const unlistenInput = listenToInputEvents(state);
     const unlistenWindow = listtenToWindowEvents(state);
     connect(pageInfo, state, () => {
