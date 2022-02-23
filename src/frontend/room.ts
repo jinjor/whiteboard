@@ -291,16 +291,15 @@ function isObjectSelected(object: ObjectForSelect, rect: Rectangle): boolean {
   if (fillyContained) {
     return true;
   }
-  const points =
-    object.kind === "text"
-      ? [
-          { x: orect.x, y: orect.y },
-          { x: orect.x, y: orect.bottom },
-          { x: orect.right, y: orect.y },
-          { x: orect.right, y: orect.bottom },
-        ]
-      : object.points;
-  for (const point of points) {
+  const fullySeparated =
+    orect.x > rect.right ||
+    orect.right < rect.x ||
+    orect.y > rect.bottom ||
+    orect.bottom < rect.y;
+  if (fullySeparated) {
+    return false;
+  }
+  for (const point of getPointsInObject(object)) {
     const contained =
       point.x > rect.x &&
       point.x < rect.right &&
