@@ -12,10 +12,38 @@ type PixelPosition = Position & { pos: "p" };
 type NormalizedPosition = Position & { pos: "n" };
 
 type Size = { width: number; height: number };
+class Rectangle {
+  constructor(
+    public x: number,
+    public y: number,
+    public width: number,
+    public height: number
+  ) {}
+  get right() {
+    return this.x + this.width;
+  }
+  get bottom() {
+    return this.y + this.height;
+  }
+}
 type Patch = PatchEventBody;
+type ObjectForSelect =
+  | {
+      kind: "text";
+      id: ObjectId;
+      bbox: Rectangle;
+      position: NormalizedPosition;
+    }
+  | {
+      kind: "path";
+      id: ObjectId;
+      bbox: Rectangle;
+      points: NormalizedPosition[];
+    };
+
 type EditingState =
   | { kind: "none" }
-  | { kind: "select"; start: NormalizedPosition }
+  | { kind: "select"; start: NormalizedPosition; objects: ObjectForSelect[] }
   | { kind: "move"; start: NormalizedPosition }
   | { kind: "path"; points: NormalizedPosition[]; id: ObjectId }
   | { kind: "text"; position: NormalizedPosition };
@@ -28,7 +56,7 @@ type State = {
   undos: Patch[];
   redos: Patch[];
   editing: EditingState;
-  selected: ObjectId[];
+  selected: ObjectForSelect[];
 };
 
 type PageInfo = {
@@ -113,6 +141,7 @@ function upsertText(state: State, text: TextBody) {
   if (element == null) {
     element = document.createElementNS("http://www.w3.org/2000/svg", "text");
     element.id = text.id;
+    element.classList.add("object");
     element.setAttributeNS(null, "clip-path", "url(#clip)");
     element.setAttributeNS(null, "font-size", String(0.02));
   }
@@ -128,6 +157,7 @@ function upsertPath(state: State, path: PathBody) {
   if (element == null) {
     element = document.createElementNS("http://www.w3.org/2000/svg", "path");
     element.id = path.id;
+    element.classList.add("object");
     element.setAttributeNS(null, "clip-path", "url(#clip)");
     element.setAttributeNS(null, "fill", "none");
     element.setAttributeNS(null, "stroke", "black");
@@ -143,7 +173,7 @@ function makeD(points: Position[]) {
   if (rest.length <= 0) {
     return `M${m}`;
   }
-  const l = rest.map((r) => `${r.x} ${r.y}`).join(" ");
+  const l = rest.map((r) => `${r.x},${r.y}`).join(" ");
   return `M${m} L${l}`;
 }
 function deleteObject(state: State, id: string) {
@@ -184,9 +214,9 @@ function stopDrawing(state: State, pos: NormalizedPosition): void {
     if (points.length >= 2) {
       if (state.websocket != null) {
         const object = {
-          id: generateObjectId(),
+          id: state.editing.id,
           kind: "path",
-          points: points,
+          points: points.map((p) => ({ x: p.x, y: p.y })),
         } as const;
         const event = {
           kind: "add",
@@ -201,14 +231,92 @@ function stopDrawing(state: State, pos: NormalizedPosition): void {
 }
 
 function startSelecting(state: State, pos: NormalizedPosition): void {
-  state.editing = { kind: "select", start: pos };
+  const elements = document.getElementsByClassName(
+    "object"
+  ) as unknown as SVGElement[];
+  const objects: ObjectForSelect[] = [];
+  for (const element of elements) {
+    const { x, y, width, height } = (element as any).getBBox();
+    const bbox = new Rectangle(x, y, width, height);
+    switch (element.tagName) {
+      case "text": {
+        const position = {
+          pos: "n",
+          x: parseFloat(element.getAttributeNS(null, "x")!),
+          y: parseFloat(element.getAttributeNS(null, "y")!),
+        } as const;
+        objects.push({
+          kind: "text",
+          id: element.id,
+          position,
+          bbox,
+        });
+        break;
+      }
+      case "path": {
+        const points = element
+          .getAttributeNS(null, "d")!
+          .split("L")[1]
+          .split(" ")
+          .map((s) => s.split(","))
+          .map(
+            ([x, y]) =>
+              ({
+                pos: "n",
+                x: parseFloat(x),
+                y: parseFloat(y),
+              } as const)
+          );
+        objects.push({
+          kind: "path",
+          id: element.id,
+          bbox,
+          points,
+        });
+        break;
+      }
+    }
+  }
+  state.editing = { kind: "select", start: pos, objects };
   state.selectorEl.setAttributeNS(null, "x", String(pos.x));
   state.selectorEl.setAttributeNS(null, "y", String(pos.y));
   state.selectorEl.setAttributeNS(null, "width", String(0));
   state.selectorEl.setAttributeNS(null, "height", String(0));
   state.selectorEl.setAttributeNS(null, "stroke", "red");
 }
+function isObjectSelected(object: ObjectForSelect, rect: Rectangle): boolean {
+  const orect = object.bbox;
+  const fillyContained =
+    orect.x > rect.x &&
+    orect.right < rect.right &&
+    orect.y > rect.y &&
+    orect.bottom < rect.bottom;
+  if (fillyContained) {
+    return true;
+  }
+  const points =
+    object.kind === "text"
+      ? [
+          { x: orect.x, y: orect.y },
+          { x: orect.x, y: orect.bottom },
+          { x: orect.right, y: orect.y },
+          { x: orect.right, y: orect.bottom },
+        ]
+      : object.points;
+  for (const point of points) {
+    const contained =
+      point.x > rect.x &&
+      point.x < rect.right &&
+      point.y > rect.y &&
+      point.y < rect.bottom;
+    if (contained) {
+      return true;
+    }
+  }
+  return false;
+}
 function continueSelecting(state: State, pos: NormalizedPosition): void {
+  state.selected = [];
   if (state.editing.kind === "select") {
     const start = state.editing.start;
     const x = Math.min(pos.x, start.x);
@@ -219,25 +327,123 @@ function continueSelecting(state: State, pos: NormalizedPosition): void {
     state.selectorEl.setAttributeNS(null, "y", String(y));
     state.selectorEl.setAttributeNS(null, "width", String(width));
     state.selectorEl.setAttributeNS(null, "height", String(height));
+    for (const object of state.editing.objects) {
+      const selected = isObjectSelected(
+        object,
+        new Rectangle(x, y, width, height)
+      );
+      const element = document.getElementById(object.id)!;
+      if (selected) {
+        state.selected.push(object);
+      }
+      const color = selected ? "red" : "black";
+      const key = object.kind === "text" ? "fill" : "stroke";
+      element.setAttributeNS(null, key, color);
+    }
   }
 }
 function stopSelecting(state: State, pos: NormalizedPosition): void {
-  if (state.editing.kind === "select") {
-    const start = state.editing.start;
-    const x = Math.min(pos.x, start.x);
-    const y = Math.min(pos.y, start.y);
-    const width = Math.abs(pos.x - start.x);
-    const height = Math.abs(pos.y - start.y);
-  }
   state.editing = { kind: "none" };
   state.selectorEl.setAttributeNS(null, "stroke", "none");
 }
 
 function startMoving(state: State, pos: NormalizedPosition): void {
-  state.editing = { kind: "select", start: pos };
+  state.editing = { kind: "move", start: pos };
 }
-function continueMoving(state: State, pos: NormalizedPosition): void {}
-function stopMoving(state: State, pos: NormalizedPosition): void {}
+function continueMoving(state: State, pos: NormalizedPosition): void {
+  if (state.editing.kind === "move") {
+    const dx = pos.x - state.editing.start.x;
+    const dy = pos.y - state.editing.start.y;
+    for (const object of state.selected) {
+      const element = document.getElementById(
+        object.id
+      )! as unknown as SVGElement;
+      switch (object.kind) {
+        case "text": {
+          const x = object.position.x + dx;
+          const y = object.position.y + dy;
+          element.setAttributeNS(null, "x", String(x));
+          element.setAttributeNS(null, "y", String(y));
+          break;
+        }
+        case "path": {
+          const points = object.points.map((p) => ({
+            x: p.x + dx,
+            y: p.y + dy,
+          }));
+          const d = makeD(points);
+          element.setAttributeNS(null, "d", d);
+          break;
+        }
+      }
+    }
+  }
+}
+function stopMoving(state: State, pos: NormalizedPosition): void {
+  if (state.editing.kind === "move") {
+    if (state.websocket != null) {
+      const dx = pos.x - state.editing.start.x;
+      const dy = pos.y - state.editing.start.y;
+      for (const object of state.selected) {
+        switch (object.kind) {
+          case "text": {
+            const x = object.position.x + dx;
+            const y = object.position.y + dy;
+            const oldPosision = { x: object.position.x, y: object.position.y };
+            const newPosision = { x, y };
+            const event: PatchEventBody = {
+              kind: "patch",
+              id: object.id,
+              key: "position",
+              value: { old: oldPosision, new: newPosision },
+            };
+            patchTextPosision(object.id, { pos: "n", x, y });
+            state.websocket.send(JSON.stringify(event));
+            break;
+          }
+          case "path": {
+            const points = object.points.map((p) => ({
+              x: p.x + dx,
+              y: p.y + dy,
+            }));
+            const event: PatchEventBody = {
+              kind: "patch",
+              id: object.id,
+              key: "points",
+              value: {
+                old: object.points.map((p) => ({ x: p.x, y: p.y })),
+                new: points,
+              },
+            };
+            patchPathPoints(
+              object.id,
+              points.map((p) => ({ pos: "n", x: p.x, y: p.y }))
+            );
+            state.websocket.send(JSON.stringify(event));
+            break;
+          }
+        }
+      }
+    }
+  }
+  for (const object of state.selected) {
+    const element = document.getElementById(object.id)!;
+    const key = object.kind === "text" ? "fill" : "stroke";
+    element.setAttributeNS(null, key, "black");
+  }
+  state.editing = { kind: "none" };
+  state.selected = [];
+}
+function patchTextPosision(id: ObjectId, position: NormalizedPosition): void {
+  const element = document.getElementById(id)! as unknown as SVGPathElement;
+  element.setAttributeNS(null, "x", String(position.x));
+  element.setAttributeNS(null, "y", String(position.y));
+}
+function patchPathPoints(id: ObjectId, points: NormalizedPosition[]): void {
+  const element = document.getElementById(id)! as unknown as SVGPathElement;
+  const d = makeD(points);
+  element.setAttributeNS(null, "d", d);
+}
 
 function createText(state: State, pos: NormalizedPosition): void {
   state.editing = { kind: "text", position: pos };
