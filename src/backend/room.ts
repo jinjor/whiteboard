@@ -98,14 +98,15 @@ class RoomState {
         if (session.quit) {
           throw new Error("unexpected session.quit");
         }
-        if (!limiter.checkLimit()) {
-          webSocket.send(
-            JSON.stringify({
-              error: "You are being rate-limited, please try again later.",
-            })
-          );
-          return;
-        }
+        // TODO
+        // if (!limiter.checkLimit()) {
+        //   webSocket.send(
+        //     JSON.stringify({
+        //       error: "You are being rate-limited, please try again later.",
+        //     })
+        //   );
+        //   return;
+        // }
         const event = JSON.parse(msg.data as string);
         console.log("event", event);
         if (!validateEvent(event)) {

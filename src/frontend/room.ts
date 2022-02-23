@@ -163,18 +163,17 @@ function upsertPath(state: State, path: PathBody) {
     element.setAttributeNS(null, "stroke", "black");
     element.setAttributeNS(null, "stroke-width", String(0.002));
   }
-  const d = makeD(path.points);
-  element.setAttributeNS(null, "d", d);
+  element.setAttributeNS(null, "d", path.d);
   state.svgEl.append(element);
 }
 function makeD(points: Position[]) {
   const [init, ...rest] = points;
-  const m = `${init.x} ${init.y}`;
+  const m = `${init.x.toFixed(4)},${init.y.toFixed(4)}`;
   if (rest.length <= 0) {
     return `M${m}`;
   }
-  const l = rest.map((r) => `${r.x},${r.y}`).join(" ");
-  return `M${m} L${l}`;
+  const l = rest.map((r) => `${r.x.toFixed(4)},${r.y.toFixed(4)}`).join(" ");
+  return `M${m}L${l}`;
 }
 function deleteObject(state: State, id: string) {
   document.getElementById(id)?.remove();
@@ -187,24 +186,21 @@ function startDrawing(state: State, pos: NormalizedPosition): void {
   const id = generateObjectId();
   const points = [pos];
   state.editing = { kind: "path", points, id };
-  const object = {
-    id,
-    kind: "path",
-    points,
-  } as const;
-  upsertPath(state, object);
 }
 function continueDrawing(state: State, pos: NormalizedPosition): void {
   if (state.editing.kind === "path") {
     const id = state.editing.id;
-    const element = document.getElementById(
+    let element = document.getElementById(
       id
     ) as unknown as SVGPathElement | null;
-    if (element != null) {
-      const d = makeD(state.editing.points);
+    state.editing.points.push(pos);
+    const d = makeD(state.editing.points);
+    if (element == null) {
+      const object = { id, kind: "path", d } as const;
+      upsertPath(state, object);
+    } else {
       element.setAttributeNS(null, "d", d);
     }
-    state.editing.points.push(pos);
   }
 }
 function stopDrawing(state: State, pos: NormalizedPosition): void {
@@ -216,7 +212,7 @@ function stopDrawing(state: State, pos: NormalizedPosition): void {
         const object = {
           id: state.editing.id,
           kind: "path",
-          points: points.map((p) => ({ x: p.x, y: p.y })),
+          d: makeD(points),
         } as const;
         const event = {
           kind: "add",
@@ -254,9 +250,10 @@ function startSelecting(state: State, pos: NormalizedPosition): void {
         break;
       }
       case "path": {
-        const points = element
-          .getAttributeNS(null, "d")!
-          .split("L")[1]
+        const d = element.getAttributeNS(null, "d")!;
+        const points = d
+          .slice(1) // remove M
+          .replace("L", " ")
           .split(" ")
           .map((s) => s.split(","))
           .map(
@@ -402,23 +399,22 @@ function stopMoving(state: State, pos: NormalizedPosition): void {
             break;
           }
           case "path": {
+            const oldD = makeD(object.points);
             const points = object.points.map((p) => ({
               x: p.x + dx,
               y: p.y + dy,
             }));
+            const d = makeD(points);
             const event: PatchEventBody = {
               kind: "patch",
               id: object.id,
-              key: "points",
+              key: "d",
               value: {
-                old: object.points.map((p) => ({ x: p.x, y: p.y })),
-                new: points,
+                old: oldD,
+                new: d,
               },
             };
-            patchPathPoints(
-              object.id,
-              points.map((p) => ({ pos: "n", x: p.x, y: p.y }))
-            );
+            patchPathD(object.id, d);
             state.websocket.send(JSON.stringify(event));
             break;
           }
@@ -439,9 +435,8 @@ function patchTextPosision(id: ObjectId, position: NormalizedPosition): void {
   element.setAttributeNS(null, "x", String(position.x));
   element.setAttributeNS(null, "y", String(position.y));
 }
-function patchPathPoints(id: ObjectId, points: NormalizedPosition[]): void {
+function patchPathD(id: ObjectId, d: string): void {
   const element = document.getElementById(id)! as unknown as SVGPathElement;
-  const d = makeD(points);
   element.setAttributeNS(null, "d", d);
 }
 
@@ -462,7 +457,7 @@ function stopEditingText(state: State): void {
           id: generateObjectId(),
           kind: "text",
           text,
-          position,
+          position: { x: position.x, y: position.y },
         } as const;
         const event = {
           kind: "add",
@@ -525,12 +520,9 @@ function toNormalizedPosition(
   const offsetY = viewBoxHeight * ((1 - scaleY) / 2);
   return {
     pos: "n",
-    x: cutDecimal((ppos.x / width) * scaleX + offsetX),
-    y: cutDecimal((ppos.y / height) * scaleY + offsetY),
+    x: (ppos.x / width) * scaleX + offsetX,
+    y: (ppos.y / height) * scaleY + offsetY,
   };
-}
-function cutDecimal(n: number) {
-  return Math.floor(n * 1000) / 1000;
 }
 function toPixelPosition(
   state: State,

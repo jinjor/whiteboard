@@ -23,7 +23,7 @@ export type TextBody = {
 export type PathBody = {
   id: ObjectId;
   kind: "path";
-  points: Position[];
+  d: string;
 };
 export type ObjectBody = TextBody | PathBody;
 export type Object_ = ObjectHead & ObjectBody;
