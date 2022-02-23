@@ -13,6 +13,7 @@
       svg {
         width: 100vw;
         height: 100vh;
+        background-color: #eee;
       }
       #container {
         position: relative;
@@ -26,7 +27,12 @@
     <div id="container">
       <input id="selector" class="hidden" />
       <input id="input" class="hidden" />
-      <svg id="board" viewBox="0 0 1 1"></svg>
+      <svg id="board" viewBox="0 0 1 1">
+        <clipPath id="clip">
+          <rect x="0" y="0" width="1" height="1" />
+        </clipPath>
+        <rect x="0" y="0" width="1" height="1" fill="white" />
+      </svg>
     </div>
     <script src="/assets/room.js"></script>
   </body>

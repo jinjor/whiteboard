@@ -1,4 +1,5 @@
 import {
+  ObjectBody,
   ObjectId,
   PatchEventBody,
   PathBody,
@@ -16,7 +17,7 @@ type EditingState =
   | { kind: "none" }
   | { kind: "select"; start: NormalizedPosition }
   | { kind: "move"; start: NormalizedPosition }
-  | { kind: "path"; path: NormalizedPosition[] }
+  | { kind: "path"; points: NormalizedPosition[]; id: ObjectId }
   | { kind: "text"; position: NormalizedPosition };
 type State = {
   svgEl: HTMLElement;
@@ -68,32 +69,12 @@ function connect(pageInfo: PageInfo, state: State, disableEditing: () => void) {
     switch (data.kind) {
       case "init": {
         for (const key of Object.keys(data.objects)) {
-          const object = data.objects[key];
-          switch (object.kind) {
-            case "text": {
-              upsertText(state, object);
-              break;
-            }
-            case "path": {
-              upsertPath(state, object);
-              break;
-            }
-          }
+          upsertObject(state, data.objects[key]);
         }
         break;
       }
       case "upsert": {
-        const object = data.object;
-        switch (object.kind) {
-          case "text": {
-            upsertText(state, object);
-            break;
-          }
-          case "path": {
-            upsertPath(state, object);
-            break;
-          }
-        }
+        upsertObject(state, data.object);
         break;
       }
       case "delete": {
@@ -115,12 +96,24 @@ function connect(pageInfo: PageInfo, state: State, disableEditing: () => void) {
     // TODO: reconnect
   });
 }
-
+function upsertObject(state: State, object: ObjectBody) {
+  switch (object.kind) {
+    case "text": {
+      upsertText(state, object);
+      break;
+    }
+    case "path": {
+      upsertPath(state, object);
+      break;
+    }
+  }
+}
 function upsertText(state: State, text: TextBody) {
   let element = document.getElementById(text.id) as unknown as SVGTextElement;
   if (element == null) {
     element = document.createElementNS("http://www.w3.org/2000/svg", "text");
     element.id = text.id;
+    element.setAttributeNS(null, "clip-path", "url(#clip)");
     element.setAttributeNS(null, "font-size", String(0.04));
   }
   element.textContent = text.text;
@@ -129,45 +122,82 @@ function upsertText(state: State, text: TextBody) {
   state.svgEl.append(element);
 }
 function upsertPath(state: State, path: PathBody) {
-  let element = document.getElementById(path.id) as unknown as SVGPathElement;
+  let element = document.getElementById(
+    path.id
+  ) as unknown as SVGPathElement | null;
   if (element == null) {
     element = document.createElementNS("http://www.w3.org/2000/svg", "path");
     element.id = path.id;
+    element.setAttributeNS(null, "clip-path", "url(#clip)");
+    element.setAttributeNS(null, "fill", "none");
     element.setAttributeNS(null, "stroke", "black");
-    element.setAttributeNS(null, "stroke-width", String(2));
+    element.setAttributeNS(null, "stroke-width", String(0.005));
   }
-  const [init, ...rest] = path.points;
-  const m = `${init.x} ${init.y}`;
-  const l = rest.map((r) => `${r.x} ${r.y}`).join(" ");
-  const d = `M${m} L${l}`;
+  const d = makeD(path.points);
   element.setAttributeNS(null, "d", d);
   state.svgEl.append(element);
+}
+function makeD(points: Position[]) {
+  const [init, ...rest] = points;
+  const m = `${init.x} ${init.y}`;
+  if (rest.length <= 0) {
+    return `M${m}`;
+  }
+  const l = rest.map((r) => `${r.x} ${r.y}`).join(" ");
+  return `M${m} L${l}`;
 }
 function deleteObject(state: State, id: string) {
   document.getElementById(id)?.remove();
 }
 
-function generateObjectId(): string {
+function generateObjectId(): ObjectId {
   return String(Date.now()).padStart(32, "0");
 }
 function startDrawing(state: State, pos: NormalizedPosition): void {
-  state.editing = { kind: "path", path: [pos] };
+  const id = generateObjectId();
+  const points = [pos];
+  state.editing = { kind: "path", points, id };
+  const object = {
+    id,
+    kind: "path",
+    points,
+  } as const;
+  upsertPath(state, object);
 }
 function continueDrawing(state: State, pos: NormalizedPosition): void {
   if (state.editing.kind === "path") {
-    state.editing.path.push(pos);
+    const id = state.editing.id;
+    const element = document.getElementById(
+      id
+    ) as unknown as SVGPathElement | null;
+    if (element != null) {
+      const d = makeD(state.editing.points);
+      element.setAttributeNS(null, "d", d);
+    }
+    state.editing.points.push(pos);
   }
 }
-function stopDrawing(
-  state: State,
-  pos: NormalizedPosition
-): NormalizedPosition[] {
+function stopDrawing(state: State, pos: NormalizedPosition): void {
   if (state.editing.kind === "path") {
-    const path = state.editing.path;
-    state.editing.path = [];
-    return path;
+    const points = state.editing.points;
+    state.editing.points = [];
+    if (points.length >= 2) {
+      if (state.websocket != null) {
+        const object = {
+          id: generateObjectId(),
+          kind: "path",
+          points: points,
+        } as const;
+        const event = {
+          kind: "add",
+          object,
+        };
+        upsertPath(state, object);
+        state.websocket.send(JSON.stringify(event));
+      }
+    }
   }
-  return [];
+  state.editing = { kind: "none" };
 }
 
 function startSelecting(state: State, pos: NormalizedPosition): void {
@@ -232,11 +262,23 @@ function toNormalizedPosition(
   state: State,
   ppos: PixelPosition
 ): NormalizedPosition {
+  const { width, height } = state.boardSize;
+  const viewBoxWidth = 1;
+  const viewBoxHeight = 1;
+  const actualRatioPerExpectedRatio =
+    width / height / (viewBoxWidth / viewBoxHeight);
+  const scaleX = Math.max(actualRatioPerExpectedRatio, 1);
+  const scaleY = Math.max(1 / actualRatioPerExpectedRatio, 1);
+  const offsetX = viewBoxWidth * ((1 - scaleX) / 2);
+  const offsetY = viewBoxHeight * ((1 - scaleY) / 2);
   return {
     pos: "n",
-    x: ppos.x / state.boardSize.width,
-    y: ppos.y / state.boardSize.height,
+    x: cutDecimal((ppos.x / width) * scaleX + offsetX),
+    y: cutDecimal((ppos.y / height) * scaleY + offsetY),
   };
+}
+function cutDecimal(n: number) {
+  return Math.floor(n * 1000) / 1000;
 }
 function toPixelPosition(
   state: State,
@@ -299,6 +341,18 @@ function listenToBoardEvents(state: State): () => void {
       return startDrawing(state, npos);
     } else {
       return startSelecting(state, npos);
+    }
+  };
+  state.svgEl.onmousemove = (e: MouseEvent) => {
+    const pos = getPixelPosition(e);
+    const npos = toNormalizedPosition(state, pos);
+    if (e.button === 0) {
+      if (state.selected.length > 0) {
+        return continueMoving(state, npos);
+      }
+      return continueDrawing(state, npos);
+    } else {
+      return continueMoving(state, npos);
     }
   };
   state.svgEl.onmouseup = (e: MouseEvent) => {
