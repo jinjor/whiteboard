@@ -624,16 +624,10 @@ function initBoard(o: BoardOptions): void {
       const button = document.createElement("button");
       button.textContent = "Create Room for Debug";
       button.onclick = async () => {
-        const res = await fetch("/api/rooms/", {
-          method: "POST",
-        });
-        if (res.status !== 200) {
-          const errorMessage = await res.text();
-          console.log(errorMessage);
-          return;
+        const roomId = await api.createRoom();
+        if (roomId != null) {
+          location.href = "/rooms/" + roomId;
         }
-        const roomName_ = await res.text();
-        location.href = "/rooms/" + roomName_;
       };
       document.getElementById("board")!.remove();
       document.body.append(button);

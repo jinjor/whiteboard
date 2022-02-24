@@ -3,6 +3,7 @@ import {
   ObjectId,
   PathBody,
   RequestEventBody,
+  RoomId,
   RoomInfo,
   TextBody,
 } from "../schema";
@@ -14,6 +15,16 @@ export async function getRoomInfo(roomId: string): Promise<RoomInfo | null> {
   }
   const roomInfo = await res.json();
   return roomInfo;
+}
+
+export async function createRoom(): Promise<RoomId | null> {
+  const res = await fetch("/api/rooms/", {
+    method: "POST",
+  });
+  if (res.status !== 200) {
+    return null;
+  }
+  return await res.text();
 }
 
 function send(websocket: WebSocket, event: RequestEventBody): void {

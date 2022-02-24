@@ -103,13 +103,18 @@ const apiRouter = Router({ base: "/api" })
         method: "PUT",
       }
     );
-    if (res.status !== 200) {
-      // TODO: ?
-      return new Response(roomId.toString(), {
-        status: res.status,
-      });
+    if (res.status === 200) {
+      const roomInfo = await res.json();
+      return new Response(JSON.stringify(roomInfo));
     }
-    return new Response(roomId.toString());
+    if (res.status === 403) {
+      return new Response("Cannot create a room this time.", { status: 403 });
+    }
+    const errorMessage = await res.text();
+    console.log(errorMessage);
+    return new Response("Internal server error", {
+      status: 500,
+    });
   })
   .get(
     "/rooms/:roomName",

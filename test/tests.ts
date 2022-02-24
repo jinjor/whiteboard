@@ -40,9 +40,11 @@ async function clean(): Promise<void> {
 async function createRoom(): Promise<string> {
   const res1 = await request("POST", "/api/rooms");
   assert.strictEqual(res1.status, 200);
-  const id = await res1.text();
-  assert.strictEqual(id.length, 64);
-  return id;
+  const roomInfo = await res1.json();
+  assert.strictEqual(roomInfo.id.length, 64);
+  assert.strictEqual(roomInfo.active, true);
+  assert.notStrictEqual(roomInfo.createdAt, undefined);
+  return roomInfo.id;
 }
 
 describe("Whiteboard", function () {
