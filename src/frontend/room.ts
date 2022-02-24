@@ -554,7 +554,11 @@ function initBoard(o: BoardOptions): void {
   svgEl.setAttributeNS(null, "viewBox", viewBox);
   setRectangle(backgroundEl, o.viewBox);
   setRectangle(clipRectEl, o.viewBox);
-  selectorEl.setAttributeNS(null, "stroke", String(o.selectorStrokeWidth));
+  selectorEl.setAttributeNS(
+    null,
+    "stroke-width",
+    String(o.selectorStrokeWidth)
+  );
 }
 
 (async () => {
