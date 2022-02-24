@@ -1,4 +1,6 @@
 // @ts-ignore
+import manifest from "__STATIC_CONTENT_MANIFEST";
+// @ts-ignore
 import { Router } from "itty-router";
 import Cookie from "cookie";
 import { encrypt, decrypt, digest } from "./crypto";
@@ -52,7 +54,7 @@ async function getAsset(
       },
       {
         ASSET_NAMESPACE: (env as any).__STATIC_CONTENT,
-        ASSET_MANIFEST: (env as any).__STATIC_CONTENT_MANIFEST,
+        ASSET_MANIFEST: manifest,
         // [mf:wrn] Cache operations will have no impact if you deploy to a workers.dev subdomain!
         cacheControl: {
           bypassCache: true,
@@ -116,7 +118,7 @@ const apiRouter = Router({ base: "/api" })
         type: "section",
         text: {
           type: "mrkdwn",
-          text: `[どうぞ！](${url})`,
+          text: `どうぞ！ ${url}`,
         },
       });
     } else if (res.status === 403) {
