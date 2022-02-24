@@ -2,7 +2,6 @@ import {
   ObjectBody,
   ObjectId,
   PathBody,
-  RequestEvent,
   RequestEventBody,
   TextBody,
 } from "../schema";
