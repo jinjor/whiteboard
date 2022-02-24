@@ -77,3 +77,8 @@ export type ResponseEventBody =
   | DeletedEventBody;
 export type RequestEvent = RequestEventHead & RequestEventBody;
 export type ResponseEvent = ResponseEventBody;
+export type RoomInfo = {
+  id: string;
+  active: boolean;
+  createdAt: number;
+};

@@ -579,8 +579,8 @@ function initBoard(o: BoardOptions): void {
 
 (async () => {
   const pageInfo = getPageInfo();
-  const roomExists = await api.isRoomPresent(pageInfo.roomId);
-  if (roomExists) {
+  const roomInfo = await api.getRoomInfo(pageInfo.roomId);
+  if (roomInfo != null) {
     const boardOptions = {
       viewBox: new Rectangle(0, 0, 16, 9),
       textFontSize: 0.3,
@@ -604,16 +604,20 @@ function initBoard(o: BoardOptions): void {
       editing: { kind: "none" },
       selected: [],
     };
-    const unlistenBoard = listenToBoard(state);
-    const unlistenInput = listenToInputEvents(state);
-    const unlistenWindow = listtenToWindowEvents(state);
-    const unlistenKeyboard = listenToKeyboardEvents(state);
-    connect(pageInfo, state, () => {
-      unlistenBoard();
-      unlistenInput();
-      unlistenWindow();
-      unlistenKeyboard();
-    });
+    if (roomInfo.active) {
+      updateStatus("inactive", "Inactive");
+    } else {
+      const unlistenBoard = listenToBoard(state);
+      const unlistenInput = listenToInputEvents(state);
+      const unlistenWindow = listtenToWindowEvents(state);
+      const unlistenKeyboard = listenToKeyboardEvents(state);
+      connect(pageInfo, state, () => {
+        unlistenBoard();
+        unlistenInput();
+        unlistenWindow();
+        unlistenKeyboard();
+      });
+    }
   } else {
     // show error
     if (location.protocol === "http:") {

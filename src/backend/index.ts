@@ -3,7 +3,7 @@ import { Router } from "itty-router";
 import Cookie from "cookie";
 import { encrypt, decrypt, digest } from "./crypto";
 import * as github from "./github";
-import { RoomInfo, RoomPatch } from "./room-manager";
+import { RoomPatch } from "./room-manager";
 export { RateLimiter } from "./rate-limiter";
 export { ChatRoom } from "./room";
 export { RoomManager } from "./room-manager";
@@ -12,6 +12,7 @@ import {
   MethodNotAllowedError,
   NotFoundError,
 } from "@cloudflare/kv-asset-handler";
+import { RoomInfo } from "../schema";
 
 type Env = {
   manager: DurableObjectNamespace;

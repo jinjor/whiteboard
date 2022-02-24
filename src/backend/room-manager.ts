@@ -1,14 +1,9 @@
 import { Router } from "itty-router";
+import { RoomInfo } from "../schema";
 
 const MAX_ACTIVE_ROOMS = 10;
 const LIVE_DURATION = 7 * 24 * 60 * 60 * 1000;
 const ACTIVE_DURATION = 24 * 60 * 60 * 1000;
-
-export type RoomInfo = {
-  id: string;
-  active: boolean;
-  createdAt: number;
-};
 
 export type RoomPatch = {
   id: string;
