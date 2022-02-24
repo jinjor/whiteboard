@@ -25,14 +25,15 @@
         position: fixed;
         display: flex;
         width: 100%;
-        padding: 10px;
         pointer-events: none;
+        padding-top: 10px;
       }
       #members {
         margin-left: auto;
         margin-right: 20px;
         display: flex;
         flex-direction: row-reverse;
+        margin-right: 20px;
       }
       .member {
         border-radius: 20px;
@@ -43,7 +44,7 @@
         justify-content: center;
         width: 40px;
         height: 40px;
-        margin-right: -10px;
+        margin-left: -10px;
       }
       .member.self {
         border-color: red;
@@ -72,6 +73,18 @@
         border-color: #f00;
         color: #a00;
       }
+      footer {
+        position: fixed;
+        bottom: 0;
+        right: 0;
+        margin-right: 20px;
+        margin-bottom: 10px;
+        text-align: right;
+        color: #ccc;
+        pointer-events: none;
+        font-size: 14px;
+        line-height: 1.4;
+      }
     </style>
   </head>
   <body>
@@ -80,6 +93,14 @@
         <div id="status" class="hidden"></div>
         <div id="members"></div>
       </nav>
+      <footer>
+        <div>Double-click: Text</div>
+        <div>Right-drag: Select</div>
+        <div>Select & Drag: Move</div>
+        <div>Select & Backspace: Delete</div>
+        <div>Ctrl(Command) + Z: Undo</div>
+        <div>Ctrl(Command) + Y: Redo</div>
+      </footer>
       <input id="input" class="hidden" />
       <svg id="board" viewBox="0 0 0 0">
         <clipPath id="clip">
