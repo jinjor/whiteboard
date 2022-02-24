@@ -6,7 +6,7 @@ import {
   ObjectBody,
   RequestEventBody,
 } from "../schema";
-import deepEqual from "deep-equal";
+import { deepEqual } from "../deep-equal";
 import { Validator } from "@cfworker/json-schema";
 // @ts-ignore
 import schemaJson from "../schema.json";

@@ -4,6 +4,7 @@ import fetch, { Response } from "node-fetch";
 import { setTimeout } from "timers/promises";
 import kill from "tree-kill";
 import WebSocket from "ws";
+import { deepEqual } from "../src/deep-equal";
 
 const port = "8787";
 const httpRoot = `http://localhost:${port}`;
@@ -47,6 +48,30 @@ async function createRoom(): Promise<string> {
   return roomInfo.id;
 }
 
+describe("deepEqual", function () {
+  it("works", function () {
+    assert.deepStrictEqual(deepEqual(undefined, undefined), true);
+    assert.deepStrictEqual(deepEqual(null, null), true);
+    assert.deepStrictEqual(deepEqual(null, undefined), false);
+    assert.deepStrictEqual(deepEqual(0, 0), true);
+    assert.deepStrictEqual(deepEqual(0, 1), false);
+    assert.deepStrictEqual(deepEqual("", ""), true);
+    assert.deepStrictEqual(deepEqual("0", ""), false);
+    assert.deepStrictEqual(deepEqual("0", "1"), false);
+    assert.deepStrictEqual(deepEqual(0, "0"), false);
+    assert.deepStrictEqual(deepEqual([], []), true);
+    assert.deepStrictEqual(deepEqual([0], [0]), true);
+    assert.deepStrictEqual(deepEqual([0], [1]), false);
+    assert.deepStrictEqual(deepEqual([0], [0, 1]), false);
+    assert.deepStrictEqual(deepEqual([1, 0], [0, 1]), false);
+    assert.deepStrictEqual(deepEqual({}, {}), true);
+    assert.deepStrictEqual(deepEqual({ a: 0 }, { a: 0 }), true);
+    assert.deepStrictEqual(deepEqual({ a: 0 }, { a: 1 }), false);
+    assert.deepStrictEqual(deepEqual({ a: 0 }, { b: 0 }), false);
+    assert.deepStrictEqual(deepEqual({}, { a: undefined }), false);
+  });
+});
+
 describe("Whiteboard", function () {
   this.timeout(10 * 1000);
   let p: ChildProcess;
@@ -62,7 +87,12 @@ describe("Whiteboard", function () {
     });
     for (let i = 0; i < 10; i++) {
       try {
-        await fetch(httpRoot, { timeout: 500 });
+        await fetch(httpRoot, {
+          timeout: 500,
+          headers: {
+            "WB-TEST-USER": "test",
+          },
+        });
         return;
       } catch (e) {
         await setTimeout(500);
@@ -883,7 +913,11 @@ describe("Whiteboard", function () {
     const edits1 = filterEditingEvents(mes1);
     const edits2 = filterEditingEvents(mes2);
     assert.strictEqual(edits1.length, 0);
-    assert.strictEqual(edits2.length, expected.events.length);
+    assert.strictEqual(
+      edits2.length,
+      expected.events.length,
+      JSON.stringify(edits2)
+    );
     for (let i = 0; i < edits2.length; i++) {
       const editEvent = edits2[i];
       if (editEvent.object != null) {

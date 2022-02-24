@@ -27,11 +27,10 @@ import {
   toPixelPosition,
   upsertObject,
   upsertPath,
-  upsertText,
-} from "./board";
-import * as api from "./api";
-import { addMember, deleteMember, updateStatus } from "./navbar";
-import deepEqual from "deep-equal";
+} from "./lib/board";
+import * as api from "./lib/api";
+import { addMember, deleteMember, updateStatus } from "./lib/navbar";
+import { deepEqual } from "../deep-equal";
 
 type Size = { width: number; height: number };
 class Rectangle {
@@ -194,8 +193,10 @@ function stopDrawing(state: State, pos: Position): void {
           kind: "path",
           d: makeD(points),
         } as const;
-        upsertPath(state.svgEl, object, state.boardOptions.pathStrokeWidth);
-        api.addObject(state.websocket, object);
+        const event = api.makeAddObjectEvent(object);
+        doAction(state, {
+          events: [event],
+        });
       }
     }
   }
@@ -349,6 +350,7 @@ function stopMoving(state: State, pos: Position): void {
     if (state.websocket != null) {
       const dx = pos.x - state.editing.start.x;
       const dy = pos.y - state.editing.start.y;
+      const events: ActionEvent[] = [];
       for (const object of state.selected) {
         // TODO: 選択中に他の人が動かしたり消したりしたらどうするか
         switch (object.kind) {
@@ -357,11 +359,15 @@ function stopMoving(state: State, pos: Position): void {
             const y = object.position.y + dy;
             const oldPosision = object.position;
             const newPosision = { x, y };
-            patchTextPosision(object.id, newPosision);
-            api.patchText(state.websocket, object.id, "position", {
-              old: oldPosision,
-              new: newPosision,
-            });
+            const event = api.makePatchObjectEventFromText(
+              object.id,
+              "position",
+              {
+                old: oldPosision,
+                new: newPosision,
+              }
+            );
+            events.push(event);
             break;
           }
           case "path": {
@@ -371,15 +377,16 @@ function stopMoving(state: State, pos: Position): void {
               y: p.y + dy,
             }));
             const d = makeD(points);
-            patchPathD(object.id, d);
-            api.patchPath(state.websocket, object.id, "d", {
+            const event = api.makePatchObjectEventFromPath(object.id, "d", {
               old: oldD,
               new: d,
             });
+            events.push(event);
             break;
           }
         }
       }
+      doAction(state, { events });
     }
   }
   for (const object of state.selected) {
@@ -389,21 +396,11 @@ function stopMoving(state: State, pos: Position): void {
   state.selected = [];
   state.editing = { kind: "none" };
 }
-function patchTextPosision(id: ObjectId, position: Position): void {
-  const element = document.getElementById(id)!;
-  setPosition(element, position);
-}
-function patchPathD(id: ObjectId, d: string): void {
-  const element = document.getElementById(id)!;
-  setD(element, d);
-}
-
 function createText(state: State, pos: Position): void {
   state.editing = { kind: "text", position: pos };
   updateInputElementPosition(state);
   state.input.showAndFocus();
 }
-function startEditingText(state: State): void {}
 function stopEditingText(state: State): void {
   if (state.editing.kind === "text") {
     const text = state.input.getText();
@@ -416,8 +413,8 @@ function stopEditingText(state: State): void {
           text,
           position: { x: position.x, y: position.y },
         } as const;
-        upsertText(state.svgEl, object, state.boardOptions.textFontSize);
-        api.addObject(state.websocket, object);
+        const event = api.makeAddObjectEvent(object);
+        doAction(state, { events: [event] });
       }
     }
   }
@@ -435,9 +432,9 @@ function deleteSelectedObjects(state: State) {
         // 既に他の人が消していた場合
         continue;
       }
-      deleteObject(id);
       const object = elementToObject(element)!;
-      api.deleteObject(state.websocket, object);
+      const event = api.makeDeleteObjectEvent(object);
+      doAction(state, { events: [event] });
     }
   }
   state.selected = [];
@@ -574,13 +571,13 @@ function listenToKeyboardEvents(state: State): () => void {
       e.preventDefault();
       return selectAll(state);
     }
-    if (ctrl && e.key === "z") {
-      e.preventDefault();
-      return undo(state);
-    }
     if ((ctrl && e.key === "y") || (ctrl && shift && e.key === "z")) {
       e.preventDefault();
       return redo(state);
+    }
+    if (ctrl && e.key === "z") {
+      e.preventDefault();
+      return undo(state);
     }
   };
   return () => {

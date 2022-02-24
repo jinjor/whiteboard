@@ -1,4 +1,4 @@
-import { UserId } from "../schema";
+import { UserId } from "../../schema";
 
 export function updateStatus(
   kind: "active" | "inactive" | "error",

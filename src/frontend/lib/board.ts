@@ -5,7 +5,7 @@ import {
   PathBody,
   Position,
   TextBody,
-} from "../schema";
+} from "../../schema";
 type Size = { width: number; height: number };
 export type PixelPosition = { px: number; py: number };
 export type Rectangle = { x: number; y: number; width: number; height: number };

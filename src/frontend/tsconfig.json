@@ -6,7 +6,7 @@
     "strict": true,
     "noEmitOnError": false,
     "moduleResolution": "node",
-    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
     "types": [],
     "allowJs": false,
     "sourceMap": true,

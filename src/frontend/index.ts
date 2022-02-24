@@ -1,4 +1,4 @@
-import * as api from "./api";
+import * as api from "./lib/api";
 
 (async () => {
   if (location.protocol === "http:") {
