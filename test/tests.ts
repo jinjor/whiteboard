@@ -337,6 +337,7 @@ describe("Whiteboard", function () {
         kind: "init",
         objects: {},
         members: ["a"],
+        self: "a",
       },
     ]);
   });
@@ -373,10 +374,11 @@ describe("Whiteboard", function () {
         kind: "init",
         objects: {},
         members: ["a"],
+        self: "a",
       },
       {
         kind: "join",
-        name: "b",
+        id: "b",
       },
     ]);
     assert.deepStrictEqual(mes2, [
@@ -384,10 +386,11 @@ describe("Whiteboard", function () {
         kind: "init",
         objects: {},
         members: ["a", "b"],
+        self: "b",
       },
       {
         kind: "quit",
-        name: "a",
+        id: "a",
       },
     ]);
   });
@@ -425,6 +428,7 @@ describe("Whiteboard", function () {
         kind: "init",
         objects: {},
         members: ["a"],
+        self: "a",
       },
     ]);
     assert.deepStrictEqual(mes2, [
@@ -432,6 +436,7 @@ describe("Whiteboard", function () {
         kind: "init",
         objects: {},
         members: ["a"],
+        self: "a",
       },
     ]);
     assert.strictEqual(code, 1001);
