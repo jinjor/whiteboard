@@ -1,6 +1,7 @@
 import { ObjectId, PatchEventBody, Position, ResponseEvent } from "../schema";
 import {
   deleteObject,
+  elementToObject,
   getD,
   getPosition,
   Input,
@@ -17,6 +18,7 @@ import {
   upsertPath,
   upsertText,
 } from "./board";
+import * as api from "./api";
 
 type Size = { width: number; height: number };
 class Rectangle {
@@ -166,12 +168,8 @@ function stopDrawing(state: State, pos: Position): void {
           kind: "path",
           d: makeD(points),
         } as const;
-        const event = {
-          kind: "add",
-          object,
-        };
         upsertPath(state.svgEl, object);
-        state.websocket.send(JSON.stringify(event));
+        api.addObject(state.websocket, object);
       }
     }
   }
@@ -321,20 +319,18 @@ function stopMoving(state: State, pos: Position): void {
       const dx = pos.x - state.editing.start.x;
       const dy = pos.y - state.editing.start.y;
       for (const object of state.selected) {
+        // TODO: 選択中に他の人が動かしたり消したりしたらどうするか
         switch (object.kind) {
           case "text": {
             const x = object.position.x + dx;
             const y = object.position.y + dy;
             const oldPosision = object.position;
             const newPosision = { x, y };
-            const event: PatchEventBody = {
-              kind: "patch",
-              id: object.id,
-              key: "position",
-              value: { old: oldPosision, new: newPosision },
-            };
             patchTextPosision(object.id, newPosision);
-            state.websocket.send(JSON.stringify(event));
+            api.patchText(state.websocket, object.id, "position", {
+              old: oldPosision,
+              new: newPosision,
+            });
             break;
           }
           case "path": {
@@ -354,7 +350,10 @@ function stopMoving(state: State, pos: Position): void {
               },
             };
             patchPathD(object.id, d);
-            state.websocket.send(JSON.stringify(event));
+            api.patchPath(state.websocket, object.id, "d", {
+              old: oldD,
+              new: d,
+            });
             break;
           }
         }
@@ -395,12 +394,8 @@ function stopEditingText(state: State): void {
           text,
           position: { x: position.x, y: position.y },
         } as const;
-        const event = {
-          kind: "add",
-          object,
-        };
         upsertText(state.svgEl, object);
-        state.websocket.send(JSON.stringify(event));
+        api.addObject(state.websocket, object);
       }
     }
   }
@@ -408,13 +403,35 @@ function stopEditingText(state: State): void {
   state.input.hideAndReset();
 }
 
+function deleteSelectedObjects(state: State) {
+  if (state.websocket != null) {
+    for (const { id } of state.selected) {
+      // TODO: 選択中に他の人が動かしたり消したりしたらどうするか
+      // 選択開始時点で見ていたものと違うものを消していい？
+      const element = document.getElementById(id);
+      if (element == null) {
+        // 既に他の人が消していた場合
+        continue;
+      }
+      deleteObject(state.svgEl, id);
+      const object = elementToObject(element)!;
+      api.deleteObject(state.websocket, object);
+    }
+  }
+  state.selected = [];
+}
+
 function undo(state: State): void {}
 function redo(state: State): void {}
-function listenToKeyboardEvents(
-  state: State,
-  element: HTMLElement
-): () => void {
-  return () => {};
+function listenToKeyboardEvents(state: State): () => void {
+  window.onkeydown = (e) => {
+    if (e.key === "Backspace") {
+      deleteSelectedObjects(state);
+    }
+  };
+  return () => {
+    window.onkeydown = null;
+  };
 }
 function getBoardRect(svgElement: HTMLElement): {
   size: Size;
@@ -542,10 +559,12 @@ function listenToBoard(state: State): () => void {
     const unlistenBoard = listenToBoard(state);
     const unlistenInput = listenToInputEvents(state);
     const unlistenWindow = listtenToWindowEvents(state);
+    const unlistenKeyboard = listenToKeyboardEvents(state);
     connect(pageInfo, state, () => {
       unlistenBoard();
       unlistenInput();
       unlistenWindow();
+      unlistenKeyboard();
     });
   } else {
     // show error

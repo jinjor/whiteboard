@@ -189,6 +189,31 @@ export function upsertPath(svgEl: HTMLElement, path: PathBody) {
   element.setAttributeNS(null, "d", path.d);
   svgEl.append(element);
 }
+export function elementToObject(element: HTMLElement): ObjectBody | null {
+  const id = element.id;
+  const kind = element.tagName;
+  switch (kind) {
+    case "text": {
+      const text = getText(element);
+      const position = getPosition(element);
+      return {
+        id,
+        kind: "text",
+        text,
+        position,
+      };
+    }
+    case "path": {
+      const d = getD(element);
+      return {
+        id,
+        kind: "path",
+        d,
+      };
+    }
+  }
+  return null;
+}
 function formatPosition(pos: Position): string {
   return `${pos.x.toFixed(4)},${pos.y.toFixed(4)}`;
 }
@@ -211,6 +236,9 @@ export function parseD(d: string): Position[] {
       x: parseFloat(x),
       y: parseFloat(y),
     }));
+}
+export function getText(element: HTMLElement | SVGElement): string {
+  return element.textContent!;
 }
 export function getPosition(element: HTMLElement | SVGElement): Position {
   return {
