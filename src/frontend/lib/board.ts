@@ -31,6 +31,16 @@ function getPixelPositionFromTouch(
     py: touch.pageY - boardPosition.py,
   };
 }
+export function getBoardRect(svgElement: HTMLElement): {
+  size: Size;
+  position: PixelPosition;
+} {
+  const rect = svgElement.getBoundingClientRect();
+  return {
+    size: { width: rect.width, height: rect.height },
+    position: { px: rect.left, py: rect.top },
+  };
+}
 export function listenToBoardEvents(
   boardOptions: BoardOptions,
   svgEl: HTMLElement,

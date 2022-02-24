@@ -11,6 +11,7 @@ import {
   BoardOptions,
   deleteObject,
   elementToObject,
+  getBoardRect,
   getD,
   getPosition,
   Input,
@@ -584,16 +585,6 @@ function listenToKeyboardEvents(state: State): () => void {
     window.onkeydown = null;
   };
 }
-function getBoardRect(svgElement: HTMLElement): {
-  size: Size;
-  position: PixelPosition;
-} {
-  const rect = svgElement.getBoundingClientRect();
-  return {
-    size: { width: rect.width, height: rect.height },
-    position: { px: rect.left, py: rect.top },
-  };
-}
 function updateInputElementPosition(state: State): void {
   if (state.editing.kind === "text") {
     const ppos = toPixelPosition(
@@ -604,7 +595,7 @@ function updateInputElementPosition(state: State): void {
     state.input.setPosition(ppos);
   }
 }
-function listtenToWindowEvents(state: State): () => void {
+function listenToWindowEvents(state: State): () => void {
   window.onresize = () => {
     state.boardRect = getBoardRect(state.svgEl);
     updateInputElementPosition(state);
@@ -743,7 +734,7 @@ function initBoard(o: BoardOptions): void {
     } else {
       const unlistenBoard = listenToBoard(state);
       const unlistenInput = listenToInputEvents(state);
-      const unlistenWindow = listtenToWindowEvents(state);
+      const unlistenWindow = listenToWindowEvents(state);
       const unlistenKeyboard = listenToKeyboardEvents(state);
       connect(pageInfo, state, () => {
         unlistenBoard();
