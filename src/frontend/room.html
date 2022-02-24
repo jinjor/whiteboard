@@ -26,12 +26,19 @@
   <body>
     <div id="container">
       <input id="input" class="hidden" />
-      <svg id="board" viewBox="0 0 1 1">
+      <svg id="board" viewBox="0 0 0 0">
         <clipPath id="clip">
-          <rect x="0" y="0" width="1" height="1" />
+          <rect id="board-clip-rect" x="0" y="0" width="0" height="0" />
         </clipPath>
-        <rect x="0" y="0" width="1" height="1" fill="white" />
-        <rect id="selector" fill="none" stroke="none" stroke-width="0.001" />
+        <rect
+          id="board-background"
+          x="0"
+          y="0"
+          width="0"
+          height="0"
+          fill="white"
+        />
+        <rect id="board-selector" fill="none" stroke="none" stroke-width="0" />
       </svg>
     </div>
     <script src="/assets/room.js"></script>

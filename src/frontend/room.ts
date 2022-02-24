@@ -1,5 +1,6 @@
 import { ObjectId, PatchEventBody, Position, ResponseEvent } from "../schema";
 import {
+  BoardOptions,
   deleteObject,
   elementToObject,
   getD,
@@ -12,6 +13,7 @@ import {
   Selector,
   setD,
   setPosition,
+  setRectangle,
   setSelected,
   toPixelPosition,
   upsertObject,
@@ -57,6 +59,7 @@ type EditingState =
   | { kind: "path"; points: Position[]; id: ObjectId }
   | { kind: "text"; position: Position };
 type State = {
+  boardOptions: BoardOptions;
   svgEl: HTMLElement;
   input: Input;
   selector: Selector;
@@ -106,12 +109,12 @@ function connect(pageInfo: PageInfo, state: State, disableEditing: () => void) {
     switch (data.kind) {
       case "init": {
         for (const key of Object.keys(data.objects)) {
-          upsertObject(state.svgEl, data.objects[key]);
+          upsertObject(state.svgEl, data.objects[key], state.boardOptions);
         }
         break;
       }
       case "upsert": {
-        upsertObject(state.svgEl, data.object);
+        upsertObject(state.svgEl, data.object, state.boardOptions);
         break;
       }
       case "delete": {
@@ -151,7 +154,7 @@ function continueDrawing(state: State, pos: Position): void {
     const d = makeD(state.editing.points);
     if (element == null) {
       const object = { id, kind: "path", d } as const;
-      upsertPath(state.svgEl, object);
+      upsertPath(state.svgEl, object, state.boardOptions.pathStrokeWidth);
     } else {
       setD(element, d);
     }
@@ -168,7 +171,7 @@ function stopDrawing(state: State, pos: Position): void {
           kind: "path",
           d: makeD(points),
         } as const;
-        upsertPath(state.svgEl, object);
+        upsertPath(state.svgEl, object, state.boardOptions.pathStrokeWidth);
         api.addObject(state.websocket, object);
       }
     }
@@ -394,7 +397,7 @@ function stopEditingText(state: State): void {
           text,
           position: { x: position.x, y: position.y },
         } as const;
-        upsertText(state.svgEl, object);
+        upsertText(state.svgEl, object, state.boardOptions.textFontSize);
         api.addObject(state.websocket, object);
       }
     }
@@ -445,7 +448,11 @@ function getBoardRect(svgElement: HTMLElement): {
 }
 function updateInputElementPosition(state: State): void {
   if (state.editing.kind === "text") {
-    const ppos = toPixelPosition(state.boardRect.size, state.editing.position);
+    const ppos = toPixelPosition(
+      state.boardOptions,
+      state.boardRect.size,
+      state.editing.position
+    );
     state.input.setPosition(ppos);
   }
 }
@@ -467,7 +474,7 @@ function listenToInputEvents(state: State): () => void {
   return () => state.input.unlisten();
 }
 function listenToBoard(state: State): () => void {
-  return listenToBoardEvents(state.svgEl, {
+  return listenToBoardEvents(state.boardOptions, state.svgEl, {
     getBoardRect: () => {
       return state.boardRect;
     },
@@ -538,14 +545,34 @@ function listenToBoard(state: State): () => void {
   });
 }
 
+function initBoard(o: BoardOptions): void {
+  const svgEl = document.getElementById("board")!;
+  const backgroundEl = document.getElementById("board-background")!;
+  const clipRectEl = document.getElementById("board-clip-rect")!;
+  const selectorEl = document.getElementById("board-selector")!;
+  const viewBox = `${o.viewBox.x} ${o.viewBox.y} ${o.viewBox.width} ${o.viewBox.height}`;
+  svgEl.setAttributeNS(null, "viewBox", viewBox);
+  setRectangle(backgroundEl, o.viewBox);
+  setRectangle(clipRectEl, o.viewBox);
+  selectorEl.setAttributeNS(null, "stroke", String(o.selectorStrokeWidth));
+}
+
 (async () => {
   const pageInfo = getPageInfo();
   const roomExists = await isRoomPresent(pageInfo.roomId);
   if (roomExists) {
+    const boardOptions = {
+      viewBox: new Rectangle(0, 0, 1, 1),
+      textFontSize: 0.02,
+      pathStrokeWidth: 0.002,
+      selectorStrokeWidth: 0.001,
+    };
+    initBoard(boardOptions);
     const svgEl = document.getElementById("board")!;
-    const selectorEl = document.getElementById("selector")!;
+    const selectorEl = document.getElementById("board-selector")!;
     const inputEl = document.getElementById("input")! as HTMLInputElement;
     const state: State = {
+      boardOptions,
       svgEl,
       input: new Input(inputEl),
       selector: new Selector(selectorEl),

@@ -1,6 +1,13 @@
 import { ObjectBody, PathBody, Position, TextBody } from "../schema";
 type Size = { width: number; height: number };
 export type PixelPosition = { px: number; py: number };
+export type Rectangle = { x: number; y: number; width: number; height: number };
+export type BoardOptions = {
+  viewBox: Rectangle;
+  textFontSize: number;
+  pathStrokeWidth: number;
+  selectorStrokeWidth: number;
+};
 
 function getPixelPositionFromMouse(e: MouseEvent): PixelPosition {
   return {
@@ -18,6 +25,7 @@ function getPixelPositionFromTouch(
   };
 }
 export function listenToBoardEvents(
+  boardOptions: BoardOptions,
   svgEl: HTMLElement,
   o: {
     getBoardRect: () => { position: PixelPosition; size: Size };
@@ -34,7 +42,7 @@ export function listenToBoardEvents(
     e.preventDefault();
     const boardRect = o.getBoardRect();
     const pos = getPixelPositionFromMouse(e);
-    const npos = toBoardPosition(boardRect.size, pos);
+    const npos = toBoardPosition(boardOptions, boardRect.size, pos);
     o.doubleClick(npos);
   };
   svgEl.oncontextmenu = (e: MouseEvent) => {
@@ -47,35 +55,35 @@ export function listenToBoardEvents(
     e.preventDefault();
     const boardRect = o.getBoardRect();
     const pos = getPixelPositionFromMouse(e);
-    const npos = toBoardPosition(boardRect.size, pos);
+    const npos = toBoardPosition(boardOptions, boardRect.size, pos);
     o.mouseDown(npos, e.button !== 0);
   };
   svgEl.ontouchstart = (e: TouchEvent) => {
     e.preventDefault();
     const boardRect = o.getBoardRect();
     const pos = getPixelPositionFromTouch(boardRect.position, e.touches[0]);
-    const npos = toBoardPosition(boardRect.size, pos);
+    const npos = toBoardPosition(boardOptions, boardRect.size, pos);
     o.touchStart(npos);
   };
   svgEl.onmousemove = (e: MouseEvent) => {
     e.preventDefault();
     const boardRect = o.getBoardRect();
     const pos = getPixelPositionFromMouse(e);
-    const npos = toBoardPosition(boardRect.size, pos);
+    const npos = toBoardPosition(boardOptions, boardRect.size, pos);
     o.mouseMove(npos);
   };
   svgEl.ontouchmove = (e: TouchEvent) => {
     e.preventDefault();
     const boardRect = o.getBoardRect();
     const pos = getPixelPositionFromTouch(boardRect.position, e.touches[0]);
-    const npos = toBoardPosition(boardRect.size, pos);
+    const npos = toBoardPosition(boardOptions, boardRect.size, pos);
     o.touchMove(npos);
   };
   svgEl.onmouseup = (e: MouseEvent) => {
     e.preventDefault();
     const boardRect = o.getBoardRect();
     const pos = getPixelPositionFromMouse(e);
-    const npos = toBoardPosition(boardRect.size, pos);
+    const npos = toBoardPosition(boardOptions, boardRect.size, pos);
     o.mouseUp(npos);
   };
   svgEl.ontouchend = (e: TouchEvent) => {
@@ -85,7 +93,7 @@ export function listenToBoardEvents(
       boardRect.position,
       e.changedTouches[0]
     );
-    const npos = toBoardPosition(boardRect.size, pos);
+    const npos = toBoardPosition(boardOptions, boardRect.size, pos);
     o.touchEnd(npos);
   };
   return () => {
@@ -100,12 +108,13 @@ export function listenToBoardEvents(
 }
 
 export function toBoardPosition(
+  boardOptions: BoardOptions,
   boardSize: Size,
   ppos: PixelPosition
 ): Position {
   const { width, height } = boardSize;
-  const viewBoxWidth = 1;
-  const viewBoxHeight = 1;
+  const viewBoxWidth = boardOptions.viewBox.width;
+  const viewBoxHeight = boardOptions.viewBox.height;
   const actualRatioPerExpectedRatio =
     width / height / (viewBoxWidth / viewBoxHeight);
   const scaleX = Math.max(actualRatioPerExpectedRatio, 1);
@@ -118,12 +127,13 @@ export function toBoardPosition(
   };
 }
 export function toPixelPosition(
+  boardOptions: BoardOptions,
   boardSize: Size,
   npos: Position
 ): PixelPosition {
   const { width, height } = boardSize;
-  const viewBoxWidth = 1;
-  const viewBoxHeight = 1;
+  const viewBoxWidth = boardOptions.viewBox.width;
+  const viewBoxHeight = boardOptions.viewBox.height;
   const actualRatioPerExpectedRatio =
     width / height / (viewBoxWidth / viewBoxHeight);
   const scaleX = Math.max(actualRatioPerExpectedRatio, 1);
@@ -135,13 +145,17 @@ export function toPixelPosition(
     py: ((npos.y - offsetY) / scaleY) * height,
   };
 }
-export function upsertObject(svgEl: HTMLElement, object: ObjectBody): void {
+export function upsertObject(
+  svgEl: HTMLElement,
+  object: ObjectBody,
+  boardOptions: BoardOptions
+): void {
   switch (object.kind) {
     case "text": {
-      return upsertText(svgEl, object);
+      return upsertText(svgEl, object, boardOptions.textFontSize);
     }
     case "path": {
-      return upsertPath(svgEl, object);
+      return upsertPath(svgEl, object, boardOptions.pathStrokeWidth);
     }
   }
 }
@@ -165,18 +179,26 @@ function createObjectElement<T extends string>(
   element.setAttributeNS(null, "clip-path", "url(#clip)");
   return element as any;
 }
-export function upsertText(svgEl: HTMLElement, text: TextBody) {
+export function upsertText(
+  svgEl: HTMLElement,
+  text: TextBody,
+  fontSize: number
+) {
   let element = document.getElementById(text.id) as unknown as SVGTextElement;
   if (element == null) {
     element = createObjectElement("text", text.id);
-    element.setAttributeNS(null, "font-size", String(0.02));
+    element.setAttributeNS(null, "font-size", String(fontSize));
   }
   element.textContent = text.text;
   element.setAttributeNS(null, "x", String(text.position.x));
   element.setAttributeNS(null, "y", String(text.position.y));
   svgEl.append(element);
 }
-export function upsertPath(svgEl: HTMLElement, path: PathBody) {
+export function upsertPath(
+  svgEl: HTMLElement,
+  path: PathBody,
+  strokeWidth: number
+) {
   let element = document.getElementById(
     path.id
   ) as unknown as SVGPathElement | null;
@@ -184,7 +206,7 @@ export function upsertPath(svgEl: HTMLElement, path: PathBody) {
     element = createObjectElement("path", path.id);
     element.setAttributeNS(null, "fill", "none");
     element.setAttributeNS(null, "stroke", "black");
-    element.setAttributeNS(null, "stroke-width", String(0.002));
+    element.setAttributeNS(null, "stroke-width", String(strokeWidth));
   }
   element.setAttributeNS(null, "d", path.d);
   svgEl.append(element);
@@ -248,6 +270,13 @@ export function getPosition(element: HTMLElement | SVGElement): Position {
 }
 export function getD(element: HTMLElement | SVGElement): string {
   return element.getAttributeNS(null, "d")!;
+}
+export function setRectangle(
+  element: HTMLElement | SVGElement,
+  rect: Rectangle
+) {
+  setPosition(element, rect);
+  setSize(element, rect);
 }
 export function setPosition(
   element: HTMLElement | SVGElement,
@@ -316,8 +345,7 @@ export class Input {
 export class Selector {
   constructor(private element: HTMLElement) {}
   setRectangle(x: number, y: number, width: number, height: number): void {
-    setPosition(this.element, { x, y });
-    setSize(this.element, { width, height });
+    setRectangle(this.element, { x, y, width, height });
   }
   show(): void {
     setStroke(this.element, "red");
