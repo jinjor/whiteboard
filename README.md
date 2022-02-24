@@ -31,3 +31,20 @@ UI
 - https://github.com/cloudflare/durable-objects-rollup-esm
 - https://github.com/cloudflare/durable-objects-webpack-commonjs
 - https://developers.cloudflare.com/workers/tutorials/build-a-slackbot
+
+TODO:
+- Slack コマンドの認証
+- Slack のマークダウン
+- Slack のアイコン
+- Slack oauth
+- GitHub auth で org を optional に
+- 一括で消した時の undo
+- 十時カーソル
+- テキストを右クリックで選択
+- dev 環境
+- トップページ
+- 404 ページ
+- updatedAt, updatedBy 要らないかも
+- 選択中に干渉された場合の動作
+- キャプチャ
+- ヘルプを最初は非表示に
