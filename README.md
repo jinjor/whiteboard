@@ -30,3 +30,4 @@ UI
 - https://github.com/cloudflare/durable-objects-template
 - https://github.com/cloudflare/durable-objects-rollup-esm
 - https://github.com/cloudflare/durable-objects-webpack-commonjs
+- https://developers.cloudflare.com/workers/tutorials/build-a-slackbot

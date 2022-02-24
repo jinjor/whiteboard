@@ -52,6 +52,7 @@ async function getAsset(
       },
       {
         ASSET_NAMESPACE: (env as any).__STATIC_CONTENT,
+        ASSET_MANIFEST: (env as any).__STATIC_CONTENT_MANIFEST,
         // [mf:wrn] Cache operations will have no impact if you deploy to a workers.dev subdomain!
         cacheControl: {
           bypassCache: true,
@@ -93,6 +94,56 @@ const debugRouter = Router({ base: "/debug" })
     });
   });
 const apiRouter = Router({ base: "/api" })
+  .post("/slack", async (request: Request, env: Env) => {
+    // TODO: 認証
+    const body = await request.text();
+    console.log(body);
+    // const params = new URLSearchParams(body);
+    // const text = params.get("text")!.trim();
+    const roomId = env.rooms.newUniqueId();
+    const singletonId = env.manager.idFromName("singleton");
+    const managerStub = env.manager.get(singletonId);
+    const res = await managerStub.fetch(
+      "https://dummy-url/rooms/" + roomId.toString(),
+      {
+        method: "PUT",
+      }
+    );
+    const blocks = [];
+    if (res.status === 200) {
+      const url = `https://whiteboard.jinjor.workers.dev/rooms/${roomId}`;
+      blocks.push({
+        type: "section",
+        text: {
+          type: "mrkdwn",
+          text: `[どうぞ！](${url})`,
+        },
+      });
+    } else if (res.status === 403) {
+      blocks.push({
+        type: "section",
+        text: {
+          type: "mrkdwn",
+          text: `部屋がいっぱいです`,
+        },
+      });
+    } else {
+      blocks.push({
+        type: "section",
+        text: {
+          type: "mrkdwn",
+          text: `部屋の作成に失敗しました`,
+        },
+      });
+    }
+    return new Response(
+      JSON.stringify({
+        blocks,
+        response_type: "in_channel",
+      }),
+      { headers: { "Content-type": "application/json" } }
+    );
+  })
   .post("/rooms", async (request: Request, env: Env) => {
     const roomId = env.rooms.newUniqueId();
     const singletonId = env.manager.idFromName("singleton");
