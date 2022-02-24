@@ -17,14 +17,14 @@ export async function getRoomInfo(roomId: string): Promise<RoomInfo | null> {
   return roomInfo;
 }
 
-export async function createRoom(): Promise<RoomId | null> {
+export async function createRoom(): Promise<RoomInfo | null> {
   const res = await fetch("/api/rooms/", {
     method: "POST",
   });
   if (res.status !== 200) {
     return null;
   }
-  return await res.text();
+  return await res.json();
 }
 
 function send(websocket: WebSocket, event: RequestEventBody): void {

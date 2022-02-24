@@ -5,9 +5,9 @@ import * as api from "./api";
     const button = document.createElement("button");
     button.textContent = "Create Room for Debug";
     button.onclick = async () => {
-      const roomId = await api.createRoom();
-      if (roomId != null) {
-        location.href = "/rooms/" + roomId;
+      const roomInfo = await api.createRoom();
+      if (roomInfo != null) {
+        location.href = "/rooms/" + roomInfo.id;
       }
     };
     document.body.append(button);

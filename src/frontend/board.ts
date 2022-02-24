@@ -46,7 +46,7 @@ export function listenToBoardEvents(
     o.doubleClick(npos);
   };
   svgEl.oncontextmenu = (e: MouseEvent) => {
-    if (e.ctrlKey) {
+    if (e.ctrlKey || e.metaKey) {
       return;
     }
     e.preventDefault();

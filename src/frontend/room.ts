@@ -195,10 +195,11 @@ function stopDrawing(state: State, pos: Position): void {
   state.editing = { kind: "none" };
 }
 
-function startSelecting(state: State, pos: Position): void {
-  const elements = document.getElementsByClassName(
-    "object"
-  ) as unknown as SVGElement[];
+function getAllObjectElements(): SVGElement[] {
+  return document.getElementsByClassName("object") as unknown as SVGElement[];
+}
+function getAllObjectsForSelect(): ObjectForSelect[] {
+  const elements = getAllObjectElements();
   const objects: ObjectForSelect[] = [];
   for (const element of elements) {
     const { x, y, width, height } = (element as any).getBBox();
@@ -227,6 +228,10 @@ function startSelecting(state: State, pos: Position): void {
       }
     }
   }
+  return objects;
+}
+function startSelecting(state: State, pos: Position): void {
+  const objects = getAllObjectsForSelect();
   state.editing = { kind: "select", start: pos, objects };
   state.selector.setRectangle(pos.x, pos.y, 0, 0);
   state.selector.show();
@@ -439,13 +444,34 @@ function deleteSelectedObjects(state: State) {
   }
   state.selected = [];
 }
-
+function selectAll(state: State): void {
+  const objects = getAllObjectsForSelect();
+  for (const object of objects) {
+    state.selected.push(object);
+    const element = document.getElementById(object.id)!;
+    setSelected(element, true);
+  }
+}
 function undo(state: State): void {}
 function redo(state: State): void {}
 function listenToKeyboardEvents(state: State): () => void {
   window.onkeydown = (e) => {
+    const ctrl = e.ctrlKey || e.metaKey;
+    const shift = e.shiftKey;
     if (e.key === "Backspace") {
-      deleteSelectedObjects(state);
+      return deleteSelectedObjects(state);
+    }
+    if (ctrl && e.key === "a") {
+      e.preventDefault();
+      return selectAll(state);
+    }
+    if (ctrl && e.key === "z") {
+      e.preventDefault();
+      return undo(state);
+    }
+    if ((ctrl && e.key === "y") || (ctrl && shift && e.key === "z")) {
+      e.preventDefault();
+      return redo(state);
     }
   };
   return () => {
@@ -588,6 +614,7 @@ function initBoard(o: BoardOptions): void {
       selectorStrokeWidth: 0.01,
     };
     initBoard(boardOptions);
+
     const svgEl = document.getElementById("board")!;
     const selectorEl = document.getElementById("board-selector")!;
     const inputEl = document.getElementById("input")! as HTMLInputElement;
@@ -604,8 +631,9 @@ function initBoard(o: BoardOptions): void {
       editing: { kind: "none" },
       selected: [],
     };
-    if (roomInfo.active) {
+    if (!roomInfo.active) {
       updateStatus("inactive", "Inactive");
+      // TODO: show objects
     } else {
       const unlistenBoard = listenToBoard(state);
       const unlistenInput = listenToInputEvents(state);
@@ -624,9 +652,9 @@ function initBoard(o: BoardOptions): void {
       const button = document.createElement("button");
       button.textContent = "Create Room for Debug";
       button.onclick = async () => {
-        const roomId = await api.createRoom();
-        if (roomId != null) {
-          location.href = "/rooms/" + roomId;
+        const roomInfo = await api.createRoom();
+        if (roomInfo != null) {
+          location.href = "/rooms/" + roomInfo.id;
         }
       };
       document.getElementById("board")!.remove();
