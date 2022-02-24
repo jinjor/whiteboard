@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="/assets/style.css" />
     <style>
       .hidden {
-        display: none;
+        display: none !important;
       }
       svg {
         width: 100vw;
@@ -21,10 +21,65 @@
       #input {
         position: absolute;
       }
+      nav {
+        position: fixed;
+        display: flex;
+        width: 100%;
+        padding: 10px;
+        pointer-events: none;
+      }
+      #members {
+        margin-left: auto;
+        margin-right: 20px;
+        display: flex;
+        flex-direction: row-reverse;
+      }
+      .member {
+        border-radius: 20px;
+        border: solid 1px #000;
+        background: #fff;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 40px;
+        height: 40px;
+        margin-right: -10px;
+      }
+      .member.self {
+        border-color: red;
+      }
+      #status {
+        border-radius: 20px;
+        border: solid 1px #333;
+        background: #fff;
+        color: #333;
+        margin-left: 20px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding-left: 15px;
+        padding-right: 15px;
+      }
+      #status.active {
+        border-color: #47f;
+        color: #05a;
+      }
+      #status.inactive {
+        border-color: #aaa;
+        color: #888;
+      }
+      #status.error {
+        border-color: #f00;
+        color: #a00;
+      }
     </style>
   </head>
   <body>
     <div id="container">
+      <nav>
+        <div id="status" class="hidden"></div>
+        <div id="members"></div>
+      </nav>
       <input id="input" class="hidden" />
       <svg id="board" viewBox="0 0 0 0">
         <clipPath id="clip">

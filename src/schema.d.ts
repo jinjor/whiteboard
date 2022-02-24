@@ -50,6 +50,15 @@ export type InitEventBody = {
   kind: "init";
   objects: Objects;
   members: UserId[];
+  self: UserId;
+};
+export type JoinEventBody = {
+  kind: "join";
+  id: UserId;
+};
+export type QuitEventBody = {
+  kind: "quit";
+  id: UserId;
 };
 export type UpsertEventBody = {
   kind: "upsert";
@@ -62,6 +71,8 @@ export type DeletedEventBody = {
 export type RequestEventBody = AddEventBody | PatchEventBody | DeleteEventBody;
 export type ResponseEventBody =
   | InitEventBody
+  | JoinEventBody
+  | QuitEventBody
   | UpsertEventBody
   | DeletedEventBody;
 export type RequestEvent = RequestEventHead & RequestEventBody;

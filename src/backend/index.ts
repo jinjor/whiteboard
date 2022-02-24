@@ -228,8 +228,8 @@ const authRouter = Router()
       env.GITHUB_ORG
     );
     console.log("isMemberOfOrg:", isMemberOfOrg);
-    // const userId = isMemberOfOrg ? login : "_guest"; // "_guest" is an invalid github name
-    const userId = login; // TODO: for debug
+    // const userId = isMemberOfOrg ? "gh:" + login : "_guest"; // "_guest" is an invalid github name
+    const userId = "gh:" + login; // TODO: for debug
 
     const res = new Response(null, {
       status: 302,
@@ -262,7 +262,7 @@ const authRouter = Router()
         throw new Error("assertion error");
       }
       const hash = await digest(userAgent);
-      userId = "UA_" + hash.slice(0, 7);
+      userId = "ua/" + hash.slice(0, 7);
     } else if (env.AUTH_TYPE === "github") {
       const cookie = Cookie.parse(request.headers.get("Cookie") ?? "");
       console.log("cookie:", cookie);

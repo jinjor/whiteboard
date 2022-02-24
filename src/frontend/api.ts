@@ -6,6 +6,16 @@ import {
   TextBody,
 } from "../schema";
 
+export async function isRoomPresent(roomId: string): Promise<boolean> {
+  const res = await fetch("/api/rooms/" + roomId);
+  const roomExists = res.status === 200;
+  if (!roomExists) {
+    const errorMessage = await res.text();
+    console.log(errorMessage);
+  }
+  return res.status === 200;
+}
+
 function send(websocket: WebSocket, event: RequestEventBody): void {
   websocket.send(JSON.stringify(event));
 }

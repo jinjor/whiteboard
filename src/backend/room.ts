@@ -145,16 +145,21 @@ class RoomState {
     webSocket.addEventListener("close", () => {
       session.quit = true;
       this.sessions = this.sessions.filter((member) => member !== session);
-      this.broadcast(session.name, { kind: "quit", name: session.name });
+      this.broadcast(session.name, { kind: "quit", id: session.name });
     });
 
     const objects: Objects = (await this.storage.get("objects")) ?? {};
     await this.storage.put("objects", objects);
     const members = this.sessions.map((s) => s.name);
     webSocket.send(
-      JSON.stringify({ kind: "init", objects: objects ?? {}, members })
+      JSON.stringify({
+        kind: "init",
+        objects: objects ?? {},
+        members,
+        self: session.name,
+      })
     );
-    this.broadcast(session.name, { kind: "join", name: session.name });
+    this.broadcast(session.name, { kind: "join", id: session.name });
   }
 
   private broadcast(sender: string, message: any) {
@@ -174,7 +179,7 @@ class RoomState {
       }
     });
     quitters.forEach((quitter) => {
-      this.broadcast(quitter.name, { kind: "quit", name: quitter.name });
+      this.broadcast(quitter.name, { kind: "quit", id: quitter.name });
     });
   }
 }

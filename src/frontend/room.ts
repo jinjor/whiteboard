@@ -1,4 +1,10 @@
-import { ObjectId, PatchEventBody, Position, ResponseEvent } from "../schema";
+import {
+  ObjectId,
+  PatchEventBody,
+  Position,
+  ResponseEvent,
+  UserId,
+} from "../schema";
 import {
   BoardOptions,
   deleteObject,
@@ -21,6 +27,7 @@ import {
   upsertText,
 } from "./board";
 import * as api from "./api";
+import { addMember, deleteMember, updateStatus } from "./navbar";
 
 type Size = { width: number; height: number };
 class Rectangle {
@@ -59,6 +66,7 @@ type EditingState =
   | { kind: "path"; points: Position[]; id: ObjectId }
   | { kind: "text"; position: Position };
 type State = {
+  self: UserId | null;
   boardOptions: BoardOptions;
   svgEl: HTMLElement;
   input: Input;
@@ -86,15 +94,6 @@ function getPageInfo(): PageInfo {
     wsRoot: `${wsProtocol}://${host}`,
   };
 }
-async function isRoomPresent(roomId: string): Promise<boolean> {
-  const res = await fetch("/api/rooms/" + roomId);
-  const roomExists = res.status === 200;
-  if (!roomExists) {
-    const errorMessage = await res.text();
-    console.log(errorMessage);
-  }
-  return res.status === 200;
-}
 
 function connect(pageInfo: PageInfo, state: State, disableEditing: () => void) {
   const ws = new WebSocket(
@@ -102,15 +101,30 @@ function connect(pageInfo: PageInfo, state: State, disableEditing: () => void) {
   );
   ws.addEventListener("open", () => {
     state.websocket = ws;
+    updateStatus("active", "Connected");
   });
   ws.addEventListener("message", (event) => {
     const data: ResponseEvent = JSON.parse(event.data);
     console.log(data);
     switch (data.kind) {
       case "init": {
+        state.self = data.self;
+        for (const member of data.members) {
+          addMember(member, member === state.self);
+        }
         for (const key of Object.keys(data.objects)) {
           upsertObject(state.svgEl, data.objects[key], state.boardOptions);
         }
+        break;
+      }
+      case "join": {
+        const member = data.id;
+        addMember(member, member === state.self);
+        break;
+      }
+      case "quit": {
+        const member = data.id;
+        deleteMember(member);
         break;
       }
       case "upsert": {
@@ -127,12 +141,14 @@ function connect(pageInfo: PageInfo, state: State, disableEditing: () => void) {
     console.log("WebSocket closed: " + event.code + " " + event.reason);
     state.websocket = null;
     disableEditing();
+    updateStatus("inactive", "Disconnected");
     // TODO: reconnect
   });
   ws.addEventListener("error", (event) => {
     console.log("WebSocket error:", event);
     state.websocket = null;
     disableEditing();
+    updateStatus("error", "Error");
     // TODO: reconnect
   });
 }
@@ -563,7 +579,7 @@ function initBoard(o: BoardOptions): void {
 
 (async () => {
   const pageInfo = getPageInfo();
-  const roomExists = await isRoomPresent(pageInfo.roomId);
+  const roomExists = await api.isRoomPresent(pageInfo.roomId);
   if (roomExists) {
     const boardOptions = {
       viewBox: new Rectangle(0, 0, 16, 9),
@@ -576,6 +592,7 @@ function initBoard(o: BoardOptions): void {
     const selectorEl = document.getElementById("board-selector")!;
     const inputEl = document.getElementById("input")! as HTMLInputElement;
     const state: State = {
+      self: null,
       boardOptions,
       svgEl,
       input: new Input(inputEl),
