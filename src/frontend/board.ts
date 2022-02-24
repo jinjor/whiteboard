@@ -1,4 +1,11 @@
-import { ObjectBody, PathBody, Position, TextBody } from "../schema";
+import {
+  ObjectBody,
+  ObjectId,
+  PatchEventBody,
+  PathBody,
+  Position,
+  TextBody,
+} from "../schema";
 type Size = { width: number; height: number };
 export type PixelPosition = { px: number; py: number };
 export type Rectangle = { x: number; y: number; width: number; height: number };
@@ -157,7 +164,7 @@ export function upsertObject(
     }
   }
 }
-export function deleteObject(svgEl: HTMLElement, id: string): void {
+export function deleteObject(id: string): void {
   document.getElementById(id)?.remove();
 }
 function createObjectElement<T extends string>(
@@ -176,6 +183,29 @@ function createObjectElement<T extends string>(
   element.classList.add("object");
   element.setAttributeNS(null, "clip-path", "url(#clip)");
   return element as any;
+}
+export function patchObject(id: ObjectId, key: string, value: any): void {
+  const element = document.getElementById(id)!;
+  switch (element.tagName) {
+    case "text": {
+      switch (key) {
+        case "position": {
+          setPosition(element, value);
+          break;
+        }
+      }
+      break;
+    }
+    case "path": {
+      switch (key) {
+        case "d": {
+          setD(element, value);
+          break;
+        }
+      }
+      break;
+    }
+  }
 }
 export function upsertText(
   svgEl: HTMLElement,

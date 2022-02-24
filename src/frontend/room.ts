@@ -1,4 +1,6 @@
 import {
+  AddEventBody,
+  DeleteEventBody,
   ObjectId,
   PatchEventBody,
   Position,
@@ -15,6 +17,7 @@ import {
   listenToBoardEvents,
   makeD,
   parseD,
+  patchObject,
   PixelPosition,
   Selector,
   setD,
@@ -28,6 +31,7 @@ import {
 } from "./board";
 import * as api from "./api";
 import { addMember, deleteMember, updateStatus } from "./navbar";
+import deepEqual from "deep-equal";
 
 type Size = { width: number; height: number };
 class Rectangle {
@@ -44,7 +48,10 @@ class Rectangle {
     return this.y + this.height;
   }
 }
-type Patch = PatchEventBody;
+type ActionEvent = AddEventBody | PatchEventBody | DeleteEventBody;
+type Action = {
+  events: ActionEvent[];
+};
 type ObjectForSelect =
   | {
       kind: "text";
@@ -73,8 +80,8 @@ type State = {
   selector: Selector;
   boardRect: { position: PixelPosition; size: Size };
   websocket: WebSocket | null;
-  undos: Patch[];
-  redos: Patch[];
+  undos: Action[];
+  redos: Action[];
   editing: EditingState;
   selected: ObjectForSelect[];
 };
@@ -132,7 +139,7 @@ function connect(pageInfo: PageInfo, state: State, disableEditing: () => void) {
         break;
       }
       case "delete": {
-        deleteObject(state.svgEl, data.id);
+        deleteObject(data.id);
         break;
       }
     }
@@ -364,15 +371,6 @@ function stopMoving(state: State, pos: Position): void {
               y: p.y + dy,
             }));
             const d = makeD(points);
-            const event: PatchEventBody = {
-              kind: "patch",
-              id: object.id,
-              key: "d",
-              value: {
-                old: oldD,
-                new: d,
-              },
-            };
             patchPathD(object.id, d);
             api.patchPath(state.websocket, object.id, "d", {
               old: oldD,
@@ -437,7 +435,7 @@ function deleteSelectedObjects(state: State) {
         // 既に他の人が消していた場合
         continue;
       }
-      deleteObject(state.svgEl, id);
+      deleteObject(id);
       const object = elementToObject(element)!;
       api.deleteObject(state.websocket, object);
     }
@@ -452,8 +450,119 @@ function selectAll(state: State): void {
     setSelected(element, true);
   }
 }
-function undo(state: State): void {}
-function redo(state: State): void {}
+function canApplyEvent(event: ActionEvent): boolean {
+  switch (event.kind) {
+    case "add": {
+      const element = document.getElementById(event.object.id);
+      return element == null;
+    }
+    case "patch": {
+      const element = document.getElementById(event.id);
+      if (element == null) {
+        return false; // ?
+      }
+      const object = elementToObject(element);
+      return deepEqual((object as any)[event.key], event.value.old);
+    }
+    case "delete": {
+      const element = document.getElementById(event.object.id);
+      if (element == null) {
+        return false; // ?
+      }
+      const object = elementToObject(element);
+      return deepEqual(object, event.object);
+    }
+  }
+}
+function doEventWithoutCheck(state: State, event: ActionEvent) {
+  switch (event.kind) {
+    case "add": {
+      upsertObject(state.svgEl, event.object, state.boardOptions);
+      break;
+    }
+    case "patch": {
+      patchObject(event.id, event.key, event.value.new);
+      break;
+    }
+    case "delete": {
+      deleteObject(event.object.id);
+      break;
+    }
+  }
+  api.send(state.websocket!, event);
+}
+function invertEvent(event: ActionEvent): ActionEvent {
+  switch (event.kind) {
+    case "add": {
+      return {
+        kind: "delete",
+        object: event.object,
+      };
+    }
+    case "patch": {
+      return {
+        kind: "patch",
+        id: event.id,
+        key: event.key,
+        value: { old: event.value.new, new: event.value.old },
+      };
+    }
+    case "delete": {
+      return {
+        kind: "add",
+        object: event.object,
+      };
+    }
+  }
+}
+function doAction(state: State, action: Action) {
+  if (state.websocket == null) {
+    return;
+  }
+  for (const event of action.events) {
+    doEventWithoutCheck(state, event);
+  }
+  state.undos.push(action);
+  state.redos = [];
+}
+function undo(state: State): void {
+  if (state.websocket == null) {
+    return;
+  }
+  const action = state.undos.pop();
+  if (action == null) {
+    return;
+  }
+  for (const event of action.events) {
+    const invertedEvent = invertEvent(event);
+    if (!canApplyEvent(invertedEvent)) {
+      return;
+    }
+  }
+  for (const event of action.events) {
+    const invertedEvent = invertEvent(event);
+    doEventWithoutCheck(state, invertedEvent);
+  }
+  state.redos.push(action);
+}
+function redo(state: State): void {
+  if (state.websocket == null) {
+    return;
+  }
+  const action = state.redos.pop();
+  if (action == null) {
+    return;
+  }
+  for (const event of action.events) {
+    if (!canApplyEvent(event)) {
+      return;
+    }
+  }
+  for (const event of action.events) {
+    doEventWithoutCheck(state, event);
+  }
+  state.undos.push(action);
+}
 function listenToKeyboardEvents(state: State): () => void {
   window.onkeydown = (e) => {
     const ctrl = e.ctrlKey || e.metaKey;

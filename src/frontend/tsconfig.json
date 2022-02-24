@@ -6,6 +6,7 @@
     "strict": true,
     "noEmitOnError": false,
     "moduleResolution": "node",
+    "esModuleInterop": true,
     "types": [],
     "allowJs": false,
     "sourceMap": true,

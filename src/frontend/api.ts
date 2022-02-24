@@ -27,7 +27,7 @@ export async function createRoom(): Promise<RoomInfo | null> {
   return await res.json();
 }
 
-function send(websocket: WebSocket, event: RequestEventBody): void {
+export function send(websocket: WebSocket, event: RequestEventBody): void {
   websocket.send(JSON.stringify(event));
 }
 
