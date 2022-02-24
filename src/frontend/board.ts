@@ -119,12 +119,11 @@ export function toBoardPosition(
     width / height / (viewBoxWidth / viewBoxHeight);
   const scaleX = Math.max(actualRatioPerExpectedRatio, 1);
   const scaleY = Math.max(1 / actualRatioPerExpectedRatio, 1);
-  const offsetX = viewBoxWidth * ((1 - scaleX) / 2);
-  const offsetY = viewBoxHeight * ((1 - scaleY) / 2);
-  return {
-    x: (ppos.px / width) * scaleX + offsetX,
-    y: (ppos.py / height) * scaleY + offsetY,
-  };
+  const offsetX = (1 - scaleX) / 2;
+  const offsetY = (1 - scaleY) / 2;
+  const x = viewBoxWidth * ((ppos.px / width) * scaleX + offsetX);
+  const y = viewBoxHeight * ((ppos.py / height) * scaleY + offsetY);
+  return { x, y };
 }
 export function toPixelPosition(
   boardOptions: BoardOptions,
@@ -138,12 +137,11 @@ export function toPixelPosition(
     width / height / (viewBoxWidth / viewBoxHeight);
   const scaleX = Math.max(actualRatioPerExpectedRatio, 1);
   const scaleY = Math.max(1 / actualRatioPerExpectedRatio, 1);
-  const offsetX = viewBoxWidth * ((1 - scaleX) / 2);
-  const offsetY = viewBoxHeight * ((1 - scaleY) / 2);
-  return {
-    px: ((npos.x - offsetX) / scaleX) * width,
-    py: ((npos.y - offsetY) / scaleY) * height,
-  };
+  const offsetX = (1 - scaleX) / 2;
+  const offsetY = (1 - scaleY) / 2;
+  const px = ((npos.x / viewBoxWidth - offsetX) / scaleX) * width;
+  const py = ((npos.y / viewBoxHeight - offsetY) / scaleY) * height;
+  return { px, py };
 }
 export function upsertObject(
   svgEl: HTMLElement,

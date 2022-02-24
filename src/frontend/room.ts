@@ -566,10 +566,10 @@ function initBoard(o: BoardOptions): void {
   const roomExists = await isRoomPresent(pageInfo.roomId);
   if (roomExists) {
     const boardOptions = {
-      viewBox: new Rectangle(0, 0, 1, 1),
-      textFontSize: 0.02,
-      pathStrokeWidth: 0.002,
-      selectorStrokeWidth: 0.001,
+      viewBox: new Rectangle(0, 0, 16, 9),
+      textFontSize: 0.3,
+      pathStrokeWidth: 0.02,
+      selectorStrokeWidth: 0.01,
     };
     initBoard(boardOptions);
     const svgEl = document.getElementById("board")!;
