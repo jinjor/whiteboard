@@ -498,7 +498,7 @@ describe("Whiteboard", function () {
     });
     assert.strictEqual(code, 1007);
   });
-  it("broadcasts addition to everyone in the room except for their sender", async function () {
+  it("broadcasts updates to everyone in the room except for their sender", async function () {
     const id1 = await createRoom();
     const id2 = await createRoom();
     const senderId = "a";
@@ -560,6 +560,49 @@ describe("Whiteboard", function () {
       mes2.find((m) => m.kind === "upsert")?.object.lastEditedBy,
       senderId
     );
+  });
+  it("provides objects from a room", async function () {
+    {
+      const res = await request("GET", `/api/rooms/${"a".repeat(64)}/objects`);
+      assert.strictEqual(res.status, 404);
+    }
+    const id = await createRoom();
+    {
+      const res = await request("GET", `/api/rooms/${id}/objects`);
+      assert.strictEqual(res.status, 200);
+      const objects = await res.json();
+      assert.deepStrictEqual(objects, {});
+    }
+    const senderId = "a";
+    const object = {
+      id: "a".repeat(32),
+      kind: "text",
+      text: "a",
+      position: { x: 0, y: 0 },
+    };
+    await useWebsocket(
+      senderId,
+      `/api/rooms/${id}/websocket`,
+      async (ws: WebSocket) => {
+        ws.send(
+          JSON.stringify({
+            kind: "add",
+            object,
+          })
+        );
+        await setTimeout(500);
+      }
+    );
+    {
+      const res = await request("GET", `/api/rooms/${id}/objects`);
+      assert.strictEqual(res.status, 200);
+      const objects = await res.json();
+      removeMetaInfoFromObjects(objects);
+      assert.deepStrictEqual(objects, {
+        [object.id]: object,
+      });
+    }
+    // TODO: deactivate, kill
   });
   describe("`add` event", function () {
     const event = {

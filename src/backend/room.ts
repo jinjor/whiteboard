@@ -27,6 +27,11 @@ const roomRouter = Router()
     // 101 Switching Protocols
     return new Response(null, { status: 101, webSocket: pair[0] });
   })
+  .get("/objects", async (request: Request, state: RoomState) => {
+    const objects = await state.getObjects();
+    console.log(objects);
+    return new Response(JSON.stringify(objects));
+  })
   .all("*", () => new Response("Not found.", { status: 404 }));
 
 type Session = {
@@ -65,6 +70,14 @@ class RoomState {
     const timestamp = Math.max(Date.now(), this.lastTimestamp + 1);
     this.lastTimestamp = timestamp;
     return timestamp;
+  }
+  async getObjects(): Promise<Objects> {
+    const objects = await this.storage.get("objects");
+    if (objects == null) {
+      await this.storage.put("objects", {});
+      return {};
+    }
+    return objects as Objects;
   }
   async handleSession(webSocket: WebSocket, userId: string): Promise<void> {
     webSocket.accept();
@@ -113,7 +126,7 @@ class RoomState {
           throw new InvalidEvent();
         }
         const timestamp = this.newUniqueTimestamp();
-        const objects: Objects = (await this.storage.get("objects"))!;
+        const objects = await this.getObjects();
         const events = applyEvent(
           { ...event, uniqueTimestamp: timestamp, requestedBy: session.name },
           objects
@@ -147,9 +160,7 @@ class RoomState {
       this.sessions = this.sessions.filter((member) => member !== session);
       this.broadcast(session.name, { kind: "quit", id: session.name });
     });
-
-    const objects: Objects = (await this.storage.get("objects")) ?? {};
-    await this.storage.put("objects", objects);
+    const objects = await this.getObjects();
     const members = this.sessions.map((s) => s.name);
     webSocket.send(
       JSON.stringify({

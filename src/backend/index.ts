@@ -113,7 +113,8 @@ const apiRouter = Router({ base: "/api" })
     );
     const blocks = [];
     if (res.status === 200) {
-      const url = `https://whiteboard.jinjor.workers.dev/rooms/${roomId}`;
+      const host = "whiteboard.jinjor.workers.dev"; // TODO
+      const url = `https://${host}/rooms/${roomId}`;
       blocks.push({
         type: "section",
         text: {
@@ -224,9 +225,7 @@ const apiRouter = Router({ base: "/api" })
           status: 403,
         });
       }
-      // スタブ（クライアント）が即時に作られる。リモートでは ID が最初に使われた時に必要に応じて作られる。
       const roomStub = env.rooms.get(roomId);
-
       return roomStub.fetch("https://dummy-url/websocket", {
         headers: {
           Connection: "Upgrade",
@@ -234,6 +233,31 @@ const apiRouter = Router({ base: "/api" })
           "WB-USER-ID": userId,
         },
       });
+    }
+  )
+  .get(
+    "/rooms/:roomName/objects",
+    async (
+      request: Request & { params: { roomName: string } },
+      env: Env,
+      context: ExecutionContext,
+      userId: string
+    ) => {
+      const roomName = request.params.roomName;
+      let roomId;
+      try {
+        roomId = env.rooms.idFromString(roomName);
+      } catch (e) {
+        return new Response("Not found.", { status: 404 });
+      }
+      const singletonId = env.manager.idFromName("singleton");
+      const managerStub = env.manager.get(singletonId);
+      const res = await managerStub.fetch("https://dummy-url/rooms/" + roomId);
+      if (res.status !== 200) {
+        return new Response("Not found.", { status: 404 });
+      }
+      const roomStub = env.rooms.get(roomId);
+      return roomStub.fetch("https://dummy-url/objects");
     }
   );
 

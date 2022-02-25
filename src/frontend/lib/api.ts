@@ -1,6 +1,7 @@
 import {
   ObjectBody,
   ObjectId,
+  Objects,
   PathBody,
   RequestEventBody,
   RoomInfo,
@@ -14,6 +15,15 @@ export async function getRoomInfo(roomId: string): Promise<RoomInfo | null> {
   }
   const roomInfo = await res.json();
   return roomInfo;
+}
+
+export async function getObjects(roomId: string): Promise<Objects | null> {
+  const res = await fetch("/api/rooms/" + roomId + "/objects");
+  if (res.status !== 200) {
+    return null;
+  }
+  const objects = await res.json();
+  return objects;
 }
 
 export async function createRoom(): Promise<RoomInfo | null> {

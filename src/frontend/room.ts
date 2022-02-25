@@ -740,7 +740,12 @@ function initBoard(o: BoardOptions): void {
     };
     if (!roomInfo.active) {
       updateStatus("inactive", "Inactive");
-      // TODO: show objects
+      const objects = await api.getObjects(roomInfo.id);
+      if (objects != null) {
+        for (const key of Object.keys(objects)) {
+          upsertObject(state.svgEl, objects[key], state.boardOptions);
+        }
+      }
     } else {
       const unlistenBoard = listenToBoard(state);
       const unlistenInput = listenToInputEvents(state);
