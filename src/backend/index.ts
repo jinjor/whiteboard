@@ -5,6 +5,7 @@ import { Router } from "itty-router";
 import Cookie from "cookie";
 import { encrypt, decrypt, digest, hmacSha256 } from "./crypto";
 import * as github from "./github";
+import * as slack from "./slack";
 import { RoomPatch } from "./room-manager";
 export { RateLimiter } from "./rate-limiter";
 export { ChatRoom } from "./room";
@@ -34,6 +35,12 @@ type Env = {
       GITHUB_CLIENT_ID: string;
       GITHUB_CLIENT_SECRET: string;
       GITHUB_ORG: string;
+      COOKIE_SECRET: string;
+    }
+  | {
+      AUTH_TYPE: "slack";
+      SLACK_CLIENT_ID: string;
+      SLACK_CLIENT_SECRET: string;
       COOKIE_SECRET: string;
     }
 ) &
@@ -321,6 +328,7 @@ const router = Router()
   .all("*", () => new Response("Not found.", { status: 404 }));
 
 const GITHUB_SCOPE = "read:org";
+const SLACK_SCOPE = "identity.basic";
 
 const authRouter = Router()
   .get("/callback/github", async (request: Request, env: Env) => {
@@ -348,8 +356,50 @@ const authRouter = Router()
       env.GITHUB_ORG
     );
     console.log("isMemberOfOrg:", isMemberOfOrg);
-    // const userId = isMemberOfOrg ? "gh:" + login : "_guest"; // "_guest" is an invalid github name
-    const userId = "gh:" + login; // TODO: for debug
+    // const userId = isMemberOfOrg ? "gh/" + login : "_guest"; // "_guest" is an invalid github name
+    const userId = "gh/" + login; // TODO: for debug
+
+    const res = new Response(null, {
+      status: 302,
+      headers: {
+        "Set-Cookie": Cookie.serialize(
+          "session",
+          await encrypt(env.COOKIE_SECRET, userId),
+          {
+            path: "/",
+            httpOnly: true,
+            maxAge: 60 * 60 * 24 * 7, // 1 week
+            sameSite: "strict",
+          }
+        ),
+        Location: cookie.original_url ?? `/`,
+      },
+    });
+    return res;
+  })
+  .get("/callback/slack", async (request: Request, env: Env) => {
+    if (env.AUTH_TYPE !== "slack") {
+      return new Response("Not found.", { status: 404 });
+    }
+    const cookie = Cookie.parse(request.headers.get("Cookie") ?? "");
+    const code = new URL(request.url).searchParams.get("code");
+    if (code == null) {
+      return new Response("Not found.", { status: 404 });
+    }
+    const { accessToken, scope } = await slack.getAccessToken(
+      env.SLACK_CLIENT_ID,
+      env.SLACK_CLIENT_SECRET,
+      code
+    );
+    if (scope !== SLACK_SCOPE) {
+      return new Response("Not found.", { status: 404 });
+    }
+    const name = await slack.getUserName(accessToken);
+    console.log("login:", name);
+    const isMemberOfOrg = true; // TODO: ?
+    console.log("isMemberOfOrg:", isMemberOfOrg);
+    // const userId = isMemberOfOrg ? "sl/" + login : "_guest"; // "_guest" is an invalid slack name <--- really?
+    const userId = "sl/" + name; // TODO: for debug
 
     const res = new Response(null, {
       status: 302,
@@ -388,7 +438,10 @@ const authRouter = Router()
       console.log("cookie:", cookie);
       if (cookie.session != null) {
         try {
-          userId = await decrypt(env.COOKIE_SECRET, cookie.session);
+          const decrypted = await decrypt(env.COOKIE_SECRET, cookie.session);
+          if (decrypted.startsWith("gh/")) {
+            userId = decrypted;
+          }
         } catch (e) {}
       }
       if (userId == null) {
@@ -399,9 +452,46 @@ const authRouter = Router()
               path: "/",
               httpOnly: true,
               maxAge: 60,
+              secure: true, // TODO: switch
               sameSite: "strict",
             }),
             Location: github.makeFormUrl(env.GITHUB_CLIENT_ID, GITHUB_SCOPE),
+          },
+        });
+      }
+      if (userId === "_guest") {
+        return new Response("Not a member of org.", { status: 403 });
+      }
+    } else if (env.AUTH_TYPE === "slack") {
+      const cookie = Cookie.parse(request.headers.get("Cookie") ?? "");
+      console.log("cookie:", cookie);
+      if (cookie.session != null) {
+        try {
+          const decrypted = await decrypt(env.COOKIE_SECRET, cookie.session);
+          if (decrypted.startsWith("sl/")) {
+            userId = decrypted;
+          }
+        } catch (e) {}
+      }
+      if (userId == null) {
+        const host = "whiteboard.jinjor.workers.dev"; // TODO
+        const redirectUrl = `https://${host}/callback/slack`;
+        // const redirectUrl = `http://localhost:8787/callback/slack`;
+        return new Response(null, {
+          status: 302,
+          headers: {
+            "Set-Cookie": Cookie.serialize("original_url", request.url, {
+              path: "/",
+              httpOnly: true,
+              maxAge: 60,
+              secure: true, // TODO: switch
+              sameSite: "strict",
+            }),
+            Location: slack.makeFormUrl(
+              env.SLACK_CLIENT_ID,
+              SLACK_SCOPE,
+              redirectUrl
+            ),
           },
         });
       }
@@ -437,7 +527,7 @@ export default {
       preconditionOk = false;
       console.log("DEBUG_API not valid");
     }
-    if (!["header", "user_agent", "github"].includes(env.AUTH_TYPE)) {
+    if (!["header", "user_agent", "github", "slack"].includes(env.AUTH_TYPE)) {
       preconditionOk = false;
       console.log("AUTH_TYPE not valid");
     }
@@ -453,6 +543,20 @@ export default {
       if (!env.GITHUB_ORG) {
         preconditionOk = false;
         console.log("GITHUB_ORG not found");
+      }
+      if (!env.COOKIE_SECRET) {
+        preconditionOk = false;
+        console.log("COOKIE_SECRET not found");
+      }
+    }
+    if (env.AUTH_TYPE === "slack") {
+      if (!env.SLACK_CLIENT_ID) {
+        preconditionOk = false;
+        console.log("SLACK_CLIENT_ID not found");
+      }
+      if (!env.SLACK_CLIENT_SECRET) {
+        preconditionOk = false;
+        console.log("SLACK_CLIENT_SECRET not found");
       }
       if (!env.COOKIE_SECRET) {
         preconditionOk = false;

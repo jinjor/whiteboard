@@ -35,8 +35,8 @@ UI
 TODO:
 - Slack のマークダウン
 - Slack のアイコン
-- Slack oauth
 - GitHub auth で org を optional に
+- Slack の org 相当は要らない？
 - 十時カーソル
 - テキストを右クリックで選択
 - dev 環境

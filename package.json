@@ -7,6 +7,7 @@
     "build:backend": "esbuild --tsconfig=src/backend/tsconfig.json src/backend/index.ts --bundle --sourcemap --external:__STATIC_CONTENT_MANIFEST --format=esm --outfile=dist/index.mjs",
     "build:frontend": "esbuild --tsconfig=src/frontend/tsconfig.json src/frontend/*.ts --bundle --sourcemap --outdir=assets && cp src/frontend/*.html src/frontend/*.css assets",
     "dev": "miniflare -e .env.dev --watch --debug",
+    "dev:auth": "miniflare --watch --debug",
     "test": "npm run build && tsc -p test/tsconfig.json && mocha -r source-map-support/register test/dist/test/*.js"
   },
   "keywords": [],

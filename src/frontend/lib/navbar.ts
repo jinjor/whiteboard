@@ -34,6 +34,10 @@ export function addMember(member: UserId, self: boolean): void {
       element.style.backgroundImage = `https://github.com/${member}.png`;
       break;
     }
+    case "sl": {
+      element.textContent = name.slice(0, 2); // TODO: avatar
+      break;
+    }
   }
   const selfEl = document.querySelector(".member.self");
   if (selfEl != null) {
