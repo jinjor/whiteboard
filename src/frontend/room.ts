@@ -353,7 +353,6 @@ function stopMoving(state: State, pos: Position): void {
       const dy = pos.y - state.editing.start.y;
       const events: ActionEvent[] = [];
       for (const object of state.selected) {
-        // TODO: 選択中に他の人が動かしたり消したりしたらどうするか
         switch (object.kind) {
           case "text": {
             const x = object.position.x + dx;
@@ -425,9 +424,8 @@ function stopEditingText(state: State): void {
 
 function deleteSelectedObjects(state: State) {
   if (state.websocket != null) {
+    const events = [];
     for (const { id } of state.selected) {
-      // TODO: 選択中に他の人が動かしたり消したりしたらどうするか
-      // 選択開始時点で見ていたものと違うものを消していい？
       const element = document.getElementById(id);
       if (element == null) {
         // 既に他の人が消していた場合
@@ -435,8 +433,9 @@ function deleteSelectedObjects(state: State) {
       }
       const object = elementToObject(element)!;
       const event = api.makeDeleteObjectEvent(object);
-      doAction(state, { events: [event] });
+      events.push(event);
     }
+    doAction(state, { events });
   }
   state.selected = [];
 }
@@ -627,12 +626,22 @@ function listenToBoard(state: State): () => void {
         if (state.selected.length > 0) {
           return startMoving(state, npos);
         }
+        switch (state.editing.kind) {
+          case "text": {
+            return stopEditingText(state);
+          }
+        }
         return startDrawing(state, npos);
       }
     },
     touchStart: (npos) => {
       if (state.selected.length > 0) {
         return startMoving(state, npos);
+      }
+      switch (state.editing.kind) {
+        case "text": {
+          return stopEditingText(state);
+        }
       }
       return startDrawing(state, npos);
     },
@@ -698,6 +707,7 @@ function initBoard(o: BoardOptions): void {
     "stroke-width",
     String(o.selectorStrokeWidth)
   );
+  document.getElementById("help")!.classList.remove("hidden");
 }
 
 (async () => {
