@@ -33,7 +33,6 @@ UI
 - https://developers.cloudflare.com/workers/tutorials/build-a-slackbot
 
 TODO:
-- Slack コマンドの認証
 - Slack のマークダウン
 - Slack のアイコン
 - Slack oauth
@@ -45,10 +44,9 @@ TODO:
 - 404 ページ
 - updatedAt, updatedBy 要らないかも
 - キャプチャ
-- ヘルプを最初は非表示に
 - 有効期限を表示
-- ステータスを返すコマンド
-- 部屋作成に失敗したらステータスを表示
+- ステータス・リミットを返すコマンド
+- 部屋作成に失敗したらステータス・リミットを表示
 - 選択中に切断したら選択解除
 - 再接続
 - 部屋がユーザーでいっぱいだった時の表示

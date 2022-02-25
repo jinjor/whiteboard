@@ -3,7 +3,7 @@ import manifest from "__STATIC_CONTENT_MANIFEST";
 // @ts-ignore
 import { Router } from "itty-router";
 import Cookie from "cookie";
-import { encrypt, decrypt, digest } from "./crypto";
+import { encrypt, decrypt, digest, hmacSha256 } from "./crypto";
 import * as github from "./github";
 import { RoomPatch } from "./room-manager";
 export { RateLimiter } from "./rate-limiter";
@@ -36,7 +36,16 @@ type Env = {
       GITHUB_ORG: string;
       COOKIE_SECRET: string;
     }
-);
+) &
+  (
+    | {
+        SLACK_APP: "true";
+        SLACK_SIGNING_SECRET: string;
+      }
+    | {
+        SLACK_APP: "false";
+      }
+  );
 
 async function getAsset(
   request: Request,
@@ -97,9 +106,37 @@ const debugRouter = Router({ base: "/debug" })
   });
 const apiRouter = Router({ base: "/api" })
   .post("/slack", async (request: Request, env: Env) => {
-    // TODO: 認証
+    if (env.SLACK_APP !== "true") {
+      return new Response("Not found.", { status: 404 });
+    }
+    const timestamp = request.headers.get("X-Slack-Request-Timestamp");
+    if (timestamp == null) {
+      return new Response("invalid request", { status: 400 });
+    }
+    const ts = parseInt(timestamp);
+    if (isNaN(ts)) {
+      return new Response("invalid request", { status: 400 });
+    }
+    if (Date.now() / 1000 - ts > 10) {
+      return new Response("invalid request", { status: 403 });
+    }
+    const actualSignature = request.headers.get("X-Slack-Signature");
+    if (actualSignature == null) {
+      return new Response("invalid request", { status: 400 });
+    }
     const body = await request.text();
-    console.log(body);
+    const sigBaseString = `v0:${timestamp}:${body}`;
+    const digest = await hmacSha256(sigBaseString, env.SLACK_SIGNING_SECRET);
+    const expectedSignature = `v0=${digest}`;
+    if (actualSignature !== expectedSignature) {
+      console.log(
+        "signature does not match",
+        actualSignature,
+        expectedSignature
+      );
+      return new Response("invalid request", { status: 403 });
+    }
+    // console.log(body);
     // const params = new URLSearchParams(body);
     // const text = params.get("text")!.trim();
     const roomId = env.rooms.newUniqueId();
@@ -420,6 +457,16 @@ export default {
       if (!env.COOKIE_SECRET) {
         preconditionOk = false;
         console.log("COOKIE_SECRET not found");
+      }
+    }
+    if (!["true", "false"].includes(env.SLACK_APP)) {
+      preconditionOk = false;
+      console.log("SLACK_APP not valid");
+    }
+    if (env.SLACK_APP === "true") {
+      if (!env.SLACK_SIGNING_SECRET) {
+        preconditionOk = false;
+        console.log("SLACK_SIGNING_SECRET not found");
       }
     }
     if (!preconditionOk) {

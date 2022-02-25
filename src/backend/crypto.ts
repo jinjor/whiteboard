@@ -69,11 +69,41 @@ export async function decrypt(secret: string, text: string): Promise<string> {
   return aesDecrypt(key, text);
 }
 
+function hex(buf: ArrayBuffer): string {
+  const hashArray = Array.from(new Uint8Array(buf));
+  return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
 export async function digest(text: string): Promise<string> {
   const buf = await crypto.subtle.digest(
     "SHA-1",
     new TextEncoder().encode(text)
   );
-  const hashArray = Array.from(new Uint8Array(buf));
-  return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+  return hex(buf);
+}
+
+async function makeKeyForSign(secret: string) {
+  return await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(secret),
+    {
+      name: "HMAC",
+      hash: "SHA-256",
+    },
+    false,
+    ["sign"]
+  );
+}
+
+export async function hmacSha256(
+  text: string,
+  secret: string
+): Promise<string> {
+  const key = await makeKeyForSign(secret);
+  const buf = await crypto.subtle.sign(
+    "HMAC",
+    key,
+    new TextEncoder().encode(text)
+  );
+  return hex(buf);
 }

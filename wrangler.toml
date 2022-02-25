@@ -18,8 +18,7 @@ bucket = "./assets"
 entry-point = "./dist"
 
 [triggers]
-# TODO: 本番はもっと低頻度でいい
-crons = ["* * * * *"]
+crons = ["*/10 * * * *"]
 
 [durable_objects]
 bindings = [
