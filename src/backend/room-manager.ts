@@ -1,5 +1,5 @@
 import { Router } from "itty-router";
-import { RoomInfo } from "../schema";
+import { Room, RoomInfo } from "../schema";
 
 const MAX_ACTIVE_ROOMS = 10;
 const LIVE_DURATION = 7 * 24 * 60 * 60 * 1000;
@@ -37,14 +37,24 @@ class RoomManagerState {
       this.ACTIVE_DURATION = config.ACTIVE_DURATION;
     }
   }
-  async getRoomInfo(roomId: string): Promise<RoomInfo | null> {
-    const roomInfo = await this.storage.get(roomId);
-    return (roomInfo ?? null) as RoomInfo | null;
+  private makeRoomInfo(room: Room): RoomInfo {
+    return {
+      ...room,
+      activeUntil: room.createdAt + this.ACTIVE_DURATION,
+      aliveUntil: room.createdAt + this.LIVE_DURATION,
+    };
   }
-  async createRoomInfo(roomId: string): Promise<RoomInfo | null> {
+  async getRoom(roomId: string): Promise<RoomInfo | null> {
+    const room = (await this.storage.get(roomId)) as Room | null;
+    if (room == null) {
+      return null;
+    }
+    return this.makeRoomInfo(room);
+  }
+  async createRoom(roomId: string): Promise<Room | null> {
     let activeRooms = 0;
-    for (const roomInfo of await this.listRoomInfo()) {
-      if (roomInfo.active) {
+    for (const room of await this.listRoom()) {
+      if (room.active) {
         activeRooms++;
       }
     }
@@ -52,49 +62,49 @@ class RoomManagerState {
     if (activeRooms >= this.MAX_ACTIVE_ROOMS) {
       return null;
     }
-    const roomInfo = {
+    const room = {
       id: roomId,
       createdAt: Date.now(),
       active: true,
     };
-    await this.setRoomInfo(roomInfo);
-    return roomInfo;
+    await this.setRoom(room);
+    return room;
   }
-  async setRoomInfo(roomInfo: RoomInfo): Promise<void> {
-    await this.storage.put(roomInfo.id, roomInfo);
+  async setRoom(room: Room): Promise<void> {
+    await this.storage.put(room.id, room);
   }
-  async deleteRoomInfo(roomId: string): Promise<void> {
+  async deleteRoom(roomId: string): Promise<void> {
     await this.storage.delete(roomId);
   }
-  async listRoomInfo(): Promise<RoomInfo[]> {
-    const map = (await this.storage.list()) as Map<string, RoomInfo>;
-    return [...map.values()];
+  async listRoom(): Promise<RoomInfo[]> {
+    const map = (await this.storage.list()) as Map<string, Room>;
+    return [...map.values()].map((room) => this.makeRoomInfo(room));
   }
   async dryClean(): Promise<RoomPatch[]> {
     const list: RoomPatch[] = [];
-    for (const roomInfo of await this.listRoomInfo()) {
+    for (const room of await this.listRoom()) {
       const now = Date.now();
       list.push({
-        id: roomInfo.id,
-        active: now - roomInfo.createdAt < this.ACTIVE_DURATION,
-        alive: now - roomInfo.createdAt < this.LIVE_DURATION,
+        id: room.id,
+        active: now - room.createdAt < this.ACTIVE_DURATION,
+        alive: now - room.createdAt < this.LIVE_DURATION,
       });
     }
     return list;
   }
   async clean(patches: RoomPatch[]): Promise<void> {
     for (const patch of patches) {
-      const roomInfo = await this.getRoomInfo(patch.id);
-      if (roomInfo == null) {
+      const room = await this.getRoom(patch.id);
+      if (room == null) {
         continue;
       }
       if (!patch.alive) {
-        await this.deleteRoomInfo(roomInfo.id);
+        await this.deleteRoom(room.id);
         continue;
       }
       if (!patch.active) {
-        roomInfo.active = false;
-        await this.setRoomInfo(roomInfo);
+        room.active = false;
+        await this.setRoom(room);
       }
     }
   }
@@ -132,11 +142,11 @@ const roomManagerRouter = Router()
       state: RoomManagerState
     ) => {
       const roomId = request.params.roomId;
-      const roomInfo = await state.getRoomInfo(roomId);
-      if (roomInfo == null) {
+      const room = await state.getRoom(roomId);
+      if (room == null) {
         return new Response("Not found", { status: 404 });
       }
-      return new Response(JSON.stringify(roomInfo), { status: 200 });
+      return new Response(JSON.stringify(room), { status: 200 });
     }
   )
   .put(
@@ -146,17 +156,17 @@ const roomManagerRouter = Router()
       state: RoomManagerState
     ) => {
       const roomId = request.params.roomId;
-      const exsistingRoomInfo = await state.getRoomInfo(roomId);
-      if (exsistingRoomInfo != null) {
-        return new Response(JSON.stringify(exsistingRoomInfo), { status: 200 });
+      const exsistingRoom = await state.getRoom(roomId);
+      if (exsistingRoom != null) {
+        return new Response(JSON.stringify(exsistingRoom), { status: 200 });
       }
-      const newRoomInfo = await state.createRoomInfo(roomId);
-      if (newRoomInfo == null) {
+      const newRoom = await state.createRoom(roomId);
+      if (newRoom == null) {
         return new Response("The maximum number of rooms has been reached.", {
           status: 403,
         });
       }
-      return new Response(JSON.stringify(newRoomInfo), { status: 200 });
+      return new Response(JSON.stringify(newRoom), { status: 200 });
     }
   )
   .all("*", () => new Response("Not found.", { status: 404 }));

@@ -78,8 +78,12 @@ export type ResponseEventBody =
 export type RequestEvent = RequestEventHead & RequestEventBody;
 export type ResponseEvent = ResponseEventBody;
 export type RoomId = string;
-export type RoomInfo = {
+export type Room = {
   id: RoomId;
   active: boolean;
   createdAt: Timestamp;
+};
+export type RoomInfo = Room & {
+  activeUntil: Timestamp;
+  aliveUntil: Timestamp;
 };
