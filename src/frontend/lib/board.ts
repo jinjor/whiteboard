@@ -96,13 +96,6 @@ export function listenToBoardEvents(
     const npos = toBoardPosition(boardOptions, boardRect.size, pos);
     o.touchMove(npos);
   };
-  svgEl.onmouseup = (e: MouseEvent) => {
-    e.preventDefault();
-    const boardRect = o.getBoardRect();
-    const pos = getPixelPositionFromMouse(e);
-    const npos = toBoardPosition(boardOptions, boardRect.size, pos);
-    o.mouseUp(npos);
-  };
   svgEl.ontouchend = (e: TouchEvent) => {
     e.preventDefault();
     const boardRect = o.getBoardRect();
@@ -113,14 +106,22 @@ export function listenToBoardEvents(
     const npos = toBoardPosition(boardOptions, boardRect.size, pos);
     o.touchEnd(npos);
   };
+  const mouseUp = (e: MouseEvent) => {
+    e.preventDefault();
+    const boardRect = o.getBoardRect();
+    const pos = getPixelPositionFromMouse(e);
+    const npos = toBoardPosition(boardOptions, boardRect.size, pos);
+    o.mouseUp(npos);
+  };
+  window.addEventListener("mouseup", mouseUp);
   return () => {
     svgEl.ondblclick = null;
     svgEl.onmousedown = null;
     svgEl.ontouchstart = null;
     svgEl.onmousemove = null;
     svgEl.ontouchmove = null;
-    svgEl.onmouseup = null;
     svgEl.ontouchend = null;
+    window.removeEventListener("mouseup", mouseUp);
   };
 }
 
