@@ -663,6 +663,10 @@ function listenToBoard(state: State): () => void {
       }
       return startDrawing(state, npos);
     },
+    touchStartLong: (npos) => {
+      // createText(state, npos);
+      startSelecting(state, npos);
+    },
     mouseMove: (npos) => {
       switch (state.editing.kind) {
         case "move": {
@@ -683,13 +687,13 @@ function listenToBoard(state: State): () => void {
     touchMove: (npos) => {
       switch (state.editing.kind) {
         case "move": {
-          return stopMoving(state, npos);
+          return continueMoving(state, npos);
         }
         case "path": {
-          return stopDrawing(state, npos);
+          return continueDrawing(state, npos);
         }
         case "select": {
-          return stopSelecting(state, npos);
+          return continueSelecting(state, npos);
         }
       }
     },
@@ -711,10 +715,21 @@ function listenToBoard(state: State): () => void {
       syncCursor(state);
     },
     touchEnd: (npos) => {
-      if (state.selected.length > 0) {
-        return stopMoving(state, npos);
+      switch (state.editing.kind) {
+        case "move": {
+          stopMoving(state, npos);
+          break;
+        }
+        case "path": {
+          stopDrawing(state, npos);
+          break;
+        }
+        case "select": {
+          stopSelecting(state, npos);
+          break;
+        }
       }
-      return stopDrawing(state, npos);
+      syncCursor(state);
     },
   });
 }

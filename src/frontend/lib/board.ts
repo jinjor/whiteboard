@@ -49,6 +49,7 @@ export function listenToBoardEvents(
     doubleClick: (pos: Position) => void;
     mouseDown: (pos: Position, isRight: boolean) => void;
     touchStart: (pos: Position) => void;
+    touchStartLong: (pos: Position) => void;
     mouseMove: (pos: Position) => void;
     touchMove: (pos: Position) => void;
     mouseUp: (pos: Position) => void;
@@ -75,12 +76,22 @@ export function listenToBoardEvents(
     const npos = toBoardPosition(boardOptions, boardRect.size, pos);
     o.mouseDown(npos, e.button !== 0);
   };
+  let touchdown = false;
   svgEl.ontouchstart = (e: TouchEvent) => {
     e.preventDefault();
     const boardRect = o.getBoardRect();
     const pos = getPixelPositionFromTouch(boardRect.position, e.touches[0]);
     const npos = toBoardPosition(boardOptions, boardRect.size, pos);
     o.touchStart(npos);
+
+    e.stopPropagation();
+    touchdown = true;
+    setTimeout(() => {
+      if (touchdown) {
+        touchdown = false;
+        o.touchStartLong(npos);
+      }
+    }, 600);
   };
   svgEl.onmousemove = (e: MouseEvent) => {
     e.preventDefault();
@@ -90,6 +101,7 @@ export function listenToBoardEvents(
     o.mouseMove(npos);
   };
   svgEl.ontouchmove = (e: TouchEvent) => {
+    touchdown = false;
     e.preventDefault();
     const boardRect = o.getBoardRect();
     const pos = getPixelPositionFromTouch(boardRect.position, e.touches[0]);
@@ -97,6 +109,7 @@ export function listenToBoardEvents(
     o.touchMove(npos);
   };
   svgEl.ontouchend = (e: TouchEvent) => {
+    touchdown = false;
     e.preventDefault();
     const boardRect = o.getBoardRect();
     const pos = getPixelPositionFromTouch(
