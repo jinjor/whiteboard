@@ -1,15 +1,7 @@
-import * as api from "./lib/api";
+import { appendCreateRoomButton, debugging } from "./lib/debug";
 
 (async () => {
-  if (location.protocol === "http:") {
-    const button = document.createElement("button");
-    button.textContent = "Create Room for Debug";
-    button.onclick = async () => {
-      const roomInfo = await api.createRoom();
-      if (roomInfo != null) {
-        location.href = "/rooms/" + roomInfo.id;
-      }
-    };
-    document.body.append(button);
+  if (debugging) {
+    await appendCreateRoomButton(document.body);
   }
 })();

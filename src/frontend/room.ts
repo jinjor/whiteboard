@@ -32,6 +32,7 @@ import {
 import * as api from "./lib/api";
 import { addMember, deleteMember, updateStatus } from "./lib/navbar";
 import { deepEqual } from "../deep-equal";
+import { appendCreateRoomButton, debugging } from "./lib/debug";
 
 type Size = { width: number; height: number };
 class Rectangle {
@@ -771,17 +772,9 @@ function initBoard(o: BoardOptions): void {
     }
   } else {
     // show error
-    if (location.protocol === "http:") {
-      const button = document.createElement("button");
-      button.textContent = "Create Room for Debug";
-      button.onclick = async () => {
-        const roomInfo = await api.createRoom();
-        if (roomInfo != null) {
-          location.href = "/rooms/" + roomInfo.id;
-        }
-      };
+    if (debugging) {
       document.getElementById("board")!.remove();
-      document.body.append(button);
+      await appendCreateRoomButton(document.body);
     }
   }
 })();
