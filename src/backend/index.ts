@@ -371,53 +371,97 @@ const authRouter = Router()
       );
       return new Response("invalid request", { status: 403 });
     }
-    // console.log(body);
-    // const params = new URLSearchParams(body);
-    // const text = params.get("text")!.trim();
-    const roomId = env.rooms.newUniqueId();
-    const singletonId = env.manager.idFromName("singleton");
-    const managerStub = env.manager.get(singletonId);
-    const res = await managerStub.fetch(
-      "https://dummy-url/rooms/" + roomId.toString(),
-      {
-        method: "PUT",
+    const params = new URLSearchParams(body);
+    const text = (params.get("text") ?? "").trim();
+    switch (text) {
+      case "": {
+        const roomId = env.rooms.newUniqueId();
+        const singletonId = env.manager.idFromName("singleton");
+        const managerStub = env.manager.get(singletonId);
+        const res = await managerStub.fetch(
+          "https://dummy-url/rooms/" + roomId.toString(),
+          {
+            method: "PUT",
+          }
+        );
+        const blocks = [];
+        if (res.status === 200) {
+          const host = "whiteboard.jinjor.workers.dev"; // TODO
+          const url = `https://${host}/rooms/${roomId}`;
+          blocks.push({
+            type: "section",
+            text: {
+              type: "mrkdwn",
+              text: `どうぞ！ ${url}`,
+            },
+          });
+        } else if (res.status === 403) {
+          blocks.push({
+            type: "section",
+            text: {
+              type: "mrkdwn",
+              text: `部屋がいっぱいです`,
+            },
+          });
+        } else {
+          blocks.push({
+            type: "section",
+            text: {
+              type: "mrkdwn",
+              text: `部屋の作成に失敗しました`,
+            },
+          });
+        }
+        return new Response(
+          JSON.stringify({
+            blocks,
+            response_type: "in_channel",
+          }),
+          { headers: { "Content-type": "application/json" } }
+        );
       }
-    );
-    const blocks = [];
-    if (res.status === 200) {
-      const host = "whiteboard.jinjor.workers.dev"; // TODO
-      const url = `https://${host}/rooms/${roomId}`;
-      blocks.push({
-        type: "section",
-        text: {
-          type: "mrkdwn",
-          text: `どうぞ！ ${url}`,
-        },
-      });
-    } else if (res.status === 403) {
-      blocks.push({
-        type: "section",
-        text: {
-          type: "mrkdwn",
-          text: `部屋がいっぱいです`,
-        },
-      });
-    } else {
-      blocks.push({
-        type: "section",
-        text: {
-          type: "mrkdwn",
-          text: `部屋の作成に失敗しました`,
-        },
-      });
+      case "status": {
+        const singletonId = env.manager.idFromName("singleton");
+        const managerStub = env.manager.get(singletonId);
+        const res = await managerStub.fetch("https://dummy-url/rooms");
+        const rooms = (await res.json()) as RoomInfo[];
+        const activeRooms = rooms
+          .filter((room) => room.active)
+          .sort((r1, r2) => {
+            return r1.activeUntil - r2.activeUntil;
+          });
+        const maxActiveRooms = 10; // TODO: use variable
+        const now = Date.now();
+        const message = [
+          `Total rooms: ${rooms.length}`,
+          `Active rooms: ${activeRooms.length} / ${maxActiveRooms}`,
+          ...activeRooms.map((room, i) => {
+            const left = (room.activeUntil - now) / 1000; // seconds
+            const formatted =
+              left >= 3600
+                ? Math.floor(left / 3600) + " hours"
+                : Math.floor(left / 60) + " minutes";
+            return `${i}: ${formatted} left`;
+          }),
+        ].join("\n");
+        const blocks = [
+          {
+            type: "section",
+            text: {
+              type: "mrkdwn",
+              text: message,
+            },
+          },
+        ];
+        return new Response(
+          JSON.stringify({
+            blocks,
+            response_type: "in_channel",
+          }),
+          { headers: { "Content-type": "application/json" } }
+        );
+      }
     }
-    return new Response(
-      JSON.stringify({
-        blocks,
-        response_type: "in_channel",
-      }),
-      { headers: { "Content-type": "application/json" } }
-    );
   })
   .all("*", async (request: Request, env: Env, context: ExecutionContext) => {
     let userId;

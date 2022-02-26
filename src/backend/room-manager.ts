@@ -135,6 +135,10 @@ const roomManagerRouter = Router()
     await state.clean(patches);
     return new Response(JSON.stringify(null), { status: 200 });
   })
+  .get("/rooms", async (request: Request, state: RoomManagerState) => {
+    const rooms = await state.listRoom();
+    return new Response(JSON.stringify(rooms), { status: 200 });
+  })
   .get(
     "/rooms/:roomId",
     async (
