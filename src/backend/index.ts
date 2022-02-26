@@ -112,85 +112,6 @@ const debugRouter = Router({ base: "/debug" })
     });
   });
 const apiRouter = Router({ base: "/api" })
-  .post("/slack", async (request: Request, env: Env) => {
-    if (env.SLACK_APP !== "true") {
-      return new Response("Not found.", { status: 404 });
-    }
-    const timestamp = request.headers.get("X-Slack-Request-Timestamp");
-    if (timestamp == null) {
-      return new Response("invalid request", { status: 400 });
-    }
-    const ts = parseInt(timestamp);
-    if (isNaN(ts)) {
-      return new Response("invalid request", { status: 400 });
-    }
-    if (Date.now() / 1000 - ts > 10) {
-      return new Response("invalid request", { status: 403 });
-    }
-    const actualSignature = request.headers.get("X-Slack-Signature");
-    if (actualSignature == null) {
-      return new Response("invalid request", { status: 400 });
-    }
-    const body = await request.text();
-    const sigBaseString = `v0:${timestamp}:${body}`;
-    const digest = await hmacSha256(sigBaseString, env.SLACK_SIGNING_SECRET);
-    const expectedSignature = `v0=${digest}`;
-    if (actualSignature !== expectedSignature) {
-      console.log(
-        "signature does not match",
-        actualSignature,
-        expectedSignature
-      );
-      return new Response("invalid request", { status: 403 });
-    }
-    // console.log(body);
-    // const params = new URLSearchParams(body);
-    // const text = params.get("text")!.trim();
-    const roomId = env.rooms.newUniqueId();
-    const singletonId = env.manager.idFromName("singleton");
-    const managerStub = env.manager.get(singletonId);
-    const res = await managerStub.fetch(
-      "https://dummy-url/rooms/" + roomId.toString(),
-      {
-        method: "PUT",
-      }
-    );
-    const blocks = [];
-    if (res.status === 200) {
-      const host = "whiteboard.jinjor.workers.dev"; // TODO
-      const url = `https://${host}/rooms/${roomId}`;
-      blocks.push({
-        type: "section",
-        text: {
-          type: "mrkdwn",
-          text: `どうぞ！ ${url}`,
-        },
-      });
-    } else if (res.status === 403) {
-      blocks.push({
-        type: "section",
-        text: {
-          type: "mrkdwn",
-          text: `部屋がいっぱいです`,
-        },
-      });
-    } else {
-      blocks.push({
-        type: "section",
-        text: {
-          type: "mrkdwn",
-          text: `部屋の作成に失敗しました`,
-        },
-      });
-    }
-    return new Response(
-      JSON.stringify({
-        blocks,
-        response_type: "in_channel",
-      }),
-      { headers: { "Content-type": "application/json" } }
-    );
-  })
   .post("/rooms", async (request: Request, env: Env) => {
     const roomId = env.rooms.newUniqueId();
     const singletonId = env.manager.idFromName("singleton");
@@ -418,6 +339,85 @@ const authRouter = Router()
       },
     });
     return res;
+  })
+  .post("/app/slack", async (request: Request, env: Env) => {
+    if (env.SLACK_APP !== "true") {
+      return new Response("Not found.", { status: 404 });
+    }
+    const timestamp = request.headers.get("X-Slack-Request-Timestamp");
+    if (timestamp == null) {
+      return new Response("invalid request", { status: 400 });
+    }
+    const ts = parseInt(timestamp);
+    if (isNaN(ts)) {
+      return new Response("invalid request", { status: 400 });
+    }
+    if (Date.now() / 1000 - ts > 10) {
+      return new Response("invalid request", { status: 403 });
+    }
+    const actualSignature = request.headers.get("X-Slack-Signature");
+    if (actualSignature == null) {
+      return new Response("invalid request", { status: 400 });
+    }
+    const body = await request.text();
+    const sigBaseString = `v0:${timestamp}:${body}`;
+    const digest = await hmacSha256(sigBaseString, env.SLACK_SIGNING_SECRET);
+    const expectedSignature = `v0=${digest}`;
+    if (actualSignature !== expectedSignature) {
+      console.log(
+        "signature does not match",
+        actualSignature,
+        expectedSignature
+      );
+      return new Response("invalid request", { status: 403 });
+    }
+    // console.log(body);
+    // const params = new URLSearchParams(body);
+    // const text = params.get("text")!.trim();
+    const roomId = env.rooms.newUniqueId();
+    const singletonId = env.manager.idFromName("singleton");
+    const managerStub = env.manager.get(singletonId);
+    const res = await managerStub.fetch(
+      "https://dummy-url/rooms/" + roomId.toString(),
+      {
+        method: "PUT",
+      }
+    );
+    const blocks = [];
+    if (res.status === 200) {
+      const host = "whiteboard.jinjor.workers.dev"; // TODO
+      const url = `https://${host}/rooms/${roomId}`;
+      blocks.push({
+        type: "section",
+        text: {
+          type: "mrkdwn",
+          text: `どうぞ！ ${url}`,
+        },
+      });
+    } else if (res.status === 403) {
+      blocks.push({
+        type: "section",
+        text: {
+          type: "mrkdwn",
+          text: `部屋がいっぱいです`,
+        },
+      });
+    } else {
+      blocks.push({
+        type: "section",
+        text: {
+          type: "mrkdwn",
+          text: `部屋の作成に失敗しました`,
+        },
+      });
+    }
+    return new Response(
+      JSON.stringify({
+        blocks,
+        response_type: "in_channel",
+      }),
+      { headers: { "Content-type": "application/json" } }
+    );
   })
   .all("*", async (request: Request, env: Env, context: ExecutionContext) => {
     let userId;
