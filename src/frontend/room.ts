@@ -633,18 +633,24 @@ function listenToBoard(state: State): () => void {
     },
     mouseDown: (npos, isRight) => {
       if (isRight) {
-        return startSelecting(state, npos);
+        startSelecting(state, npos);
       } else {
         if (state.selected.length > 0) {
-          return startMoving(state, npos);
-        }
-        switch (state.editing.kind) {
-          case "text": {
-            return stopEditingText(state);
+          startMoving(state, npos);
+        } else {
+          switch (state.editing.kind) {
+            case "text": {
+              stopEditingText(state);
+              break;
+            }
+            default: {
+              startDrawing(state, npos);
+              break;
+            }
           }
         }
-        return startDrawing(state, npos);
       }
+      syncCursor(state);
     },
     touchStart: (npos) => {
       if (state.selected.length > 0) {
@@ -660,15 +666,19 @@ function listenToBoard(state: State): () => void {
     mouseMove: (npos) => {
       switch (state.editing.kind) {
         case "move": {
-          return continueMoving(state, npos);
+          continueMoving(state, npos);
+          break;
         }
         case "path": {
-          return continueDrawing(state, npos);
+          continueDrawing(state, npos);
+          break;
         }
         case "select": {
-          return continueSelecting(state, npos);
+          continueSelecting(state, npos);
+          break;
         }
       }
+      syncCursor(state);
     },
     touchMove: (npos) => {
       switch (state.editing.kind) {
@@ -686,15 +696,19 @@ function listenToBoard(state: State): () => void {
     mouseUp: (npos) => {
       switch (state.editing.kind) {
         case "move": {
-          return stopMoving(state, npos);
+          stopMoving(state, npos);
+          break;
         }
         case "path": {
-          return stopDrawing(state, npos);
+          stopDrawing(state, npos);
+          break;
         }
         case "select": {
-          return stopSelecting(state, npos);
+          stopSelecting(state, npos);
+          break;
         }
       }
+      syncCursor(state);
     },
     touchEnd: (npos) => {
       if (state.selected.length > 0) {
@@ -703,6 +717,13 @@ function listenToBoard(state: State): () => void {
       return stopDrawing(state, npos);
     },
   });
+}
+function syncCursor(state: State) {
+  if (state.editing.kind !== "select" && state.selected.length > 0) {
+    state.svgEl.style.cursor = "move";
+  } else {
+    state.svgEl.style.removeProperty("cursor");
+  }
 }
 
 function initBoard(o: BoardOptions): void {
