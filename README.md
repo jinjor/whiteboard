@@ -33,20 +33,29 @@ UI
 - https://developers.cloudflare.com/workers/tutorials/build-a-slackbot
 
 TODO:
-- Slack のマークダウン
+- title
+- 文字がずれる問題
+- 選択中に切断したら選択解除
 - Slack のアイコン
-- GitHub auth で org を optional に
-- Slack の org 相当は要らない？
-- 十時カーソル
-- テキストを右クリックで選択
-- dev 環境
 - トップページ
 - 404 ページ
+- ステータス・リミットを返すコマンド
+- 部屋作成に失敗したらステータス・リミットを表示
+- タッチデバイス操作
+- 部屋がユーザーでいっぱいだった時の表示
+- テキストを右クリックで選択
+- 常に UA でユーザーを分ける？
+- 十時カーソル
+- Slack の org 相当は要らない？
+- Slack のマークダウン
+- OS でヘルプ表示を変える
+- GitHub auth のアイコン
+- GitHub auth で org を optional に
+- GitHub 要らない説
+- env で期限も変える？
+- dev 環境
 - updatedAt, updatedBy 要らないかも
 - キャプチャ
 - 有効期限を表示
-- ステータス・リミットを返すコマンド
-- 部屋作成に失敗したらステータス・リミットを表示
-- 選択中に切断したら選択解除
 - 再接続
-- 部屋がユーザーでいっぱいだった時の表示
+- ogp
