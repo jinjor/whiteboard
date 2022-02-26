@@ -77,7 +77,8 @@
         border-color: #f00;
         color: #a00;
       }
-      footer {
+      #help,
+      #help-touch {
         position: fixed;
         bottom: 0;
         right: 0;
@@ -97,7 +98,7 @@
         <div id="status" class="hidden"></div>
         <div id="members"></div>
       </nav>
-      <footer id="help" class="hidden">
+      <div id="help" class="hidden">
         <div>Double-click: Text</div>
         <div>Right-drag: Select</div>
         <div>Select & Drag: Move</div>
@@ -105,7 +106,17 @@
         <div>Ctrl(⌘) + A: Select All</div>
         <div>Ctrl(⌘) + Z: Undo</div>
         <div>Ctrl(⌘) + Shift + Z, Ctrl(⌘) + Y: Redo</div>
-      </footer>
+      </div>
+      <div id="help-touch" class="hidden">
+        <div>Long tap: Text</div>
+        <div>Select & Drag: Move</div>
+      </div>
+      <div id="shortcut-buttons" class="hidden">
+        <button id="undo" disabled>Undo</button>
+        <button id="redo" disabled>Redo</button>
+        <button id="select">Select</button>
+        <button id="remove" class="hidden">Remove</button>
+      </div>
       <input id="input" class="hidden" />
       <svg id="board" viewBox="0 0 0 0">
         <clipPath id="clip">

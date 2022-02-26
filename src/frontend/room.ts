@@ -664,8 +664,7 @@ function listenToBoard(state: State): () => void {
       return startDrawing(state, npos);
     },
     touchStartLong: (npos) => {
-      // createText(state, npos);
-      startSelecting(state, npos);
+      createText(state, npos);
     },
     mouseMove: (npos) => {
       switch (state.editing.kind) {
