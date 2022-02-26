@@ -33,14 +33,10 @@ UI
 - https://developers.cloudflare.com/workers/tutorials/build-a-slackbot
 
 TODO:
-- title
 - 文字がずれる問題
 - 選択中に切断したら選択解除
-- Slack のアイコン
 - トップページ
 - 404 ページ
-- ステータス・リミットを返すコマンド
-- 部屋作成に失敗したらステータス・リミットを表示
 - タッチデバイス操作
 - 部屋がユーザーでいっぱいだった時の表示
 - テキストを右クリックで選択
@@ -49,13 +45,21 @@ TODO:
 - Slack の org 相当は要らない？
 - Slack のマークダウン
 - OS でヘルプ表示を変える
+- 誰も編集しないと接続が切れる仕様の実装
+- ステータス表示を洗練させる
+- 部屋作成に失敗したらステータス・リミットを表示
 - GitHub auth のアイコン
 - GitHub auth で org を optional に
 - GitHub 要らない説
 - env で期限も変える？
 - dev 環境
+- HTML のテンプレート化
 - updatedAt, updatedBy 要らないかも
 - キャプチャ
 - 有効期限を表示
 - 再接続
 - ogp
+- コマンドのヘルプ
+
+メモ：
+- logo のフォントは Verdana
