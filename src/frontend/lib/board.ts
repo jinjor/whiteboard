@@ -383,8 +383,8 @@ export class Input {
 }
 export class Selector {
   constructor(private element: HTMLElement) {}
-  setRectangle(x: number, y: number, width: number, height: number): void {
-    setRectangle(this.element, { x, y, width, height });
+  setRectangle(rect: Rectangle): void {
+    setRectangle(this.element, rect);
   }
   show(): void {
     setStroke(this.element, "red");

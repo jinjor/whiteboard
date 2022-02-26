@@ -242,19 +242,13 @@ function getAllObjectsForSelect(): ObjectForSelect[] {
 function startSelecting(state: State, pos: Position): void {
   const objects = getAllObjectsForSelect();
   state.editing = { kind: "select", start: pos, objects };
-  state.selector.setRectangle(pos.x, pos.y, 0, 0);
+  const rect = new Rectangle(pos.x, pos.y, 0, 0);
+  state.selector.setRectangle(rect);
   state.selector.show();
+  selectAllObjects(state, state.editing.objects, rect);
 }
 function isObjectSelected(object: ObjectForSelect, rect: Rectangle): boolean {
   const orect = object.bbox;
-  const fullyContained =
-    orect.x > rect.x &&
-    orect.right < rect.right &&
-    orect.y > rect.y &&
-    orect.bottom < rect.bottom;
-  if (fullyContained) {
-    return true;
-  }
   const fullySeparated =
     orect.x > rect.right ||
     orect.right < rect.x ||
@@ -262,6 +256,17 @@ function isObjectSelected(object: ObjectForSelect, rect: Rectangle): boolean {
     orect.bottom < rect.y;
   if (fullySeparated) {
     return false;
+  }
+  if (object.kind === "text") {
+    return true;
+  }
+  const fullyContained =
+    orect.x > rect.x &&
+    orect.right < rect.right &&
+    orect.y > rect.y &&
+    orect.bottom < rect.bottom;
+  if (fullyContained) {
+    return true;
   }
   for (const point of getPointsInObject(object)) {
     const contained =
@@ -291,7 +296,20 @@ function getPointsInObject(object: ObjectForSelect): Position[] {
     }
   }
 }
-
+function selectAllObjects(
+  state: State,
+  objects: ObjectForSelect[],
+  rect: Rectangle
+) {
+  for (const object of objects) {
+    const selected = isObjectSelected(object, rect);
+    if (selected) {
+      state.selected.push(object);
+    }
+    const element = document.getElementById(object.id)!;
+    setSelected(element, selected);
+  }
+}
 function continueSelecting(state: State, pos: Position): void {
   state.selected = [];
   if (state.editing.kind === "select") {
@@ -300,16 +318,9 @@ function continueSelecting(state: State, pos: Position): void {
     const y = Math.min(pos.y, start.y);
     const width = Math.abs(pos.x - start.x);
     const height = Math.abs(pos.y - start.y);
-    state.selector.setRectangle(x, y, width, height);
     const rect = new Rectangle(x, y, width, height);
-    for (const object of state.editing.objects) {
-      const selected = isObjectSelected(object, rect);
-      if (selected) {
-        state.selected.push(object);
-      }
-      const element = document.getElementById(object.id)!;
-      setSelected(element, selected);
-    }
+    state.selector.setRectangle(rect);
+    selectAllObjects(state, state.editing.objects, rect);
   }
 }
 function stopSelecting(state: State, pos: Position): void {
