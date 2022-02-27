@@ -48,6 +48,7 @@ export class SlackOAuth implements OAuth {
       code
     );
     if (scope !== OAUTH_SCOPE) {
+      console.log("invalid scope", scope, OAUTH_SCOPE);
       throw new ReturnedScopeDoesNotMatch();
     }
     return accessToken;

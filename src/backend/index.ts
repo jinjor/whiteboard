@@ -270,8 +270,7 @@ const router = Router()
 const authRouter = Router()
   .get("/", async (req: Request, env: Env, ctx: ExecutionContext) => {
     const res = await getAsset(req, env, ctx, () => "/index.html");
-    preserveSession(req, res);
-    return res;
+    return preserveSession(req, res);
   })
   .get("/assets/*", async (req: Request, env: Env, ctx: ExecutionContext) => {
     return getAsset(req, env, ctx, (path) => path.replace("/assets/", "/"));
@@ -285,6 +284,7 @@ const authRouter = Router()
       }
       case "slack": {
         auth = new SlackOAuth(env);
+        break;
       }
       default: {
         return new Response("Not found.", { status: 404 });
@@ -453,15 +453,15 @@ const authRouter = Router()
       throw new Error("assertion error");
     }
     const res: Response = await router.handle(request, env, context, user);
-    preserveSession(request, res);
-    return res;
+    return preserveSession(request, res);
   });
 
-function preserveSession(req: Request, res: Response): void {
+function preserveSession(req: Request, res: Response): Response {
   const cookie = Cookie.parse(req.headers.get("Cookie") ?? "");
   if (cookie.session == null) {
-    return;
+    return res;
   }
+  res = new Response(res.body, res);
   res.headers.set(
     "Set-Cookie",
     Cookie.serialize("session", cookie.session, {
@@ -472,6 +472,7 @@ function preserveSession(req: Request, res: Response): void {
       sameSite: "strict",
     })
   );
+  return res;
 }
 
 function isEnvValid(env: Env): boolean {

@@ -37,7 +37,7 @@ export async function check(
           httpOnly: true,
           maxAge: 60,
           secure: true, // TODO: switch
-          sameSite: "strict",
+          sameSite: "lax", // strict だと直後に cookie を送信してくれない
         }),
         Location: oauth.getFormUrl(request),
       },
@@ -76,12 +76,14 @@ export async function handleCallback(
 ): Promise<Response> {
   try {
     const pathname = new URL(request.url).pathname;
-    if (pathname !== "/callback/" + oauth.getAuthType) {
+    if (pathname !== "/callback/" + oauth.getAuthType()) {
+      console.log("invalid path");
       throw new InvalidCallback();
     }
     const cookie = Cookie.parse(request.headers.get("Cookie") ?? "");
     const code = oauth.getCodeFromCallback(request);
     if (code == null) {
+      console.log("code not found");
       throw new InvalidCallback();
     }
     const accessToken = await oauth.getAccessToken(code);
