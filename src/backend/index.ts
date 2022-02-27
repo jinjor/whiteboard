@@ -359,11 +359,8 @@ const authRouter = Router()
       return new Response("Not found.", { status: 404 });
     }
     const name = await slack.getUserName(accessToken);
-    console.log("login:", name);
-    const isMemberOfOrg = true; // TODO: ?
-    console.log("isMemberOfOrg:", isMemberOfOrg);
-    // const userId = isMemberOfOrg ? "sl/" + login : "_guest"; // "_guest" is an invalid slack name <--- really?
-    const userId = "sl/" + name; // TODO: for debug
+    console.log("slack user name:", name);
+    const userId = "sl/" + name;
 
     const res = new Response(null, {
       status: 302,
@@ -614,62 +611,65 @@ const authRouter = Router()
     return res;
   });
 
+function isEnvValid(env: Env): boolean {
+  let ok = true;
+  if (!["true", "false"].includes(env.DEBUG_API)) {
+    ok = false;
+    console.log("DEBUG_API not valid");
+  }
+  if (!["header", "user_agent", "github", "slack"].includes(env.AUTH_TYPE)) {
+    ok = false;
+    console.log("AUTH_TYPE not valid");
+  }
+  if (env.AUTH_TYPE === "github") {
+    if (!env.GITHUB_CLIENT_ID) {
+      ok = false;
+      console.log("GITHUB_CLIENT_ID not found");
+    }
+    if (!env.GITHUB_CLIENT_SECRET) {
+      ok = false;
+      console.log("GITHUB_CLIENT_SECRET not found");
+    }
+    if (!env.GITHUB_ORG) {
+      ok = false;
+      console.log("GITHUB_ORG not found");
+    }
+    if (!env.COOKIE_SECRET) {
+      ok = false;
+      console.log("COOKIE_SECRET not found");
+    }
+  }
+  if (env.AUTH_TYPE === "slack") {
+    if (!env.SLACK_CLIENT_ID) {
+      ok = false;
+      console.log("SLACK_CLIENT_ID not found");
+    }
+    if (!env.SLACK_CLIENT_SECRET) {
+      ok = false;
+      console.log("SLACK_CLIENT_SECRET not found");
+    }
+    if (!env.COOKIE_SECRET) {
+      ok = false;
+      console.log("COOKIE_SECRET not found");
+    }
+  }
+  if (!["true", "false"].includes(env.SLACK_APP)) {
+    ok = false;
+    console.log("SLACK_APP not valid");
+  }
+  if (env.SLACK_APP === "true") {
+    if (!env.SLACK_SIGNING_SECRET) {
+      ok = false;
+      console.log("SLACK_SIGNING_SECRET not found");
+    }
+  }
+  return ok;
+}
+
 export default {
   async fetch(request: Request, env: Env, context: ExecutionContext) {
     console.log("Root's fetch(): " + request.method, request.url);
-    console.log("AUTH_TYPE: " + env.AUTH_TYPE);
-    let preconditionOk = true;
-    if (!["true", "false"].includes(env.DEBUG_API)) {
-      preconditionOk = false;
-      console.log("DEBUG_API not valid");
-    }
-    if (!["header", "user_agent", "github", "slack"].includes(env.AUTH_TYPE)) {
-      preconditionOk = false;
-      console.log("AUTH_TYPE not valid");
-    }
-    if (env.AUTH_TYPE === "github") {
-      if (!env.GITHUB_CLIENT_ID) {
-        preconditionOk = false;
-        console.log("GITHUB_CLIENT_ID not found");
-      }
-      if (!env.GITHUB_CLIENT_SECRET) {
-        preconditionOk = false;
-        console.log("GITHUB_CLIENT_SECRET not found");
-      }
-      if (!env.GITHUB_ORG) {
-        preconditionOk = false;
-        console.log("GITHUB_ORG not found");
-      }
-      if (!env.COOKIE_SECRET) {
-        preconditionOk = false;
-        console.log("COOKIE_SECRET not found");
-      }
-    }
-    if (env.AUTH_TYPE === "slack") {
-      if (!env.SLACK_CLIENT_ID) {
-        preconditionOk = false;
-        console.log("SLACK_CLIENT_ID not found");
-      }
-      if (!env.SLACK_CLIENT_SECRET) {
-        preconditionOk = false;
-        console.log("SLACK_CLIENT_SECRET not found");
-      }
-      if (!env.COOKIE_SECRET) {
-        preconditionOk = false;
-        console.log("COOKIE_SECRET not found");
-      }
-    }
-    if (!["true", "false"].includes(env.SLACK_APP)) {
-      preconditionOk = false;
-      console.log("SLACK_APP not valid");
-    }
-    if (env.SLACK_APP === "true") {
-      if (!env.SLACK_SIGNING_SECRET) {
-        preconditionOk = false;
-        console.log("SLACK_SIGNING_SECRET not found");
-      }
-    }
-    if (!preconditionOk) {
+    if (!isEnvValid(env)) {
       return new Response("Configuration Error", { status: 500 });
     }
     return await authRouter
