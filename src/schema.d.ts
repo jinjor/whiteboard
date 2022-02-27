@@ -49,12 +49,12 @@ export type DeleteEventBody = {
 export type InitEventBody = {
   kind: "init";
   objects: Objects;
-  members: UserId[];
+  members: User[];
   self: UserId;
 };
 export type JoinEventBody = {
   kind: "join";
-  id: UserId;
+  user: User;
 };
 export type QuitEventBody = {
   kind: "quit";

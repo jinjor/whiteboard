@@ -1,7 +1,7 @@
 import { Router } from "itty-router";
 import { RateLimiterClient } from "./rate-limiter";
 import { applyEvent, InvalidEvent, validateEvent } from "./object";
-import { Objects } from "../schema";
+import { Objects, User, UserId } from "../schema";
 
 type Env = {
   limiters: DurableObjectNamespace;
@@ -19,11 +19,13 @@ const roomRouter = Router()
       return new Response("expected websocket", { status: 400 });
     }
     const userId = request.headers.get("WB-USER-ID")!;
+    const userImage = request.headers.get("WB-USER-IMAGE")!;
+    const user = { id: userId, image: userImage || null };
     if (!state.canStart(userId)) {
       return new Response("room is full", { status: 403 });
     }
     const pair = new WebSocketPair();
-    await state.handleSession(pair[1], userId);
+    await state.handleSession(pair[1], user);
     // 101 Switching Protocols
     return new Response(null, { status: 101, webSocket: pair[0] });
   })
@@ -35,7 +37,7 @@ const roomRouter = Router()
   .all("*", () => new Response("Not found.", { status: 404 }));
 
 type Session = {
-  name: string;
+  user: User;
   quit: boolean;
   webSocket: WebSocket;
 };
@@ -60,7 +62,7 @@ class RoomState {
     }
   }
   canStart(userId: string): boolean {
-    if (this.sessions.some((session) => session.name === userId)) {
+    if (this.sessions.some((session) => session.user.id === userId)) {
       return true;
     }
     return this.sessions.length < MAX_ACTIVE_USERS;
@@ -79,10 +81,10 @@ class RoomState {
     }
     return objects as Objects;
   }
-  async handleSession(webSocket: WebSocket, userId: string): Promise<void> {
+  async handleSession(webSocket: WebSocket, user: User): Promise<void> {
     webSocket.accept();
 
-    const limiterId = this.env.limiters.idFromName(userId);
+    const limiterId = this.env.limiters.idFromName(user.id);
     const limiter = new RateLimiterClient(
       () => this.env.limiters.get(limiterId),
       (err) => {
@@ -93,13 +95,13 @@ class RoomState {
 
     const session: Session = {
       webSocket,
-      name: userId,
+      user,
       quit: false,
     };
     // 同じユーザーは複数の接続を開始できない
     for (let i = this.sessions.length - 1; i >= 0; i--) {
       const session = this.sessions[i];
-      if (session.name === userId) {
+      if (session.user.id === user.id) {
         session.webSocket.close(1001);
         this.sessions.splice(i, 1);
       }
@@ -128,7 +130,11 @@ class RoomState {
         const timestamp = this.newUniqueTimestamp();
         const objects = await this.getObjects();
         const events = applyEvent(
-          { ...event, uniqueTimestamp: timestamp, requestedBy: session.name },
+          {
+            ...event,
+            uniqueTimestamp: timestamp,
+            requestedBy: session.user.id,
+          },
           objects
         );
         await this.storage.put("objects", objects);
@@ -138,7 +144,7 @@ class RoomState {
               break;
             }
             case "others": {
-              this.broadcast(session.name, e.event);
+              this.broadcast(session.user.id, e.event);
               break;
             }
           }
@@ -158,26 +164,26 @@ class RoomState {
     webSocket.addEventListener("close", () => {
       session.quit = true;
       this.sessions = this.sessions.filter((member) => member !== session);
-      this.broadcast(session.name, { kind: "quit", id: session.name });
+      this.broadcast(session.user.id, { kind: "quit", id: session.user.id });
     });
     const objects = await this.getObjects();
-    const members = this.sessions.map((s) => s.name);
+    const members = this.sessions.map((s) => s.user);
     webSocket.send(
       JSON.stringify({
         kind: "init",
         objects: objects ?? {},
         members,
-        self: session.name,
+        self: session.user.id,
       })
     );
-    this.broadcast(session.name, { kind: "join", id: session.name });
+    this.broadcast(session.user.id, { kind: "join", user: session.user });
   }
 
-  private broadcast(sender: string, message: any) {
+  private broadcast(sender: UserId, message: any) {
     const quitters: Session[] = [];
     this.sessions = this.sessions.filter((session) => {
       try {
-        if (session.name !== sender) {
+        if (session.user.id !== sender) {
           session.webSocket.send(JSON.stringify(message));
         }
         return true;
@@ -190,7 +196,7 @@ class RoomState {
       }
     });
     quitters.forEach((quitter) => {
-      this.broadcast(quitter.name, { kind: "quit", id: quitter.name });
+      this.broadcast(quitter.user.id, { kind: "quit", id: quitter.user.id });
     });
   }
 }

@@ -118,7 +118,7 @@ function connect(pageInfo: PageInfo, state: State, disableEditing: () => void) {
       case "init": {
         state.self = data.self;
         for (const member of data.members) {
-          addMember(member, member === state.self);
+          addMember(member, member.id === state.self);
         }
         for (const key of Object.keys(data.objects)) {
           upsertObject(state.svgEl, data.objects[key], state.boardOptions);
@@ -126,8 +126,8 @@ function connect(pageInfo: PageInfo, state: State, disableEditing: () => void) {
         break;
       }
       case "join": {
-        const member = data.id;
-        addMember(member, member === state.self);
+        const member = data.user;
+        addMember(member, member.id === state.self);
         break;
       }
       case "quit": {

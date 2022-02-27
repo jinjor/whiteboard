@@ -1,4 +1,4 @@
-import { UserId } from "../../schema";
+import { User, UserId } from "../../schema";
 
 export function updateStatus(
   kind: "active" | "inactive" | "error",
@@ -11,33 +11,24 @@ export function updateStatus(
   element.textContent = text;
 }
 
-export function addMember(member: UserId, self: boolean): void {
+export function addMember(member: User, self: boolean): void {
   const membersEl = document.getElementById("members")!;
-  const [prefix, name] = member.split("/");
-  let element = document.getElementById(member);
+  const [prefix, name] = member.id.split("/");
+  let element = document.getElementById(member.id);
   if (element != null) {
     return;
   }
   element = document.createElement("div");
   membersEl.append(element);
-  element.id = member; // スラッシュが入っているので被らないはず...
+  element.id = member.id; // スラッシュが入っているので被らないはず...
   element.classList.add("member");
   if (self) {
     element.classList.add("self");
   }
-  switch (prefix) {
-    case "ua": {
-      element.textContent = name.slice(0, 2);
-      break;
-    }
-    case "gh": {
-      element.style.backgroundImage = `https://github.com/${member}.png`;
-      break;
-    }
-    case "sl": {
-      element.textContent = name.slice(0, 2); // TODO: avatar
-      break;
-    }
+  if (member.image != null) {
+    element.style.backgroundImage = member.image;
+  } else {
+    element.textContent = name.slice(0, 2);
   }
   const selfEl = document.querySelector(".member.self");
   if (selfEl != null) {

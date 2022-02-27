@@ -197,6 +197,7 @@ const apiRouter = Router({ base: "/api" })
           Connection: "Upgrade",
           Upgrade: "websocket",
           "WB-USER-ID": user.id,
+          "WB-USER-IMAGE": user.image ?? "",
         },
       });
     }
