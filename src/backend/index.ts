@@ -290,7 +290,8 @@ const authRouter = Router()
             path: "/",
             httpOnly: true,
             maxAge: 60 * 60 * 24 * 7, // 1 week
-            sameSite: "strict",
+            secure: true, // TODO: switch
+            sameSite: "lax", // strict だと直後に cookie を送信してくれない
           }
         ),
         Location: cookie.original_url ?? `/`,
@@ -332,7 +333,8 @@ const authRouter = Router()
             path: "/",
             httpOnly: true,
             maxAge: 60 * 60 * 24 * 7, // 1 week
-            sameSite: "strict",
+            secure: true, // TODO: switch
+            sameSite: "lax", // strict だと直後に cookie を送信してくれない
           }
         ),
         Location: cookie.original_url ?? `/`,
@@ -548,16 +550,24 @@ const authRouter = Router()
       throw new Error("assertion error");
     }
     const res: Response = await router.handle(request, env, context, userId);
-    if (env.AUTH_TYPE === "github") {
-      res.headers.set(
-        "Set-Cookie",
-        Cookie.serialize("session", await encrypt(env.COOKIE_SECRET, userId), {
-          path: "/",
-          httpOnly: true,
-          maxAge: 60 * 60 * 24 * 7, // 1 week
-          sameSite: "strict",
-        })
-      );
+    switch (env.AUTH_TYPE) {
+      case "github":
+      case "slack": {
+        res.headers.set(
+          "Set-Cookie",
+          Cookie.serialize(
+            "session",
+            await encrypt(env.COOKIE_SECRET, userId),
+            {
+              path: "/",
+              httpOnly: true,
+              maxAge: 60 * 60 * 24 * 7, // 1 week
+              secure: true, // TODO: switch
+              sameSite: "strict",
+            }
+          )
+        );
+      }
     }
     return res;
   });
