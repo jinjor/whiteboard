@@ -1,4 +1,5 @@
 import Cookie from "cookie";
+import { User } from "../schema";
 import { decrypt, encrypt } from "./crypto";
 
 export class InvalidSession extends Error {}
@@ -25,10 +26,10 @@ export async function check(
   request: Request,
   oauth: OAuth,
   cookieSecret: string
-): Promise<Response | string> {
+): Promise<{ ok: true; user: User } | { ok: false; response: Response }> {
   const session = await getDecryptedSessionFromCookie(request, cookieSecret);
   if (session == null) {
-    return new Response(null, {
+    const response = new Response(null, {
       status: 302,
       headers: {
         "Set-Cookie": Cookie.serialize("original_url", request.url, {
@@ -41,15 +42,29 @@ export async function check(
         Location: oauth.getFormUrl(request),
       },
     });
+    return {
+      ok: false,
+      response,
+    };
   }
   try {
-    return await oauth.getUserIdFromSession(session);
+    const user = await oauth.getUserFromSession(session);
+    return {
+      ok: true,
+      user,
+    };
   } catch (e: unknown) {
     if (e instanceof InvalidSession) {
-      return new Response("Not found.", { status: 404 });
+      return {
+        ok: false,
+        response: new Response("Not found.", { status: 404 }),
+      };
     }
     if (e instanceof NotAMemberOfOrg) {
-      return new Response("Not a member of org.", { status: 403 });
+      return {
+        ok: false,
+        response: new Response("Not a member of org.", { status: 403 }),
+      };
     }
     throw e;
   }
@@ -101,7 +116,7 @@ export async function handleCallback(
 }
 export type OAuth = {
   getAuthType: () => string;
-  getUserIdFromSession(session: string): Promise<string>;
+  getUserFromSession(session: string): Promise<User>;
   getFormUrl(request: Request): string;
   getCodeFromCallback: (request: Request) => string | null;
   getAccessToken: (code: string) => Promise<string>;

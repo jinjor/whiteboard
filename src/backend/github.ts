@@ -1,3 +1,4 @@
+import { User } from "../schema";
 import {
   InvalidSession,
   NotAMemberOfOrg,
@@ -24,14 +25,23 @@ export class GitHubOAuth implements OAuth {
   getAuthType(): string {
     return "github";
   }
-  async getUserIdFromSession(session: string): Promise<string> {
-    if (!session.startsWith("gh/")) {
+  async getUserFromSession(session: string): Promise<User> {
+    let user: User;
+    try {
+      user = JSON.parse(session);
+    } catch (e) {
       throw new InvalidSession();
     }
-    if (session === "gh/_guest") {
+    if (user.id == null || user.image == null) {
+      throw new InvalidSession();
+    }
+    if (!user.id.startsWith("gh/")) {
+      throw new InvalidSession();
+    }
+    if (user.id === "gh/_guest") {
       throw new NotAMemberOfOrg();
     }
-    return session;
+    return user;
   }
   getFormUrl(): string {
     return makeFormUrl(this.clientId, OAUTH_SCOPE);
@@ -56,8 +66,10 @@ export class GitHubOAuth implements OAuth {
     const isMemberOfOrg = await isUserMemberOfOrg(accessToken, login, this.org);
     console.log("isMemberOfOrg:", isMemberOfOrg);
     // const userId = isMemberOfOrg ? "gh/" + login : "gh/_guest"; // "_guest" is an invalid github name
-    const userId = "gh/" + login; // TODO: for debug
-    return userId;
+    const id = "gh/" + login; // TODO: for debug
+    const image = `https://github.com/${login}.png`;
+    const user = { id, image };
+    return JSON.stringify(user);
   }
 }
 

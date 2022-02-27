@@ -1,3 +1,4 @@
+import { User } from "../schema";
 import { InvalidSession, OAuth, ReturnedScopeDoesNotMatch } from "./oauth";
 
 const OAUTH_SCOPE = "identity.basic";
@@ -17,11 +18,20 @@ export class SlackOAuth implements OAuth {
   getAuthType(): string {
     return "slack";
   }
-  async getUserIdFromSession(session: string): Promise<string> {
-    if (!session.startsWith("sl/")) {
+  async getUserFromSession(session: string): Promise<User> {
+    let user: User;
+    try {
+      user = JSON.parse(session);
+    } catch (e) {
       throw new InvalidSession();
     }
-    return session;
+    if (user.id == null || user.image == null) {
+      throw new InvalidSession();
+    }
+    if (!user.id.startsWith("sl/")) {
+      throw new InvalidSession();
+    }
+    return user;
   }
   getFormUrl(request: Request): string {
     const url = new URL(request.url);
@@ -43,10 +53,11 @@ export class SlackOAuth implements OAuth {
     return accessToken;
   }
   async createInitialSession(accessToken: string): Promise<string> {
-    const name = await getUserName(accessToken);
-    console.log("slack user name:", name);
-    const userId = "sl/" + name;
-    return userId;
+    const user = await getUser(accessToken);
+    console.log("slack user:", user);
+    const id = "sl/" + user.name;
+    const image = user.image_48 || "not_found in " + JSON.stringify(user); // TODO: for debug
+    return JSON.stringify({ id, image });
   }
 }
 
@@ -63,16 +74,15 @@ function makeFormUrl(
 
 // TODO: get id, name, avatar
 // https://api.slack.com/methods/users.identity
-async function getUserName(accessToken: string): Promise<string> {
+async function getUser(accessToken: string): Promise<any> {
   const res = await fetch(`https://slack.com/api/users.identity`, {
     headers: {
       Authorization: `Bearer ${accessToken}`,
     },
   });
   const data: any = await res.json();
-  // console.log(data);
   if (data.ok) {
-    return data.user.name;
+    return data.user;
   }
   throw new Error(JSON.stringify(data));
 }

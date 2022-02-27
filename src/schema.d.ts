@@ -87,3 +87,7 @@ export type RoomInfo = Room & {
   activeUntil: Timestamp;
   aliveUntil: Timestamp;
 };
+export type User = {
+  id: UserId;
+  image: string | null;
+};

@@ -15,7 +15,7 @@ import {
   MethodNotAllowedError,
   NotFoundError,
 } from "@cloudflare/kv-asset-handler";
-import { RoomInfo } from "../schema";
+import { RoomInfo, User } from "../schema";
 import { check, handleCallback, OAuth } from "./oauth";
 
 type Env = {
@@ -168,7 +168,7 @@ const apiRouter = Router({ base: "/api" })
       request: Request & { params: { roomName: string } },
       env: Env,
       context: ExecutionContext,
-      userId: string
+      user: User
     ) => {
       const roomName = request.params.roomName;
       let roomId;
@@ -196,7 +196,7 @@ const apiRouter = Router({ base: "/api" })
         headers: {
           Connection: "Upgrade",
           Upgrade: "websocket",
-          "WB-USER-ID": userId,
+          "WB-USER-ID": user.id,
         },
       });
     }
@@ -207,7 +207,7 @@ const apiRouter = Router({ base: "/api" })
       request: Request & { params: { roomName: string } },
       env: Env,
       context: ExecutionContext,
-      userId: string
+      user: User
     ) => {
       const roomName = request.params.roomName;
       let roomId;
@@ -414,39 +414,44 @@ const authRouter = Router()
     }
   })
   .all("*", async (request: Request, env: Env, context: ExecutionContext) => {
-    let userId;
+    let user: User;
     if (env.AUTH_TYPE === "header") {
-      userId = request.headers.get("WB-TEST-USER");
+      const userId = request.headers.get("WB-TEST-USER");
       if (userId == null) {
         throw new Error("missing WB-TEST-USER");
       }
+      user = { id: userId, image: null };
     } else if (env.AUTH_TYPE === "user_agent") {
       const userAgent = request.headers.get("User-Agent");
       if (!userAgent) {
         throw new Error("assertion error");
       }
       const hash = await digest(userAgent);
-      userId = "ua/" + hash.slice(0, 7);
-    } else if (env.AUTH_TYPE === "github") {
-      const oauth = new GitHubOAuth(env);
-      const res = await check(request, oauth, env.COOKIE_SECRET);
-      if (typeof res !== "string") {
-        return res;
+      const userId = "ua/" + hash.slice(0, 7);
+      user = { id: userId, image: null };
+    } else {
+      let oauth: OAuth;
+      switch (env.AUTH_TYPE) {
+        case "github": {
+          oauth = new GitHubOAuth(env);
+          break;
+        }
+        case "slack": {
+          oauth = new SlackOAuth(env);
+          break;
+        }
       }
-      userId = res;
-    } else if (env.AUTH_TYPE === "slack") {
-      const oauth = new SlackOAuth(env);
-      const res = await check(request, oauth, env.COOKIE_SECRET);
-      if (typeof res !== "string") {
-        return res;
+      const result = await check(request, oauth, env.COOKIE_SECRET);
+      if (!result.ok) {
+        return result.response;
       }
-      userId = res;
+      user = result.user;
     }
-    console.log("userId:", userId);
-    if (userId == null) {
+    console.log("user:", user);
+    if (user == null) {
       throw new Error("assertion error");
     }
-    const res: Response = await router.handle(request, env, context, userId);
+    const res: Response = await router.handle(request, env, context, user);
     preserveSession(request, res);
     return res;
   });
