@@ -240,18 +240,60 @@ const router = Router()
   .get("/assets/*", async (req: Request, env: Env, ctx: ExecutionContext) => {
     return getAsset(req, env, ctx, (path) => path.replace("/assets/", "/"));
   })
-  .get("/", async (req: Request, env: Env, ctx: ExecutionContext) => {
-    return getAsset(req, env, ctx, () => "/index.html");
-  })
-  .get("/rooms/:id", async (req: Request, env: Env, ctx: ExecutionContext) => {
-    return getAsset(req, env, ctx, () => "/room.html");
-  })
+  .get(
+    "/rooms/:roomName",
+    async (
+      request: Request & { params: { roomName: string } },
+      env: Env,
+      ctx: ExecutionContext
+    ) => {
+      const roomName = request.params.roomName;
+      const singletonId = env.manager.idFromName("singleton");
+      const managerStub = env.manager.get(singletonId);
+      let roomId;
+      try {
+        roomId = env.rooms.idFromString(roomName);
+      } catch (e) {
+        return getAsset(request, env, ctx, () => "/404.html");
+      }
+      const res = await managerStub.fetch(
+        "https://dummy-url/rooms/" + roomId.toString(),
+        request
+      );
+      if (res.status === 200) {
+        return getAsset(request, env, ctx, () => "/room.html");
+      }
+      return getAsset(request, env, ctx, () => "/404.html");
+    }
+  )
   .all("*", () => new Response("Not found.", { status: 404 }));
 
 const GITHUB_SCOPE = "read:org";
 const SLACK_SCOPE = "identity.basic";
 
 const authRouter = Router()
+  .get("/", async (req: Request, env: Env, ctx: ExecutionContext) => {
+    const cookie = Cookie.parse(req.headers.get("Cookie") ?? "");
+    const res = await getAsset(req, env, ctx, () => "/index.html");
+    if (cookie.session != null) {
+      switch (env.AUTH_TYPE) {
+        case "github":
+        case "slack": {
+          res.headers.set(
+            "Set-Cookie",
+            Cookie.serialize("session", cookie.session, {
+              path: "/",
+              httpOnly: true,
+              maxAge: 60 * 60 * 24 * 7, // 1 week
+              secure: true, // TODO: switch
+              sameSite: "strict",
+            })
+          );
+        }
+      }
+    }
+    return res;
+  })
   .get("/callback/github", async (request: Request, env: Env) => {
     if (env.AUTH_TYPE !== "github") {
       return new Response("Not found.", { status: 404 });

@@ -46,6 +46,8 @@ TODO:
 - ステータス表示を洗練させる
 - 部屋作成に失敗したらステータス・リミットを表示
 - 秘匿情報をロギングしない
+- ログアウト or revoke
+- HTML と JSON を正しく返し分ける
 - GitHub auth のアイコン
 - GitHub auth で org を optional に
 - GitHub 要らない説
