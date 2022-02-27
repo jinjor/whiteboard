@@ -237,9 +237,6 @@ const router = Router()
     debugRouter.handle
   )
   .all("/api/*", apiRouter.handle)
-  .get("/assets/*", async (req: Request, env: Env, ctx: ExecutionContext) => {
-    return getAsset(req, env, ctx, (path) => path.replace("/assets/", "/"));
-  })
   .get(
     "/rooms/:roomName",
     async (
@@ -293,6 +290,9 @@ const authRouter = Router()
       }
     }
     return res;
+  })
+  .get("/assets/*", async (req: Request, env: Env, ctx: ExecutionContext) => {
+    return getAsset(req, env, ctx, (path) => path.replace("/assets/", "/"));
   })
   .get("/callback/github", async (request: Request, env: Env) => {
     if (env.AUTH_TYPE !== "github") {
