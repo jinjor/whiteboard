@@ -1,4 +1,56 @@
-export function makeFormUrl(
+import { InvalidSession, OAuth, ReturnedScopeDoesNotMatch } from "./oauth";
+
+const OAUTH_SCOPE = "identity.basic";
+
+export class SlackOAuth implements OAuth {
+  private clientId: string;
+  private clientSecret: string;
+  constructor(env: {
+    AUTH_TYPE: "slack";
+    SLACK_CLIENT_ID: string;
+    SLACK_CLIENT_SECRET: string;
+  }) {
+    this.clientId = env.SLACK_CLIENT_ID;
+    this.clientSecret = env.SLACK_CLIENT_SECRET;
+  }
+  getAuthType(): string {
+    return "github";
+  }
+  async getUserIdFromSession(session: string): Promise<string> {
+    if (!session.startsWith("sl/")) {
+      throw new InvalidSession();
+    }
+    return session;
+  }
+  getFormUrl(): string {
+    const host = "whiteboard.jinjor.workers.dev"; // TODO
+    const redirectUrl = `https://${host}/callback/slack`;
+    // const redirectUrl = `http://localhost:8787/callback/slack`;
+    return makeFormUrl(this.clientId, OAUTH_SCOPE, redirectUrl);
+  }
+  getCodeFromCallback(request: Request): string | null {
+    return new URL(request.url).searchParams.get("code");
+  }
+  async getAccessToken(code: string): Promise<string> {
+    const { accessToken, scope } = await getAccessToken(
+      this.clientId,
+      this.clientSecret,
+      code
+    );
+    if (scope !== OAUTH_SCOPE) {
+      throw new ReturnedScopeDoesNotMatch();
+    }
+    return accessToken;
+  }
+  async createInitialSession(accessToken: string): Promise<string> {
+    const name = await getUserName(accessToken);
+    console.log("slack user name:", name);
+    const userId = "sl/" + name;
+    return userId;
+  }
+}
+
+function makeFormUrl(
   clientId: string,
   scope: string,
   redirect_uri: string
@@ -11,7 +63,7 @@ export function makeFormUrl(
 
 // TODO: get id, name, avatar
 // https://api.slack.com/methods/users.identity
-export async function getUserName(accessToken: string): Promise<string> {
+async function getUserName(accessToken: string): Promise<string> {
   const res = await fetch(`https://slack.com/api/users.identity`, {
     headers: {
       Authorization: `Bearer ${accessToken}`,
@@ -25,7 +77,7 @@ export async function getUserName(accessToken: string): Promise<string> {
   throw new Error(JSON.stringify(data));
 }
 
-export async function getAccessToken(
+async function getAccessToken(
   clientId: string,
   clientSecret: string,
   code: string

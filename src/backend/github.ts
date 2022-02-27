@@ -1,8 +1,71 @@
-export function makeFormUrl(clientId: string, scope: string): string {
+import {
+  InvalidSession,
+  NotAMemberOfOrg,
+  OAuth,
+  ReturnedScopeDoesNotMatch,
+} from "./oauth";
+
+const OAUTH_SCOPE = "read:org";
+
+export class GitHubOAuth implements OAuth {
+  private org: string;
+  private clientId: string;
+  private clientSecret: string;
+  constructor(env: {
+    AUTH_TYPE: "github";
+    GITHUB_CLIENT_ID: string;
+    GITHUB_CLIENT_SECRET: string;
+    GITHUB_ORG: string;
+  }) {
+    this.org = env.GITHUB_ORG;
+    this.clientId = env.GITHUB_CLIENT_ID;
+    this.clientSecret = env.GITHUB_CLIENT_SECRET;
+  }
+  getAuthType(): string {
+    return "github";
+  }
+  async getUserIdFromSession(session: string): Promise<string> {
+    if (!session.startsWith("gh/")) {
+      throw new InvalidSession();
+    }
+    if (session === "gh/_guest") {
+      throw new NotAMemberOfOrg();
+    }
+    return session;
+  }
+  getFormUrl(): string {
+    return makeFormUrl(this.clientId, OAUTH_SCOPE);
+  }
+  getCodeFromCallback(request: Request): string | null {
+    return new URL(request.url).searchParams.get("code");
+  }
+  async getAccessToken(code: string): Promise<string> {
+    const { accessToken, scope } = await getAccessToken(
+      this.clientId,
+      this.clientSecret,
+      code
+    );
+    if (scope !== OAUTH_SCOPE) {
+      throw new ReturnedScopeDoesNotMatch();
+    }
+    return accessToken;
+  }
+  async createInitialSession(accessToken: string): Promise<string> {
+    const login = await getUserLogin(accessToken);
+    console.log("login:", login);
+    const isMemberOfOrg = await isUserMemberOfOrg(accessToken, login, this.org);
+    console.log("isMemberOfOrg:", isMemberOfOrg);
+    // const userId = isMemberOfOrg ? "gh/" + login : "gh/_guest"; // "_guest" is an invalid github name
+    const userId = "gh/" + login; // TODO: for debug
+    return userId;
+  }
+}
+
+function makeFormUrl(clientId: string, scope: string): string {
   return `https://github.com/login/oauth/authorize?client_id=${clientId}&scope=${scope}`;
 }
 
-export async function getUserLogin(accessToken: string): Promise<string> {
+async function getUserLogin(accessToken: string): Promise<string> {
   const userRes = await fetch("https://api.github.com/user", {
     headers: {
       Accept: "application/vnd.github.v3+json",
@@ -14,7 +77,7 @@ export async function getUserLogin(accessToken: string): Promise<string> {
   return login;
 }
 
-export async function isUserBelongsOrg(
+async function isUserMemberOfOrg(
   accessToken: string,
   login: string,
   org: string
@@ -32,7 +95,7 @@ export async function isUserBelongsOrg(
   return membershipRes.status === 204;
 }
 
-export async function getAccessToken(
+async function getAccessToken(
   clientId: string,
   clientSecret: string,
   code: string

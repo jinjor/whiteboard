@@ -3,9 +3,9 @@ import manifest from "__STATIC_CONTENT_MANIFEST";
 // @ts-ignore
 import { Router } from "itty-router";
 import Cookie from "cookie";
-import { encrypt, decrypt, digest, hmacSha256 } from "./crypto";
-import * as github from "./github";
-import * as slack from "./slack";
+import { digest, hmacSha256 } from "./crypto";
+import { GitHubOAuth } from "./github";
+import { SlackOAuth } from "./slack";
 import { RoomPatch } from "./room-manager";
 export { RateLimiter } from "./rate-limiter";
 export { ChatRoom } from "./room";
@@ -16,6 +16,7 @@ import {
   NotFoundError,
 } from "@cloudflare/kv-asset-handler";
 import { RoomInfo } from "../schema";
+import { check, handleCallback, OAuth } from "./oauth";
 
 type Env = {
   manager: DurableObjectNamespace;
@@ -265,121 +266,30 @@ const router = Router()
   )
   .all("*", () => new Response("Not found.", { status: 404 }));
 
-const GITHUB_SCOPE = "read:org";
-const SLACK_SCOPE = "identity.basic";
-
 const authRouter = Router()
   .get("/", async (req: Request, env: Env, ctx: ExecutionContext) => {
-    const cookie = Cookie.parse(req.headers.get("Cookie") ?? "");
     const res = await getAsset(req, env, ctx, () => "/index.html");
-    if (cookie.session != null) {
-      switch (env.AUTH_TYPE) {
-        case "github":
-        case "slack": {
-          res.headers.set(
-            "Set-Cookie",
-            Cookie.serialize("session", cookie.session, {
-              path: "/",
-              httpOnly: true,
-              maxAge: 60 * 60 * 24 * 7, // 1 week
-              secure: true, // TODO: switch
-              sameSite: "strict",
-            })
-          );
-        }
-      }
-    }
+    preserveSession(req, res);
     return res;
   })
   .get("/assets/*", async (req: Request, env: Env, ctx: ExecutionContext) => {
     return getAsset(req, env, ctx, (path) => path.replace("/assets/", "/"));
   })
-  .get("/callback/github", async (request: Request, env: Env) => {
-    if (env.AUTH_TYPE !== "github") {
-      return new Response("Not found.", { status: 404 });
+  .get("/callback/*", async (request: Request, env: Env) => {
+    let auth: OAuth;
+    switch (env.AUTH_TYPE) {
+      case "github": {
+        auth = new GitHubOAuth(env);
+        break;
+      }
+      case "slack": {
+        auth = new SlackOAuth(env);
+      }
+      default: {
+        return new Response("Not found.", { status: 404 });
+      }
     }
-    const cookie = Cookie.parse(request.headers.get("Cookie") ?? "");
-    const code = new URL(request.url).searchParams.get("code");
-    if (code == null) {
-      return new Response("Not found.", { status: 404 });
-    }
-    const { accessToken, scope } = await github.getAccessToken(
-      env.GITHUB_CLIENT_ID,
-      env.GITHUB_CLIENT_SECRET,
-      code
-    );
-    if (scope !== GITHUB_SCOPE) {
-      return new Response("Not found.", { status: 404 });
-    }
-    const login = await github.getUserLogin(accessToken);
-    console.log("login:", login);
-    const isMemberOfOrg = await github.isUserBelongsOrg(
-      accessToken,
-      login,
-      env.GITHUB_ORG
-    );
-    console.log("isMemberOfOrg:", isMemberOfOrg);
-    // const userId = isMemberOfOrg ? "gh/" + login : "_guest"; // "_guest" is an invalid github name
-    const userId = "gh/" + login; // TODO: for debug
-
-    const res = new Response(null, {
-      status: 302,
-      headers: {
-        "Set-Cookie": Cookie.serialize(
-          "session",
-          await encrypt(env.COOKIE_SECRET, userId),
-          {
-            path: "/",
-            httpOnly: true,
-            maxAge: 60 * 60 * 24 * 7, // 1 week
-            secure: true, // TODO: switch
-            sameSite: "lax", // strict だと直後に cookie を送信してくれない
-          }
-        ),
-        Location: cookie.original_url ?? `/`,
-      },
-    });
-    return res;
-  })
-  .get("/callback/slack", async (request: Request, env: Env) => {
-    if (env.AUTH_TYPE !== "slack") {
-      return new Response("Not found.", { status: 404 });
-    }
-    const cookie = Cookie.parse(request.headers.get("Cookie") ?? "");
-    const code = new URL(request.url).searchParams.get("code");
-    if (code == null) {
-      return new Response("Not found.", { status: 404 });
-    }
-    const { accessToken, scope } = await slack.getAccessToken(
-      env.SLACK_CLIENT_ID,
-      env.SLACK_CLIENT_SECRET,
-      code
-    );
-    if (scope !== SLACK_SCOPE) {
-      return new Response("Not found.", { status: 404 });
-    }
-    const name = await slack.getUserName(accessToken);
-    console.log("slack user name:", name);
-    const userId = "sl/" + name;
-
-    const res = new Response(null, {
-      status: 302,
-      headers: {
-        "Set-Cookie": Cookie.serialize(
-          "session",
-          await encrypt(env.COOKIE_SECRET, userId),
-          {
-            path: "/",
-            httpOnly: true,
-            maxAge: 60 * 60 * 24 * 7, // 1 week
-            secure: true, // TODO: switch
-            sameSite: "lax", // strict だと直後に cookie を送信してくれない
-          }
-        ),
-        Location: cookie.original_url ?? `/`,
-      },
-    });
-    return res;
+    return await handleCallback(request, auth, env.COOKIE_SECRET);
   })
   .post("/app/slack", async (request: Request, env: Env) => {
     if (env.SLACK_APP !== "true") {
@@ -519,97 +429,45 @@ const authRouter = Router()
       const hash = await digest(userAgent);
       userId = "ua/" + hash.slice(0, 7);
     } else if (env.AUTH_TYPE === "github") {
-      const cookie = Cookie.parse(request.headers.get("Cookie") ?? "");
-      console.log("cookie:", cookie);
-      if (cookie.session != null) {
-        try {
-          const decrypted = await decrypt(env.COOKIE_SECRET, cookie.session);
-          if (decrypted.startsWith("gh/")) {
-            userId = decrypted;
-          }
-        } catch (e) {}
+      const oauth = new GitHubOAuth(env);
+      const res = await check(request, oauth, env.COOKIE_SECRET);
+      if (typeof res !== "string") {
+        return res;
       }
-      if (userId == null) {
-        return new Response(null, {
-          status: 302,
-          headers: {
-            "Set-Cookie": Cookie.serialize("original_url", request.url, {
-              path: "/",
-              httpOnly: true,
-              maxAge: 60,
-              secure: true, // TODO: switch
-              sameSite: "strict",
-            }),
-            Location: github.makeFormUrl(env.GITHUB_CLIENT_ID, GITHUB_SCOPE),
-          },
-        });
-      }
-      if (userId === "_guest") {
-        return new Response("Not a member of org.", { status: 403 });
-      }
+      userId = res;
     } else if (env.AUTH_TYPE === "slack") {
-      const cookie = Cookie.parse(request.headers.get("Cookie") ?? "");
-      console.log("cookie:", cookie);
-      if (cookie.session != null) {
-        try {
-          const decrypted = await decrypt(env.COOKIE_SECRET, cookie.session);
-          if (decrypted.startsWith("sl/")) {
-            userId = decrypted;
-          }
-        } catch (e) {}
+      const oauth = new SlackOAuth(env);
+      const res = await check(request, oauth, env.COOKIE_SECRET);
+      if (typeof res !== "string") {
+        return res;
       }
-      if (userId == null) {
-        const host = "whiteboard.jinjor.workers.dev"; // TODO
-        const redirectUrl = `https://${host}/callback/slack`;
-        // const redirectUrl = `http://localhost:8787/callback/slack`;
-        return new Response(null, {
-          status: 302,
-          headers: {
-            "Set-Cookie": Cookie.serialize("original_url", request.url, {
-              path: "/",
-              httpOnly: true,
-              maxAge: 60,
-              secure: true, // TODO: switch
-              sameSite: "strict",
-            }),
-            Location: slack.makeFormUrl(
-              env.SLACK_CLIENT_ID,
-              SLACK_SCOPE,
-              redirectUrl
-            ),
-          },
-        });
-      }
-      if (userId === "_guest") {
-        return new Response("Not a member of org.", { status: 403 });
-      }
+      userId = res;
     }
     console.log("userId:", userId);
     if (userId == null) {
       throw new Error("assertion error");
     }
     const res: Response = await router.handle(request, env, context, userId);
-    switch (env.AUTH_TYPE) {
-      case "github":
-      case "slack": {
-        res.headers.set(
-          "Set-Cookie",
-          Cookie.serialize(
-            "session",
-            await encrypt(env.COOKIE_SECRET, userId),
-            {
-              path: "/",
-              httpOnly: true,
-              maxAge: 60 * 60 * 24 * 7, // 1 week
-              secure: true, // TODO: switch
-              sameSite: "strict",
-            }
-          )
-        );
-      }
-    }
+    preserveSession(request, res);
     return res;
   });
+
+function preserveSession(req: Request, res: Response): void {
+  const cookie = Cookie.parse(req.headers.get("Cookie") ?? "");
+  if (cookie.session == null) {
+    return;
+  }
+  res.headers.set(
+    "Set-Cookie",
+    Cookie.serialize("session", cookie.session, {
+      path: "/",
+      httpOnly: true,
+      maxAge: 60 * 60 * 24 * 7, // 1 week
+      secure: true, // TODO: switch
+      sameSite: "strict",
+    })
+  );
+}
 
 function isEnvValid(env: Env): boolean {
   let ok = true;
