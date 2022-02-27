@@ -5,6 +5,7 @@ const OAUTH_SCOPE = "identity.basic";
 export class SlackOAuth implements OAuth {
   private clientId: string;
   private clientSecret: string;
+
   constructor(env: {
     AUTH_TYPE: "slack";
     SLACK_CLIENT_ID: string;
@@ -14,7 +15,7 @@ export class SlackOAuth implements OAuth {
     this.clientSecret = env.SLACK_CLIENT_SECRET;
   }
   getAuthType(): string {
-    return "github";
+    return "slack";
   }
   async getUserIdFromSession(session: string): Promise<string> {
     if (!session.startsWith("sl/")) {
@@ -22,10 +23,9 @@ export class SlackOAuth implements OAuth {
     }
     return session;
   }
-  getFormUrl(): string {
-    const host = "whiteboard.jinjor.workers.dev"; // TODO
-    const redirectUrl = `https://${host}/callback/slack`;
-    // const redirectUrl = `http://localhost:8787/callback/slack`;
+  getFormUrl(request: Request): string {
+    const url = new URL(request.url);
+    const redirectUrl = `${url.origin}/callback/slack`;
     return makeFormUrl(this.clientId, OAUTH_SCOPE, redirectUrl);
   }
   getCodeFromCallback(request: Request): string | null {

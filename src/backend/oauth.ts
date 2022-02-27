@@ -38,7 +38,7 @@ export async function check(
           secure: true, // TODO: switch
           sameSite: "strict",
         }),
-        Location: oauth.getFormUrl(),
+        Location: oauth.getFormUrl(request),
       },
     });
   }
@@ -102,7 +102,7 @@ export async function handleCallback(
 export type OAuth = {
   getAuthType: () => string;
   getUserIdFromSession(session: string): Promise<string>;
-  getFormUrl(): string;
+  getFormUrl(request: Request): string;
   getCodeFromCallback: (request: Request) => string | null;
   getAccessToken: (code: string) => Promise<string>;
   createInitialSession: (accessToken: string) => Promise<string>;

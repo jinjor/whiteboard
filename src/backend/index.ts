@@ -337,8 +337,7 @@ const authRouter = Router()
         );
         const blocks = [];
         if (res.status === 200) {
-          const host = "whiteboard.jinjor.workers.dev"; // TODO
-          const url = `https://${host}/rooms/${roomId}`;
+          const url = `${new URL(request.url).origin}/rooms/${roomId}`;
           blocks.push({
             type: "section",
             text: {
