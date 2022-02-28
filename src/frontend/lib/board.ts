@@ -1,7 +1,6 @@
 import {
   ObjectBody,
   ObjectId,
-  PatchEventBody,
   PathBody,
   Position,
   TextBody,

@@ -1,7 +1,7 @@
 import { User } from "../schema";
 import { InvalidSession, OAuth, ReturnedScopeDoesNotMatch } from "./oauth";
 
-const OAUTH_SCOPE = "identity.basic";
+const OAUTH_SCOPE = "identity.basic,identity.avatar";
 
 export class SlackOAuth implements OAuth {
   private clientId: string;

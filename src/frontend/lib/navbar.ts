@@ -13,7 +13,7 @@ export function updateStatus(
 
 export function addMember(member: User, self: boolean): void {
   const membersEl = document.getElementById("members")!;
-  const [prefix, name] = member.id.split("/");
+  const [, name] = member.id.split("/");
   let element = document.getElementById(member.id);
   if (element != null) {
     return;
@@ -26,7 +26,8 @@ export function addMember(member: User, self: boolean): void {
     element.classList.add("self");
   }
   if (member.image != null) {
-    element.style.backgroundImage = member.image;
+    element.style.backgroundImage = `url(${member.image})`;
+    element.style.backgroundSize = "cover";
   } else {
     element.textContent = name.slice(0, 2);
   }
