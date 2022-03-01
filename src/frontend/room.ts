@@ -92,6 +92,9 @@ type PageInfo = {
   wsRoot: string;
 };
 
+const touchDevice =
+  window.ontouchstart != null || window.navigator.maxTouchPoints > 0;
+
 function getPageInfo(): PageInfo {
   const { host, protocol, pathname } = window.location;
   const splitted = pathname.split("/");
@@ -596,6 +599,33 @@ function listenToKeyboardEvents(state: State): () => void {
     window.onkeydown = null;
   };
 }
+function listenToShortcutButtons(state: State): () => void {
+  const undoButton = document.getElementById("undo")!;
+  const redoButton = document.getElementById("redo")!;
+  const selectButton = document.getElementById("select")!;
+  const deleteButton = document.getElementById("delete")!;
+  undoButton.onclick = () => {
+    undo(state);
+    syncCursorAndButtons(state);
+  };
+  redoButton.onclick = () => {
+    redo(state);
+    syncCursorAndButtons(state);
+  };
+  selectButton.onclick = () => {
+    selectButton.classList.add("select");
+  };
+  deleteButton.onclick = () => {
+    deleteSelectedObjects(state);
+    syncCursorAndButtons(state);
+  };
+  return () => {
+    undoButton.onclick = null;
+    redoButton.onclick = null;
+    selectButton.onclick = null;
+    deleteButton.onclick = null;
+  };
+}
 function updateInputElementPosition(state: State): void {
   if (state.editing.kind === "text") {
     const ppos = toPixelPosition(
@@ -650,9 +680,13 @@ function listenToBoard(state: State): () => void {
           }
         }
       }
-      syncCursor(state);
+      syncCursorAndButtons(state);
     },
     touchStart: (npos) => {
+      if (document.getElementById("select")!.classList.contains("select")) {
+        startSelecting(state, npos);
+        return;
+      }
       if (state.selected.length > 0) {
         return startMoving(state, npos);
       }
@@ -664,6 +698,15 @@ function listenToBoard(state: State): () => void {
       return startDrawing(state, npos);
     },
     touchStartLong: (npos) => {
+      if (document.getElementById("select")!.classList.contains("select")) {
+        return;
+      }
+      if (state.editing.kind === "select") {
+        return;
+      }
+      if (state.selected.length > 0) {
+        return;
+      }
       createText(state, npos);
     },
     mouseMove: (npos) => {
@@ -681,7 +724,7 @@ function listenToBoard(state: State): () => void {
           break;
         }
       }
-      syncCursor(state);
+      syncCursorAndButtons(state);
     },
     touchMove: (npos) => {
       switch (state.editing.kind) {
@@ -695,6 +738,7 @@ function listenToBoard(state: State): () => void {
           return continueSelecting(state, npos);
         }
       }
+      syncCursorAndButtons(state);
     },
     mouseUp: (npos) => {
       switch (state.editing.kind) {
@@ -711,7 +755,7 @@ function listenToBoard(state: State): () => void {
           break;
         }
       }
-      syncCursor(state);
+      syncCursorAndButtons(state);
     },
     touchEnd: (npos) => {
       switch (state.editing.kind) {
@@ -728,15 +772,38 @@ function listenToBoard(state: State): () => void {
           break;
         }
       }
-      syncCursor(state);
+      syncCursorAndButtons(state);
     },
   });
 }
-function syncCursor(state: State) {
+function syncCursorAndButtons(state: State) {
   if (state.editing.kind !== "select" && state.selected.length > 0) {
     state.svgEl.style.cursor = "move";
   } else {
     state.svgEl.style.removeProperty("cursor");
+  }
+  if (!touchDevice) {
+    return;
+  }
+  if (state.editing.kind !== "select") {
+    document.getElementById("select")!.classList.remove("select");
+  }
+  if (state.selected.length > 0) {
+    document.getElementById("select")!.classList.add("hidden");
+    document.getElementById("delete")!.classList.remove("hidden");
+  } else {
+    document.getElementById("select")!.classList.remove("hidden");
+    document.getElementById("delete")!.classList.add("hidden");
+  }
+  if (state.undos.length > 0) {
+    (document.getElementById("undo")! as HTMLButtonElement).disabled = false;
+  } else {
+    (document.getElementById("undo")! as HTMLButtonElement).disabled = true;
+  }
+  if (state.redos.length > 0) {
+    (document.getElementById("redo")! as HTMLButtonElement).disabled = false;
+  } else {
+    (document.getElementById("redo")! as HTMLButtonElement).disabled = true;
   }
 }
 
@@ -754,7 +821,12 @@ function initBoard(o: BoardOptions): void {
     "stroke-width",
     String(o.selectorStrokeWidth)
   );
-  document.getElementById("help")!.classList.remove("hidden");
+  if (touchDevice) {
+    document.getElementById("help-touch")!.classList.remove("hidden");
+    document.getElementById("shortcut-buttons")!.classList.remove("hidden");
+  } else {
+    document.getElementById("help")!.classList.remove("hidden");
+  }
 }
 
 (async () => {
@@ -798,11 +870,13 @@ function initBoard(o: BoardOptions): void {
       const unlistenInput = listenToInputEvents(state);
       const unlistenWindow = listenToWindowEvents(state);
       const unlistenKeyboard = listenToKeyboardEvents(state);
+      const unlistenShortcutButtons = listenToShortcutButtons(state);
       connect(pageInfo, state, () => {
         unlistenBoard();
         unlistenInput();
         unlistenWindow();
         unlistenKeyboard();
+        unlistenShortcutButtons();
       });
     }
   } else {

@@ -33,6 +33,7 @@ UI
 - https://developers.cloudflare.com/workers/tutorials/build-a-slackbot
 
 TODO:
+- エッジケースのバグ除去とリファクタリング
 - 文字がずれる問題
 - 選択中に切断したら選択解除
 - タッチデバイス操作
