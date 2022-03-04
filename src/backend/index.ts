@@ -101,6 +101,24 @@ const debugRouter = Router({ base: "/debug" })
       body: JSON.stringify(config),
     });
   })
+  .patch(
+    "/rooms/:roomName/config",
+    async (request: Request & { params: { roomName: string } }, env: Env) => {
+      const config = await request.json();
+      const roomName = request.params.roomName;
+      let roomId;
+      try {
+        roomId = env.rooms.idFromString(roomName);
+      } catch (e) {
+        return new Response("Not found.", { status: 404 });
+      }
+      const roomStub = env.rooms.get(roomId);
+      return roomStub.fetch("https://dummy-url/config", {
+        method: "PATCH",
+        body: JSON.stringify(config),
+      });
+    }
+  )
   .post("/clean", async (request: Request, env: Env) => {
     await clean(env);
     return new Response();

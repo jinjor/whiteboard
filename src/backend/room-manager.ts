@@ -1,9 +1,6 @@
 import { Router } from "itty-router";
 import { Room, RoomInfo } from "../schema";
-
-const MAX_ACTIVE_ROOMS = 10;
-const LIVE_DURATION = 7 * 24 * 60 * 60 * 1000;
-const ACTIVE_DURATION = 24 * 60 * 60 * 1000;
+import { Config, defaultConfig } from "./config";
 
 export type RoomPatch = {
   id: string;
@@ -13,20 +10,14 @@ export type RoomPatch = {
 
 class RoomManagerState {
   private storage: DurableObjectStorage;
-  private MAX_ACTIVE_ROOMS;
-  private LIVE_DURATION;
-  private ACTIVE_DURATION;
+  private MAX_ACTIVE_ROOMS!: number;
+  private LIVE_DURATION!: number;
+  private ACTIVE_DURATION!: number;
   constructor(storage: DurableObjectStorage) {
     this.storage = storage;
-    this.MAX_ACTIVE_ROOMS = MAX_ACTIVE_ROOMS;
-    this.LIVE_DURATION = LIVE_DURATION;
-    this.ACTIVE_DURATION = ACTIVE_DURATION;
+    this.updateConfig(defaultConfig);
   }
-  async updateConfig(config: {
-    MAX_ACTIVE_ROOMS?: number;
-    LIVE_DURATION?: number;
-    ACTIVE_DURATION?: number;
-  }): Promise<void> {
+  updateConfig(config: Partial<Config>): void {
     if (config.MAX_ACTIVE_ROOMS != null) {
       this.MAX_ACTIVE_ROOMS = config.MAX_ACTIVE_ROOMS;
     }
@@ -109,9 +100,7 @@ class RoomManagerState {
     }
   }
   async reset(): Promise<void> {
-    this.MAX_ACTIVE_ROOMS = MAX_ACTIVE_ROOMS;
-    this.LIVE_DURATION = LIVE_DURATION;
-    this.ACTIVE_DURATION = ACTIVE_DURATION;
+    this.updateConfig(defaultConfig);
     await this.storage.deleteAll();
   }
 }

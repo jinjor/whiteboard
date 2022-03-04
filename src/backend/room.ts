@@ -2,14 +2,18 @@ import { Router } from "itty-router";
 import { RateLimiterClient } from "./rate-limiter";
 import { applyEvent, InvalidEvent, validateEvent } from "./object";
 import { Objects, User, UserId } from "../schema";
+import { Config, defaultConfig } from "./config";
 
 type Env = {
   limiters: DurableObjectNamespace;
 };
 
-const MAX_ACTIVE_USERS = 10;
-
 const roomRouter = Router()
+  .patch("/config", async (request: Request, state: RoomState) => {
+    const config = await request.json();
+    await state.updateConfig(config as any);
+    return new Response("null", { status: 200 });
+  })
   .post("/deactivate", async (request: Request, state: RoomState) => {
     await state.disconnectAllSessions();
     return new Response("null", { status: 200 });
@@ -47,14 +51,24 @@ class RoomState {
   private env: Env;
   private sessions: Session[];
   private lastTimestamp: number;
+  private HOT_DURATION!: number;
+  private MAX_ACTIVE_USERS!: number;
   constructor(controller: any, env: Env) {
     this.storage = controller.storage;
     this.env = env;
     this.sessions = [];
     // 同時にメッセージが来てもタイムスタンプを単調増加にするための仕掛け
     this.lastTimestamp = 0;
+    this.updateConfig(defaultConfig);
   }
-
+  updateConfig(config: Partial<Config>): void {
+    if (config.HOT_DURATION != null) {
+      this.HOT_DURATION = config.HOT_DURATION;
+    }
+    if (config.MAX_ACTIVE_USERS != null) {
+      this.MAX_ACTIVE_USERS = config.MAX_ACTIVE_USERS;
+    }
+  }
   async disconnectAllSessions() {
     while (this.sessions.length > 0) {
       const session = this.sessions.pop()!;
@@ -65,7 +79,7 @@ class RoomState {
     if (this.sessions.some((session) => session.user.id === userId)) {
       return true;
     }
-    return this.sessions.length < MAX_ACTIVE_USERS;
+    return this.sessions.length < this.MAX_ACTIVE_USERS;
   }
   private newUniqueTimestamp(): number {
     // 単調増加になるように細工する

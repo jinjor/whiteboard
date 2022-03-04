@@ -20,6 +20,20 @@ entry-point = "./dist"
 [triggers]
 crons = ["*/10 * * * *"]
 
+[vars]
+HOGE = "hoge"
+FUGA = "fuga"
+
+# [env.production]
+# name = "my-worker-production"
+[env.production.vars]
+HOGE = "hogehoge"
+FUGA = "fugafuga"
+
+[env.dev.vars]
+HOGE = "hogehoge"
+FUGA = "fugafuga"
+
 [durable_objects]
 bindings = [
   { name = "manager", class_name = "RoomManager" },
