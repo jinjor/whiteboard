@@ -5,6 +5,7 @@ import { setTimeout } from "timers/promises";
 import kill from "tree-kill";
 import WebSocket from "ws";
 import { deepEqual } from "../src/deep-equal";
+import { Config } from "../src/backend/config";
 
 const port = "8787";
 const httpRoot = `http://localhost:${port}`;
@@ -25,12 +26,15 @@ async function request(
   }
   return await fetch(httpRoot + path, init);
 }
-async function config(options: {
-  MAX_ACTIVE_ROOMS?: number;
-  ACTIVE_DURATION?: number;
-  LIVE_DURATION?: number;
-}): Promise<void> {
+async function config(options: Partial<Config>): Promise<void> {
   const res = await request("PATCH", "/debug/config", options);
+  assert.strictEqual(res.status, 200);
+}
+async function roomConfig(
+  roomId: string,
+  options: Partial<Config>
+): Promise<void> {
+  const res = await request("PATCH", `/debug/rooms/${roomId}/config`, options);
   assert.strictEqual(res.status, 200);
 }
 async function clean(): Promise<void> {
@@ -232,43 +236,59 @@ describe("Whiteboard", function () {
       await useWebsocket("a", `/api/rooms/${id}/websocket`, async () => {});
     });
   });
-  it("closes all connections when a room is deactivated", async function () {
+  it("closes all connections with 1001 when a room is deactivated", async function () {
     const ACTIVE_DURATION = 1000;
     await config({
       ACTIVE_DURATION,
     });
     const id = await createRoom();
     const queue = [];
-    await useWebsocket("a", `/api/rooms/${id}/websocket`, async () => {
-      await setTimeout(ACTIVE_DURATION);
-      await clean();
-      await setTimeout(500);
-      queue.push("b");
+    const code = await useWebsocket(
+      "a",
+      `/api/rooms/${id}/websocket`,
+      async () => {
+        await setTimeout(ACTIVE_DURATION);
+        await clean();
+        await setTimeout(500);
+        queue.push("b");
+      }
+    ).catch((e) => {
+      const { code } = JSON.parse(e.message);
+      return code;
     });
     queue.push("a");
     while (queue.length < 2) {
       await setTimeout(100);
     }
     assert.deepStrictEqual(queue, ["a", "b"]);
+    assert.strictEqual(code, 1001);
   });
-  it("closes all connections when a room is deleted", async function () {
+  it("closes all connections with 1001 when a room is deleted", async function () {
     const LIVE_DURATION = 1000; // < ACTIVE_DURATION
     await config({
       LIVE_DURATION,
     });
     const id = await createRoom();
     const queue = [];
-    await useWebsocket("a", `/api/rooms/${id}/websocket`, async () => {
-      await setTimeout(LIVE_DURATION);
-      await clean();
-      await setTimeout(500);
-      queue.push("b");
+    const code = await useWebsocket(
+      "a",
+      `/api/rooms/${id}/websocket`,
+      async () => {
+        await setTimeout(LIVE_DURATION);
+        await clean();
+        await setTimeout(500);
+        queue.push("b");
+      }
+    ).catch((e) => {
+      const { code } = JSON.parse(e.message);
+      return code;
     });
     queue.push("a");
     while (queue.length < 2) {
       await setTimeout(100);
     }
     assert.deepStrictEqual(queue, ["a", "b"]);
+    assert.strictEqual(code, 1001);
   });
   it("does not allow users to make multiple connections in a room", async function () {
     const id = await createRoom();
@@ -607,6 +627,72 @@ describe("Whiteboard", function () {
     }
     // TODO: deactivate, kill
   });
+  it("closes all connections with 1001 when room becomes not hot", async function () {
+    const roomId = await createRoom();
+    await roomConfig(roomId, {
+      HOT_DURATION: 1000,
+    });
+    let i = 0;
+    const sendSomething = (ws: WebSocket) => {
+      ws.send(
+        JSON.stringify({
+          kind: "add",
+          object: {
+            id: String(++i).padStart(32, "0"),
+            kind: "text",
+            text: "foo",
+            position: { x: 0, y: 0 },
+          },
+        })
+      );
+    };
+    const received: any[] = [];
+    const p1 = useWebsocket(
+      "receiver",
+      `/api/rooms/${roomId}/websocket`,
+      async (ws: WebSocket) => {
+        ws.on("message", (event: string) => {
+          received.push(JSON.parse(event));
+        });
+        await setTimeout(5000);
+      }
+    ).catch((e) => {
+      const { code } = JSON.parse(e.message);
+      return code;
+    });
+    const p2 = useWebsocket(
+      "sender",
+      `/api/rooms/${roomId}/websocket`,
+      async (ws: WebSocket) => {
+        await setTimeout(100);
+        sendSomething(ws); // 1
+        await setTimeout(500);
+        await clean();
+        sendSomething(ws); // 2
+        await setTimeout(500);
+        await clean();
+        sendSomething(ws); // 3
+        await setTimeout(500);
+        await clean();
+        sendSomething(ws); // 4
+        await setTimeout(500);
+        await clean();
+        sendSomething(ws); // 5
+        await setTimeout(2000);
+        await clean();
+        sendSomething(ws); // 6
+        await setTimeout(500);
+      }
+    ).catch((e) => {
+      const { code } = JSON.parse(e.message);
+      return code;
+    });
+    const [code1, code2] = await Promise.all([p1, p2]);
+    assert.strictEqual(code1, 1001);
+    assert.strictEqual(code2, 1001);
+    assert.strictEqual(filterEditingEvents(received).length, 5);
+  });
+
   describe("`add` event", function () {
     const event = {
       kind: "add",

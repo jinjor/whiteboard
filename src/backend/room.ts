@@ -18,6 +18,10 @@ const roomRouter = Router()
     await state.disconnectAllSessions();
     return new Response("null", { status: 200 });
   })
+  .post("/cooldown", async (request: Request, state: RoomState) => {
+    await state.cooldown();
+    return new Response("null", { status: 200 });
+  })
   .get("/websocket", async (request: Request, state: RoomState) => {
     if (request.headers.get("Upgrade") !== "websocket") {
       return new Response("expected websocket", { status: 400 });
@@ -58,7 +62,7 @@ class RoomState {
     this.env = env;
     this.sessions = [];
     // 同時にメッセージが来てもタイムスタンプを単調増加にするための仕掛け
-    this.lastTimestamp = 0;
+    this.lastTimestamp = Date.now();
     this.updateConfig(defaultConfig);
   }
   updateConfig(config: Partial<Config>): void {
@@ -72,7 +76,12 @@ class RoomState {
   async disconnectAllSessions() {
     while (this.sessions.length > 0) {
       const session = this.sessions.pop()!;
-      session.webSocket.close(1000);
+      session.webSocket.close(1001);
+    }
+  }
+  async cooldown() {
+    if (Date.now() - this.lastTimestamp > this.HOT_DURATION) {
+      this.disconnectAllSessions();
     }
   }
   canStart(userId: string): boolean {

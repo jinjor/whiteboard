@@ -41,7 +41,6 @@ TODO:
 - 常に UA でユーザーを分ける？
 - OS でヘルプ表示を変える
 - Slack のマークダウン
-- 誰も編集しないと接続が切れる仕様の実装
 - ステータス表示を洗練させる
 - 部屋作成に失敗したらステータス・リミットを表示
 - 秘匿情報をロギングしない
@@ -50,7 +49,6 @@ TODO:
 - GitHub auth のアイコン
 - GitHub auth で org を optional に
 - GitHub 要らない説
-- env で期限も変える？
 - dev 環境
 - updatedAt, updatedBy 要らないかも
 - キャプチャ
