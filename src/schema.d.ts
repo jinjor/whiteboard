@@ -49,12 +49,12 @@ export type DeleteEventBody = {
 export type InitEventBody = {
   kind: "init";
   objects: Objects;
-  members: User[];
+  members: SessionUser[];
   self: UserId;
 };
 export type JoinEventBody = {
   kind: "join";
-  user: User;
+  user: SessionUser;
 };
 export type QuitEventBody = {
   kind: "quit";
@@ -89,5 +89,12 @@ export type RoomInfo = Room & {
 };
 export type User = {
   id: UserId;
+  name: string;
+  image: string | null;
+};
+export type SessionUserId = string;
+export type SessionUser = {
+  id: SessionUserId;
+  name: string;
   image: string | null;
 };

@@ -1,7 +1,7 @@
 import { Router } from "itty-router";
 import { RateLimiterClient } from "./rate-limiter";
 import { applyEvent, InvalidEvent, validateEvent } from "./object";
-import { Objects, User, UserId } from "../schema";
+import { Objects, SessionUser, UserId } from "../schema";
 import { Config, defaultConfig } from "./config";
 
 type Env = {
@@ -27,8 +27,13 @@ const roomRouter = Router()
       return new Response("expected websocket", { status: 400 });
     }
     const userId = request.headers.get("WB-USER-ID")!;
+    const userName = request.headers.get("WB-USER-NAME")!;
     const userImage = request.headers.get("WB-USER-IMAGE")!;
-    const user = { id: userId, image: userImage || null };
+    const user: SessionUser = {
+      id: userId,
+      name: userName,
+      image: userImage || null,
+    };
     if (!state.canStart(userId)) {
       return new Response("room is full", { status: 403 });
     }
@@ -45,7 +50,7 @@ const roomRouter = Router()
   .all("*", () => new Response("Not found.", { status: 404 }));
 
 type Session = {
-  user: User;
+  user: SessionUser;
   quit: boolean;
   webSocket: WebSocket;
 };
@@ -104,7 +109,7 @@ class RoomState {
     }
     return objects as Objects;
   }
-  async handleSession(webSocket: WebSocket, user: User): Promise<void> {
+  async handleSession(webSocket: WebSocket, user: SessionUser): Promise<void> {
     webSocket.accept();
 
     const limiterId = this.env.limiters.idFromName(user.id);

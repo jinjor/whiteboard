@@ -15,7 +15,7 @@ import {
   MethodNotAllowedError,
   NotFoundError,
 } from "@cloudflare/kv-asset-handler";
-import { RoomInfo, User } from "../schema";
+import { RoomInfo, SessionUser, User } from "../schema";
 import { check, handleCallback, OAuth } from "./oauth";
 
 type Env = {
@@ -215,6 +215,7 @@ const apiRouter = Router({ base: "/api" })
           Connection: "Upgrade",
           Upgrade: "websocket",
           "WB-USER-ID": user.id,
+          "WB-USER-NAME": user.name,
           "WB-USER-IMAGE": user.image ?? "",
         },
       });
@@ -433,21 +434,17 @@ const authRouter = Router()
     }
   })
   .all("*", async (request: Request, env: Env, context: ExecutionContext) => {
-    let user: User;
+    let user: SessionUser;
     if (env.AUTH_TYPE === "header") {
       const userId = request.headers.get("WB-TEST-USER");
       if (userId == null) {
         throw new Error("missing WB-TEST-USER");
       }
-      user = { id: userId, image: null };
+      user = { id: userId, name: userId, image: null };
     } else if (env.AUTH_TYPE === "user_agent") {
-      const userAgent = request.headers.get("User-Agent");
-      if (!userAgent) {
-        throw new Error("assertion error");
-      }
-      const hash = await digest(userAgent);
-      const userId = "ua/" + hash.slice(0, 7);
-      user = { id: userId, image: null };
+      const uaHash = await getUserAgentHash(request);
+      const userId = "ua/" + uaHash.slice(0, 7);
+      user = { id: userId, name: userId, image: null };
     } else {
       let oauth: OAuth;
       switch (env.AUTH_TYPE) {
@@ -464,7 +461,12 @@ const authRouter = Router()
       if (!result.ok) {
         return result.response;
       }
-      user = result.user;
+      const uaHash = await getUserAgentHash(request);
+      user = {
+        id: result.user.id + "/" + uaHash,
+        name: result.user.name,
+        image: result.user.image,
+      };
     }
     console.log("user:", user);
     if (user == null) {
@@ -473,6 +475,12 @@ const authRouter = Router()
     const res: Response = await router.handle(request, env, context, user);
     return preserveSession(request, res);
   });
+
+async function getUserAgentHash(request: Request) {
+  const userAgent = request.headers.get("User-Agent") ?? "";
+  const hash = await digest(userAgent);
+  return hash.slice(0, 7);
+}
 
 function preserveSession(req: Request, res: Response): Response {
   const cookie = Cookie.parse(req.headers.get("Cookie") ?? "");

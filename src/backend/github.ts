@@ -32,7 +32,7 @@ export class GitHubOAuth implements OAuth {
     } catch (e) {
       throw new InvalidSession();
     }
-    if (user.id == null || user.image == null) {
+    if (user.id == null || user.name == null || user.image == null) {
       throw new InvalidSession();
     }
     if (!user.id.startsWith("gh/")) {
@@ -67,8 +67,9 @@ export class GitHubOAuth implements OAuth {
     console.log("isMemberOfOrg:", isMemberOfOrg);
     // const userId = isMemberOfOrg ? "gh/" + login : "gh/_guest"; // "_guest" is an invalid github name
     const id = "gh/" + login; // TODO: for debug
+    const name = login;
     const image = `https://github.com/${login}.png`;
-    const user = { id, image };
+    const user: User = { id, name, image };
     return JSON.stringify(user);
   }
 }

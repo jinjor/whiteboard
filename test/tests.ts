@@ -388,7 +388,7 @@ describe("Whiteboard", function () {
       {
         kind: "init",
         objects: {},
-        members: [{ id: "a", image: null }],
+        members: [{ id: "a", name: "a", image: null }],
         self: "a",
       },
     ]);
@@ -425,12 +425,12 @@ describe("Whiteboard", function () {
       {
         kind: "init",
         objects: {},
-        members: [{ id: "a", image: null }],
+        members: [{ id: "a", name: "a", image: null }],
         self: "a",
       },
       {
         kind: "join",
-        user: { id: "b", image: null },
+        user: { id: "b", name: "b", image: null },
       },
     ]);
     assert.deepStrictEqual(mes2, [
@@ -438,8 +438,8 @@ describe("Whiteboard", function () {
         kind: "init",
         objects: {},
         members: [
-          { id: "a", image: null },
-          { id: "b", image: null },
+          { id: "a", name: "a", image: null },
+          { id: "b", name: "b", image: null },
         ],
         self: "b",
       },
@@ -482,7 +482,7 @@ describe("Whiteboard", function () {
       {
         kind: "init",
         objects: {},
-        members: [{ id: "a", image: null }],
+        members: [{ id: "a", name: "a", image: null }],
         self: "a",
       },
     ]);
@@ -490,7 +490,7 @@ describe("Whiteboard", function () {
       {
         kind: "init",
         objects: {},
-        members: [{ id: "a", image: null }],
+        members: [{ id: "a", name: "a", image: null }],
         self: "a",
       },
     ]);

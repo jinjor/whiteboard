@@ -29,22 +29,9 @@ export async function check(
 ): Promise<{ ok: true; user: User } | { ok: false; response: Response }> {
   const session = await getDecryptedSessionFromCookie(request, cookieSecret);
   if (session == null) {
-    const response = new Response(null, {
-      status: 302,
-      headers: {
-        "Set-Cookie": Cookie.serialize("original_url", request.url, {
-          path: "/",
-          httpOnly: true,
-          maxAge: 60,
-          secure: true, // TODO: switch
-          sameSite: "lax", // strict だと直後に cookie を送信してくれない
-        }),
-        Location: oauth.getFormUrl(request),
-      },
-    });
     return {
       ok: false,
-      response,
+      response: createRedirectToFormResponse(request, oauth),
     };
   }
   try {
@@ -57,18 +44,37 @@ export async function check(
     if (e instanceof InvalidSession) {
       return {
         ok: false,
-        response: new Response("Not found.", { status: 404 }),
+        response: createRedirectToFormResponse(request, oauth),
       };
     }
     if (e instanceof NotAMemberOfOrg) {
       return {
         ok: false,
-        response: new Response("Not a member of org.", { status: 403 }),
+        response: new Response("Not found.", { status: 404 }),
       };
     }
     throw e;
   }
 }
+function createRedirectToFormResponse(
+  request: Request,
+  oauth: OAuth
+): Response {
+  return new Response(null, {
+    status: 302,
+    headers: {
+      "Set-Cookie": Cookie.serialize("original_url", request.url, {
+        path: "/",
+        httpOnly: true,
+        maxAge: 60,
+        secure: true, // TODO: switch
+        sameSite: "lax", // strict だと直後に cookie を送信してくれない
+      }),
+      Location: oauth.getFormUrl(request),
+    },
+  });
+}
+
 export async function handleCallback(
   request: Request,
   oauth: OAuth,

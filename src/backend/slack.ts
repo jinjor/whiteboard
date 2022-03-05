@@ -25,7 +25,7 @@ export class SlackOAuth implements OAuth {
     } catch (e) {
       throw new InvalidSession();
     }
-    if (user.id == null || user.image == null) {
+    if (user.id == null || user.name == null || user.image == null) {
       throw new InvalidSession();
     }
     if (!user.id.startsWith("sl/")) {
@@ -54,11 +54,13 @@ export class SlackOAuth implements OAuth {
     return accessToken;
   }
   async createInitialSession(accessToken: string): Promise<string> {
-    const user = await getUser(accessToken);
-    console.log("slack user:", user);
-    const id = "sl/" + user.name;
-    const image = user.image_48 || "not_found in " + JSON.stringify(user); // TODO: for debug
-    return JSON.stringify({ id, image });
+    const slackUser = await getUser(accessToken);
+    console.log("slack user:", slackUser);
+    const id = "sl/" + slackUser.name;
+    const name = slackUser.name;
+    const image = slackUser.image_48;
+    const user: User = { id, name, image };
+    return JSON.stringify(user);
   }
 }
 
@@ -73,7 +75,6 @@ function makeFormUrl(
   )}`;
 }
 
-// TODO: get id, name, avatar
 // https://api.slack.com/methods/users.identity
 async function getUser(accessToken: string): Promise<any> {
   const res = await fetch(`https://slack.com/api/users.identity`, {
@@ -103,21 +104,6 @@ async function getAccessToken(
     }
   );
   const data: any = await atRes.json();
-  // {
-  //   "ok": true,
-  //   "app_id": "A0xxxxxx",
-  //   "authed_user": {
-  //     "id": "U8xxxxxx",
-  //     "scope": "identity.basic",
-  //     "access_token": "xoxp-xxxx",
-  //     "token_type": "user"
-  //   },
-  //   "team": {
-  //     "id": "T8xxxxxx"
-  //   },
-  //   "enterprise": null,
-  //   "is_enterprise_install": false
-  // }
   if (!data.ok) {
     throw new Error(JSON.stringify(data));
   }
