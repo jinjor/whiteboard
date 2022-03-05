@@ -506,7 +506,7 @@ describe("Whiteboard", function () {
           JSON.stringify({
             kind: "add",
             object: {
-              id: "a".repeat(32),
+              id: "a".repeat(36),
               kind: "text",
               text: "foo",
               position: { x: 0 }, // missing `y`
@@ -539,7 +539,7 @@ describe("Whiteboard", function () {
           JSON.stringify({
             kind: "add",
             object: {
-              id: "a".repeat(32),
+              id: "a".repeat(36),
               kind: "text",
               text: "a",
               position: { x: 0, y: 0 },
@@ -598,7 +598,7 @@ describe("Whiteboard", function () {
     }
     const senderId = "a";
     const object = {
-      id: "a".repeat(32),
+      id: "a".repeat(36),
       kind: "text",
       text: "a",
       position: { x: 0, y: 0 },
@@ -638,7 +638,7 @@ describe("Whiteboard", function () {
         JSON.stringify({
           kind: "add",
           object: {
-            id: String(++i).padStart(32, "0"),
+            id: String(++i).padStart(36, "0"),
             kind: "text",
             text: "foo",
             position: { x: 0, y: 0 },
@@ -697,7 +697,7 @@ describe("Whiteboard", function () {
     const event = {
       kind: "add",
       object: {
-        id: "a".repeat(32),
+        id: "a".repeat(36),
         kind: "text",
         text: "foo",
         position: { x: 0, y: 0 },
@@ -748,7 +748,7 @@ describe("Whiteboard", function () {
     const addEvent = {
       kind: "add",
       object: {
-        id: "a".repeat(32),
+        id: "a".repeat(36),
         kind: "text",
         text: "foo",
         position: { x: 0, y: 0 },
@@ -789,7 +789,7 @@ describe("Whiteboard", function () {
           {
             kind: "delete",
             object: {
-              id: "a".repeat(32),
+              id: "a".repeat(36),
               kind: "text",
               text: "foo",
               position: { x: 0, y: 1 },
@@ -814,7 +814,7 @@ describe("Whiteboard", function () {
     const addEvent = {
       kind: "add",
       object: {
-        id: "a".repeat(32),
+        id: "a".repeat(36),
         kind: "text",
         text: "foo",
         position: { x: 0, y: 0 },
@@ -889,7 +889,7 @@ describe("Whiteboard", function () {
             JSON.stringify({
               kind: "add",
               object: {
-                id: "a".repeat(32),
+                id: "a".repeat(36),
                 kind: "text",
                 text: "foo",
                 position: { x: 0, y: 0 },
@@ -906,7 +906,7 @@ describe("Whiteboard", function () {
           ws.send(
             JSON.stringify({
               kind: "patch",
-              id: "a".repeat(32),
+              id: "a".repeat(36),
               key: "unknown",
               value: { old: 0, new: 1 },
             })
@@ -929,7 +929,7 @@ describe("Whiteboard", function () {
             JSON.stringify({
               kind: "add",
               object: {
-                id: "a".repeat(32),
+                id: "a".repeat(36),
                 kind: "text",
                 text: "foo",
                 position: { x: 0, y: 0 },
@@ -946,7 +946,7 @@ describe("Whiteboard", function () {
           ws.send(
             JSON.stringify({
               kind: "patch",
-              id: "a".repeat(32),
+              id: "a".repeat(36),
               key: "text",
               value: { old: "foo", new: 1 },
             })

@@ -162,7 +162,7 @@ function connect(pageInfo: PageInfo, state: State, disableEditing: () => void) {
   });
 }
 function generateObjectId(): ObjectId {
-  return String(Date.now()).padStart(32, "0");
+  return (crypto as any).randomUUID(); // TODO: 型が古そう
 }
 function startDrawing(state: State, pos: Position): void {
   const id = generateObjectId();

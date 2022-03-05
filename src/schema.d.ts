@@ -1,6 +1,6 @@
 /**
- * @minLength 32
- * @maxLength 32
+ * @minLength 36
+ * @maxLength 36
  */
 export type ObjectId = string;
 export type UserId = string;
