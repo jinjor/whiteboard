@@ -36,6 +36,10 @@ export async function createRoom(): Promise<RoomInfo | null> {
   return await res.json();
 }
 
+export function createWebsocket(wsRoot: string, roomId: string): WebSocket {
+  return new WebSocket(`${wsRoot}/api/rooms/${roomId}/websocket`);
+}
+
 export function send(websocket: WebSocket, event: RequestEventBody): void {
   websocket.send(JSON.stringify(event));
 }

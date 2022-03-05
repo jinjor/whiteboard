@@ -33,10 +33,10 @@ UI
 - https://developers.cloudflare.com/workers/tutorials/build-a-slackbot
 
 TODO:
+- Safari で webscoket リクエストに cookie が送信されない件
 - エッジケースのバグ除去とリファクタリング
 - 文字がずれる問題
 - 選択中に切断したら選択解除
-- タッチデバイス操作
 - 部屋がユーザーでいっぱいだった時の表示
 - OS でヘルプ表示を変える
 - Slack のマークダウン

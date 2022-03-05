@@ -107,9 +107,7 @@ function getPageInfo(): PageInfo {
 }
 
 function connect(pageInfo: PageInfo, state: State, disableEditing: () => void) {
-  const ws = new WebSocket(
-    `${pageInfo.wsRoot}/api/rooms/${pageInfo.roomId}/websocket`
-  );
+  const ws = api.createWebsocket(pageInfo.wsRoot, pageInfo.roomId);
   ws.addEventListener("open", () => {
     state.websocket = ws;
     updateStatus("active", "Connected");
