@@ -112,12 +112,10 @@ export async function handleCallback(
   } catch (e: unknown) {
     if (
       e instanceof InvalidCallback ||
-      e instanceof ReturnedScopeDoesNotMatch
+      e instanceof ReturnedScopeDoesNotMatch ||
+      e instanceof NotAMemberOfOrg
     ) {
       return new Response("Not found.", { status: 404 });
-    }
-    if (e instanceof NotAMemberOfOrg) {
-      return new Response("Not a member of org.", { status: 403 });
     }
     throw e;
   }
