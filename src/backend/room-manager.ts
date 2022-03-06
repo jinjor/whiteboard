@@ -108,25 +108,25 @@ class RoomManagerState {
 const roomManagerRouter = Router()
   .delete("/", async (request: Request, state: RoomManagerState) => {
     await state.reset();
-    return new Response("null", { status: 200 });
+    return new Response("null");
   })
   .patch("/config", async (request: Request, state: RoomManagerState) => {
     const config = await request.json();
     await state.updateConfig(config as any);
-    return new Response("null", { status: 200 });
+    return new Response("null");
   })
   .get("/clean", async (request: Request, state: RoomManagerState) => {
     const list = await state.dryClean();
-    return new Response(JSON.stringify({ patches: list }), { status: 200 });
+    return new Response(JSON.stringify({ patches: list }));
   })
   .post("/clean", async (request: Request, state: RoomManagerState) => {
     const { patches } = await request.json();
     await state.clean(patches);
-    return new Response(JSON.stringify(null), { status: 200 });
+    return new Response(JSON.stringify(null));
   })
   .get("/rooms", async (request: Request, state: RoomManagerState) => {
     const rooms = await state.listRoom();
-    return new Response(JSON.stringify(rooms), { status: 200 });
+    return new Response(JSON.stringify(rooms));
   })
   .get(
     "/rooms/:roomId",
@@ -139,7 +139,7 @@ const roomManagerRouter = Router()
       if (room == null) {
         return new Response("Not found", { status: 404 });
       }
-      return new Response(JSON.stringify(room), { status: 200 });
+      return new Response(JSON.stringify(room));
     }
   )
   .put(
@@ -151,7 +151,7 @@ const roomManagerRouter = Router()
       const roomId = request.params.roomId;
       const exsistingRoom = await state.getRoom(roomId);
       if (exsistingRoom != null) {
-        return new Response(JSON.stringify(exsistingRoom), { status: 200 });
+        return new Response(JSON.stringify(exsistingRoom));
       }
       const newRoom = await state.createRoom(roomId);
       if (newRoom == null) {
@@ -159,7 +159,7 @@ const roomManagerRouter = Router()
           status: 403,
         });
       }
-      return new Response(JSON.stringify(newRoom), { status: 200 });
+      return new Response(JSON.stringify(newRoom));
     }
   )
   .all("*", () => new Response("Not found.", { status: 404 }));

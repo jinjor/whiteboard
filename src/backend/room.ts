@@ -12,15 +12,15 @@ const roomRouter = Router()
   .patch("/config", async (request: Request, state: RoomState) => {
     const config = await request.json();
     await state.updateConfig(config as any);
-    return new Response("null", { status: 200 });
+    return new Response("null");
   })
   .post("/deactivate", async (request: Request, state: RoomState) => {
     await state.disconnectAllSessions();
-    return new Response("null", { status: 200 });
+    return new Response("null");
   })
   .post("/cooldown", async (request: Request, state: RoomState) => {
     await state.cooldown();
-    return new Response("null", { status: 200 });
+    return new Response("null");
   })
   .get("/websocket", async (request: Request, state: RoomState) => {
     if (request.headers.get("Upgrade") !== "websocket") {
