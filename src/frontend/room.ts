@@ -8,14 +8,13 @@ import {
   UserId,
 } from "../schema";
 import {
+  Board,
   BoardOptions,
   deleteObject,
   elementToObject,
-  getBoardRect,
   getD,
   getPosition,
   Input,
-  listenToBoardEvents,
   makeD,
   parseD,
   patchObject,
@@ -26,8 +25,6 @@ import {
   setRectangle,
   setSelected,
   toPixelPosition,
-  upsertObject,
-  upsertPath,
 } from "./lib/board";
 import * as api from "./lib/api";
 import { addMember, deleteMember, updateStatus } from "./lib/navbar";
@@ -76,7 +73,7 @@ type EditingState =
 type State = {
   self: UserId | null;
   boardOptions: BoardOptions;
-  svgEl: HTMLElement;
+  board: Board;
   input: Input;
   selector: Selector;
   boardRect: { position: PixelPosition; size: Size };
@@ -122,7 +119,7 @@ function connect(pageInfo: PageInfo, state: State, disableEditing: () => void) {
           addMember(member, member.id === state.self);
         }
         for (const key of Object.keys(data.objects)) {
-          upsertObject(state.svgEl, data.objects[key], state.boardOptions);
+          state.board.upsertObject(data.objects[key], state.boardOptions);
         }
         break;
       }
@@ -137,7 +134,7 @@ function connect(pageInfo: PageInfo, state: State, disableEditing: () => void) {
         break;
       }
       case "upsert": {
-        upsertObject(state.svgEl, data.object, state.boardOptions);
+        state.board.upsertObject(data.object, state.boardOptions);
         break;
       }
       case "delete": {
@@ -181,7 +178,7 @@ function continueDrawing(state: State, pos: Position): void {
     const d = makeD(state.editing.points);
     if (element == null) {
       const object = { id, kind: "path", d } as const;
-      upsertPath(state.svgEl, object, state.boardOptions.pathStrokeWidth);
+      state.board.upsertPath(object, state.boardOptions.pathStrokeWidth);
     } else {
       setD(element, d);
     }
@@ -489,7 +486,7 @@ function canApplyEvent(event: ActionEvent): boolean {
 function doEventWithoutCheck(state: State, event: ActionEvent) {
   switch (event.kind) {
     case "add": {
-      upsertObject(state.svgEl, event.object, state.boardOptions);
+      state.board.upsertObject(event.object, state.boardOptions);
       break;
     }
     case "patch": {
@@ -638,7 +635,7 @@ function updateInputElementPosition(state: State): void {
 }
 function listenToWindowEvents(state: State): () => void {
   window.onresize = () => {
-    state.boardRect = getBoardRect(state.svgEl);
+    state.boardRect = state.board.calculateBoardRect();
     updateInputElementPosition(state);
   };
   return () => {
@@ -654,7 +651,7 @@ function listenToInputEvents(state: State): () => void {
   return () => state.input.unlisten();
 }
 function listenToBoard(state: State): () => void {
-  return listenToBoardEvents(state.boardOptions, state.svgEl, {
+  return state.board.listenToBoardEvents(state.boardOptions, {
     getBoardRect: () => {
       return state.boardRect;
     },
@@ -778,9 +775,9 @@ function listenToBoard(state: State): () => void {
 }
 function syncCursorAndButtons(state: State) {
   if (state.editing.kind !== "select" && state.selected.length > 0) {
-    state.svgEl.style.cursor = "move";
+    state.board.toMovingCursor();
   } else {
-    state.svgEl.style.removeProperty("cursor");
+    state.board.toDefaultCursor();
   }
   if (!touchDevice) {
     return;
@@ -841,16 +838,14 @@ function initBoard(o: BoardOptions): void {
     };
     initBoard(boardOptions);
 
-    const svgEl = document.getElementById("board")!;
-    const selectorEl = document.getElementById("board-selector")!;
-    const inputEl = document.getElementById("input")! as HTMLInputElement;
+    const board = new Board();
     const state: State = {
       self: null,
       boardOptions,
-      svgEl,
-      input: new Input(inputEl),
-      selector: new Selector(selectorEl),
-      boardRect: getBoardRect(svgEl),
+      board,
+      input: new Input(),
+      selector: new Selector(),
+      boardRect: board.calculateBoardRect(),
       websocket: null,
       undos: [],
       redos: [],
@@ -862,7 +857,7 @@ function initBoard(o: BoardOptions): void {
       const objects = await api.getObjects(roomInfo.id);
       if (objects != null) {
         for (const key of Object.keys(objects)) {
-          upsertObject(state.svgEl, objects[key], state.boardOptions);
+          state.board.upsertObject(objects[key], state.boardOptions);
         }
       }
     } else {

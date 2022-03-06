@@ -30,113 +30,6 @@ function getPixelPositionFromTouch(
     py: touch.pageY - boardPosition.py,
   };
 }
-export function getBoardRect(svgElement: HTMLElement): {
-  size: Size;
-  position: PixelPosition;
-} {
-  const rect = svgElement.getBoundingClientRect();
-  return {
-    size: { width: rect.width, height: rect.height },
-    position: { px: rect.left, py: rect.top },
-  };
-}
-export function listenToBoardEvents(
-  boardOptions: BoardOptions,
-  svgEl: HTMLElement,
-  o: {
-    getBoardRect: () => { position: PixelPosition; size: Size };
-    doubleClick: (pos: Position) => void;
-    mouseDown: (pos: Position, isRight: boolean) => void;
-    touchStart: (pos: Position) => void;
-    touchStartLong: (pos: Position) => void;
-    mouseMove: (pos: Position) => void;
-    touchMove: (pos: Position) => void;
-    mouseUp: (pos: Position) => void;
-    touchEnd: (pos: Position) => void;
-  }
-): () => void {
-  svgEl.ondblclick = (e: MouseEvent) => {
-    e.preventDefault();
-    const boardRect = o.getBoardRect();
-    const pos = getPixelPositionFromMouse(e);
-    const npos = toBoardPosition(boardOptions, boardRect.size, pos);
-    o.doubleClick(npos);
-  };
-  svgEl.oncontextmenu = (e: MouseEvent) => {
-    if (e.ctrlKey || e.metaKey) {
-      return;
-    }
-    e.preventDefault();
-  };
-  svgEl.onmousedown = (e: MouseEvent) => {
-    e.preventDefault();
-    const boardRect = o.getBoardRect();
-    const pos = getPixelPositionFromMouse(e);
-    const npos = toBoardPosition(boardOptions, boardRect.size, pos);
-    o.mouseDown(npos, e.button !== 0);
-  };
-  let touchdown = false;
-  svgEl.ontouchstart = (e: TouchEvent) => {
-    e.preventDefault();
-    const boardRect = o.getBoardRect();
-    const pos = getPixelPositionFromTouch(boardRect.position, e.touches[0]);
-    const npos = toBoardPosition(boardOptions, boardRect.size, pos);
-    o.touchStart(npos);
-
-    e.stopPropagation();
-    touchdown = true;
-    setTimeout(() => {
-      if (touchdown) {
-        touchdown = false;
-        o.touchStartLong(npos);
-      }
-    }, 600);
-  };
-  svgEl.onmousemove = (e: MouseEvent) => {
-    e.preventDefault();
-    const boardRect = o.getBoardRect();
-    const pos = getPixelPositionFromMouse(e);
-    const npos = toBoardPosition(boardOptions, boardRect.size, pos);
-    o.mouseMove(npos);
-  };
-  svgEl.ontouchmove = (e: TouchEvent) => {
-    touchdown = false;
-    e.preventDefault();
-    const boardRect = o.getBoardRect();
-    const pos = getPixelPositionFromTouch(boardRect.position, e.touches[0]);
-    const npos = toBoardPosition(boardOptions, boardRect.size, pos);
-    o.touchMove(npos);
-  };
-  svgEl.ontouchend = (e: TouchEvent) => {
-    touchdown = false;
-    e.preventDefault();
-    const boardRect = o.getBoardRect();
-    const pos = getPixelPositionFromTouch(
-      boardRect.position,
-      e.changedTouches[0]
-    );
-    const npos = toBoardPosition(boardOptions, boardRect.size, pos);
-    o.touchEnd(npos);
-  };
-  const mouseUp = (e: MouseEvent) => {
-    e.preventDefault();
-    const boardRect = o.getBoardRect();
-    const pos = getPixelPositionFromMouse(e);
-    const npos = toBoardPosition(boardOptions, boardRect.size, pos);
-    o.mouseUp(npos);
-  };
-  window.addEventListener("mouseup", mouseUp);
-  return () => {
-    svgEl.ondblclick = null;
-    svgEl.onmousedown = null;
-    svgEl.ontouchstart = null;
-    svgEl.onmousemove = null;
-    svgEl.ontouchmove = null;
-    svgEl.ontouchend = null;
-    window.removeEventListener("mouseup", mouseUp);
-  };
-}
-
 export function toBoardPosition(
   boardOptions: BoardOptions,
   boardSize: Size,
@@ -172,20 +65,6 @@ export function toPixelPosition(
   const px = ((npos.x / viewBoxWidth - offsetX) / scaleX) * width;
   const py = ((npos.y / viewBoxHeight - offsetY) / scaleY) * height;
   return { px, py };
-}
-export function upsertObject(
-  svgEl: HTMLElement,
-  object: ObjectBody,
-  boardOptions: BoardOptions
-): void {
-  switch (object.kind) {
-    case "text": {
-      return upsertText(svgEl, object, boardOptions.textFontSize);
-    }
-    case "path": {
-      return upsertPath(svgEl, object, boardOptions.pathStrokeWidth);
-    }
-  }
 }
 export function deleteObject(id: string): void {
   document.getElementById(id)?.remove();
@@ -229,38 +108,6 @@ export function patchObject(id: ObjectId, key: string, value: any): void {
       break;
     }
   }
-}
-export function upsertText(
-  svgEl: HTMLElement,
-  text: TextBody,
-  fontSize: number
-) {
-  let element = document.getElementById(text.id) as unknown as SVGTextElement;
-  if (element == null) {
-    element = createObjectElement("text", text.id);
-    element.setAttributeNS(null, "font-size", String(fontSize));
-  }
-  element.textContent = text.text;
-  element.setAttributeNS(null, "x", String(text.position.x));
-  element.setAttributeNS(null, "y", String(text.position.y));
-  svgEl.append(element);
-}
-export function upsertPath(
-  svgEl: HTMLElement,
-  path: PathBody,
-  strokeWidth: number
-) {
-  let element = document.getElementById(
-    path.id
-  ) as unknown as SVGPathElement | null;
-  if (element == null) {
-    element = createObjectElement("path", path.id);
-    element.setAttributeNS(null, "fill", "none");
-    element.setAttributeNS(null, "stroke", "black");
-    element.setAttributeNS(null, "stroke-width", String(strokeWidth));
-  }
-  element.setAttributeNS(null, "d", path.d);
-  svgEl.append(element);
 }
 export function elementToObject(element: HTMLElement): ObjectBody | null {
   const id = element.id;
@@ -363,8 +210,163 @@ export function setSelected(
   }
 }
 
+export class Board {
+  private element: HTMLElement;
+  constructor() {
+    this.element = document.getElementById("board")!;
+  }
+  calculateBoardRect(): {
+    size: Size;
+    position: PixelPosition;
+  } {
+    const rect = this.element.getBoundingClientRect();
+    return {
+      size: { width: rect.width, height: rect.height },
+      position: { px: rect.left, py: rect.top },
+    };
+  }
+  toMovingCursor() {
+    this.element.style.cursor = "move";
+  }
+  toDefaultCursor() {
+    this.element.style.removeProperty("cursor");
+  }
+  upsertObject(object: ObjectBody, boardOptions: BoardOptions): void {
+    switch (object.kind) {
+      case "text": {
+        return this.upsertText(object, boardOptions.textFontSize);
+      }
+      case "path": {
+        return this.upsertPath(object, boardOptions.pathStrokeWidth);
+      }
+    }
+  }
+  upsertText(text: TextBody, fontSize: number) {
+    let element = document.getElementById(text.id) as unknown as SVGTextElement;
+    if (element == null) {
+      element = createObjectElement("text", text.id);
+      element.setAttributeNS(null, "font-size", String(fontSize));
+    }
+    element.textContent = text.text;
+    element.setAttributeNS(null, "x", String(text.position.x));
+    element.setAttributeNS(null, "y", String(text.position.y));
+    this.element.append(element);
+  }
+  upsertPath(path: PathBody, strokeWidth: number) {
+    let element = document.getElementById(
+      path.id
+    ) as unknown as SVGPathElement | null;
+    if (element == null) {
+      element = createObjectElement("path", path.id);
+      element.setAttributeNS(null, "fill", "none");
+      element.setAttributeNS(null, "stroke", "black");
+      element.setAttributeNS(null, "stroke-width", String(strokeWidth));
+    }
+    element.setAttributeNS(null, "d", path.d);
+    this.element.append(element);
+  }
+  listenToBoardEvents(
+    boardOptions: BoardOptions,
+    o: {
+      getBoardRect: () => { position: PixelPosition; size: Size };
+      doubleClick: (pos: Position) => void;
+      mouseDown: (pos: Position, isRight: boolean) => void;
+      touchStart: (pos: Position) => void;
+      touchStartLong: (pos: Position) => void;
+      mouseMove: (pos: Position) => void;
+      touchMove: (pos: Position) => void;
+      mouseUp: (pos: Position) => void;
+      touchEnd: (pos: Position) => void;
+    }
+  ): () => void {
+    this.element.ondblclick = (e: MouseEvent) => {
+      e.preventDefault();
+      const boardRect = o.getBoardRect();
+      const pos = getPixelPositionFromMouse(e);
+      const npos = toBoardPosition(boardOptions, boardRect.size, pos);
+      o.doubleClick(npos);
+    };
+    this.element.oncontextmenu = (e: MouseEvent) => {
+      if (e.ctrlKey || e.metaKey) {
+        return;
+      }
+      e.preventDefault();
+    };
+    this.element.onmousedown = (e: MouseEvent) => {
+      e.preventDefault();
+      const boardRect = o.getBoardRect();
+      const pos = getPixelPositionFromMouse(e);
+      const npos = toBoardPosition(boardOptions, boardRect.size, pos);
+      o.mouseDown(npos, e.button !== 0);
+    };
+    let touchdown = false;
+    this.element.ontouchstart = (e: TouchEvent) => {
+      e.preventDefault();
+      const boardRect = o.getBoardRect();
+      const pos = getPixelPositionFromTouch(boardRect.position, e.touches[0]);
+      const npos = toBoardPosition(boardOptions, boardRect.size, pos);
+      o.touchStart(npos);
+
+      e.stopPropagation();
+      touchdown = true;
+      setTimeout(() => {
+        if (touchdown) {
+          touchdown = false;
+          o.touchStartLong(npos);
+        }
+      }, 600);
+    };
+    this.element.onmousemove = (e: MouseEvent) => {
+      e.preventDefault();
+      const boardRect = o.getBoardRect();
+      const pos = getPixelPositionFromMouse(e);
+      const npos = toBoardPosition(boardOptions, boardRect.size, pos);
+      o.mouseMove(npos);
+    };
+    this.element.ontouchmove = (e: TouchEvent) => {
+      touchdown = false;
+      e.preventDefault();
+      const boardRect = o.getBoardRect();
+      const pos = getPixelPositionFromTouch(boardRect.position, e.touches[0]);
+      const npos = toBoardPosition(boardOptions, boardRect.size, pos);
+      o.touchMove(npos);
+    };
+    this.element.ontouchend = (e: TouchEvent) => {
+      touchdown = false;
+      e.preventDefault();
+      const boardRect = o.getBoardRect();
+      const pos = getPixelPositionFromTouch(
+        boardRect.position,
+        e.changedTouches[0]
+      );
+      const npos = toBoardPosition(boardOptions, boardRect.size, pos);
+      o.touchEnd(npos);
+    };
+    const mouseUp = (e: MouseEvent) => {
+      e.preventDefault();
+      const boardRect = o.getBoardRect();
+      const pos = getPixelPositionFromMouse(e);
+      const npos = toBoardPosition(boardOptions, boardRect.size, pos);
+      o.mouseUp(npos);
+    };
+    window.addEventListener("mouseup", mouseUp);
+    return () => {
+      this.element.ondblclick = null;
+      this.element.onmousedown = null;
+      this.element.ontouchstart = null;
+      this.element.onmousemove = null;
+      this.element.ontouchmove = null;
+      this.element.ontouchend = null;
+      window.removeEventListener("mouseup", mouseUp);
+    };
+  }
+}
+
 export class Input {
-  constructor(private element: HTMLInputElement) {}
+  private element: HTMLInputElement;
+  constructor() {
+    this.element = document.getElementById("input")! as HTMLInputElement;
+  }
   getText(): string {
     return this.element.value;
   }
@@ -394,7 +396,10 @@ export class Input {
   }
 }
 export class Selector {
-  constructor(private element: HTMLElement) {}
+  private element: HTMLElement;
+  constructor() {
+    this.element = document.getElementById("board-selector")!;
+  }
   setRectangle(rect: Rectangle): void {
     setRectangle(this.element, rect);
   }
