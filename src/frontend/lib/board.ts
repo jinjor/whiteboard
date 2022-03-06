@@ -8,12 +8,6 @@ import {
 type Size = { width: number; height: number };
 export type PixelPosition = { px: number; py: number };
 export type Rectangle = { x: number; y: number; width: number; height: number };
-export type BoardOptions = {
-  viewBox: Rectangle;
-  textFontSize: number;
-  pathStrokeWidth: number;
-  selectorStrokeWidth: number;
-};
 
 function getPixelPositionFromMouse(e: MouseEvent): PixelPosition {
   return {
@@ -29,42 +23,6 @@ function getPixelPositionFromTouch(
     px: touch.pageX - boardPosition.px,
     py: touch.pageY - boardPosition.py,
   };
-}
-export function toBoardPosition(
-  boardOptions: BoardOptions,
-  boardSize: Size,
-  ppos: PixelPosition
-): Position {
-  const { width, height } = boardSize;
-  const viewBoxWidth = boardOptions.viewBox.width;
-  const viewBoxHeight = boardOptions.viewBox.height;
-  const actualRatioPerExpectedRatio =
-    width / height / (viewBoxWidth / viewBoxHeight);
-  const scaleX = Math.max(actualRatioPerExpectedRatio, 1);
-  const scaleY = Math.max(1 / actualRatioPerExpectedRatio, 1);
-  const offsetX = (1 - scaleX) / 2;
-  const offsetY = (1 - scaleY) / 2;
-  const x = viewBoxWidth * ((ppos.px / width) * scaleX + offsetX);
-  const y = viewBoxHeight * ((ppos.py / height) * scaleY + offsetY);
-  return { x, y };
-}
-export function toPixelPosition(
-  boardOptions: BoardOptions,
-  boardSize: Size,
-  npos: Position
-): PixelPosition {
-  const { width, height } = boardSize;
-  const viewBoxWidth = boardOptions.viewBox.width;
-  const viewBoxHeight = boardOptions.viewBox.height;
-  const actualRatioPerExpectedRatio =
-    width / height / (viewBoxWidth / viewBoxHeight);
-  const scaleX = Math.max(actualRatioPerExpectedRatio, 1);
-  const scaleY = Math.max(1 / actualRatioPerExpectedRatio, 1);
-  const offsetX = (1 - scaleX) / 2;
-  const offsetY = (1 - scaleY) / 2;
-  const px = ((npos.x / viewBoxWidth - offsetX) / scaleX) * width;
-  const py = ((npos.y / viewBoxHeight - offsetY) / scaleY) * height;
-  return { px, py };
 }
 export function deleteObject(id: string): void {
   document.getElementById(id)?.remove();
@@ -209,10 +167,15 @@ export function setSelected(
     }
   }
 }
-
+export type BoardOptions = {
+  viewBox: Rectangle;
+  textFontSize: number;
+  pathStrokeWidth: number;
+  selectorStrokeWidth: number;
+};
 export class Board {
   private element: HTMLElement;
-  constructor() {
+  constructor(private options: BoardOptions) {
     this.element = document.getElementById("board")!;
   }
   calculateBoardRect(): {
@@ -224,6 +187,34 @@ export class Board {
       size: { width: rect.width, height: rect.height },
       position: { px: rect.left, py: rect.top },
     };
+  }
+  toBoardPosition(boardSize: Size, ppos: PixelPosition): Position {
+    const { width, height } = boardSize;
+    const viewBoxWidth = this.options.viewBox.width;
+    const viewBoxHeight = this.options.viewBox.height;
+    const actualRatioPerExpectedRatio =
+      width / height / (viewBoxWidth / viewBoxHeight);
+    const scaleX = Math.max(actualRatioPerExpectedRatio, 1);
+    const scaleY = Math.max(1 / actualRatioPerExpectedRatio, 1);
+    const offsetX = (1 - scaleX) / 2;
+    const offsetY = (1 - scaleY) / 2;
+    const x = viewBoxWidth * ((ppos.px / width) * scaleX + offsetX);
+    const y = viewBoxHeight * ((ppos.py / height) * scaleY + offsetY);
+    return { x, y };
+  }
+  toPixelPosition(boardSize: Size, npos: Position): PixelPosition {
+    const { width, height } = boardSize;
+    const viewBoxWidth = this.options.viewBox.width;
+    const viewBoxHeight = this.options.viewBox.height;
+    const actualRatioPerExpectedRatio =
+      width / height / (viewBoxWidth / viewBoxHeight);
+    const scaleX = Math.max(actualRatioPerExpectedRatio, 1);
+    const scaleY = Math.max(1 / actualRatioPerExpectedRatio, 1);
+    const offsetX = (1 - scaleX) / 2;
+    const offsetY = (1 - scaleY) / 2;
+    const px = ((npos.x / viewBoxWidth - offsetX) / scaleX) * width;
+    const py = ((npos.y / viewBoxHeight - offsetY) / scaleY) * height;
+    return { px, py };
   }
   toMovingCursor() {
     this.element.style.cursor = "move";
@@ -283,7 +274,7 @@ export class Board {
       e.preventDefault();
       const boardRect = o.getBoardRect();
       const pos = getPixelPositionFromMouse(e);
-      const npos = toBoardPosition(boardOptions, boardRect.size, pos);
+      const npos = this.toBoardPosition(boardRect.size, pos);
       o.doubleClick(npos);
     };
     this.element.oncontextmenu = (e: MouseEvent) => {
@@ -296,7 +287,7 @@ export class Board {
       e.preventDefault();
       const boardRect = o.getBoardRect();
       const pos = getPixelPositionFromMouse(e);
-      const npos = toBoardPosition(boardOptions, boardRect.size, pos);
+      const npos = this.toBoardPosition(boardRect.size, pos);
       o.mouseDown(npos, e.button !== 0);
     };
     let touchdown = false;
@@ -304,7 +295,7 @@ export class Board {
       e.preventDefault();
       const boardRect = o.getBoardRect();
       const pos = getPixelPositionFromTouch(boardRect.position, e.touches[0]);
-      const npos = toBoardPosition(boardOptions, boardRect.size, pos);
+      const npos = this.toBoardPosition(boardRect.size, pos);
       o.touchStart(npos);
 
       e.stopPropagation();
@@ -320,7 +311,7 @@ export class Board {
       e.preventDefault();
       const boardRect = o.getBoardRect();
       const pos = getPixelPositionFromMouse(e);
-      const npos = toBoardPosition(boardOptions, boardRect.size, pos);
+      const npos = this.toBoardPosition(boardRect.size, pos);
       o.mouseMove(npos);
     };
     this.element.ontouchmove = (e: TouchEvent) => {
@@ -328,7 +319,7 @@ export class Board {
       e.preventDefault();
       const boardRect = o.getBoardRect();
       const pos = getPixelPositionFromTouch(boardRect.position, e.touches[0]);
-      const npos = toBoardPosition(boardOptions, boardRect.size, pos);
+      const npos = this.toBoardPosition(boardRect.size, pos);
       o.touchMove(npos);
     };
     this.element.ontouchend = (e: TouchEvent) => {
@@ -339,14 +330,14 @@ export class Board {
         boardRect.position,
         e.changedTouches[0]
       );
-      const npos = toBoardPosition(boardOptions, boardRect.size, pos);
+      const npos = this.toBoardPosition(boardRect.size, pos);
       o.touchEnd(npos);
     };
     const mouseUp = (e: MouseEvent) => {
       e.preventDefault();
       const boardRect = o.getBoardRect();
       const pos = getPixelPositionFromMouse(e);
-      const npos = toBoardPosition(boardOptions, boardRect.size, pos);
+      const npos = this.toBoardPosition(boardRect.size, pos);
       o.mouseUp(npos);
     };
     window.addEventListener("mouseup", mouseUp);

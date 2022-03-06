@@ -24,7 +24,6 @@ import {
   setPosition,
   setRectangle,
   setSelected,
-  toPixelPosition,
 } from "./lib/board";
 import * as api from "./lib/api";
 import { addMember, deleteMember, updateStatus } from "./lib/navbar";
@@ -625,8 +624,7 @@ function listenToShortcutButtons(state: State): () => void {
 }
 function updateInputElementPosition(state: State): void {
   if (state.editing.kind === "text") {
-    const ppos = toPixelPosition(
-      state.boardOptions,
+    const ppos = state.board.toPixelPosition(
       state.boardRect.size,
       state.editing.position
     );
@@ -838,7 +836,7 @@ function initBoard(o: BoardOptions): void {
     };
     initBoard(boardOptions);
 
-    const board = new Board();
+    const board = new Board(boardOptions);
     const state: State = {
       self: null,
       boardOptions,
