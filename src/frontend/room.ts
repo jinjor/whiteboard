@@ -14,6 +14,7 @@ import {
   elementToObject,
   getD,
   getPosition,
+  Help,
   Input,
   makeD,
   parseD,
@@ -22,8 +23,8 @@ import {
   Selector,
   setD,
   setPosition,
-  setRectangle,
   setSelected,
+  Shortcuts,
 } from "./lib/board";
 import * as api from "./lib/api";
 import { addMember, deleteMember, updateStatus } from "./lib/navbar";
@@ -73,6 +74,7 @@ type State = {
   self: UserId | null;
   boardOptions: BoardOptions;
   board: Board;
+  shortcuts: Shortcuts;
   input: Input;
   selector: Selector;
   boardRect: { position: PixelPosition; size: Size };
@@ -87,9 +89,6 @@ type PageInfo = {
   roomId: string;
   wsRoot: string;
 };
-
-const touchDevice =
-  window.ontouchstart != null || window.navigator.maxTouchPoints > 0;
 
 function getPageInfo(): PageInfo {
   const { host, protocol, pathname } = window.location;
@@ -777,51 +776,10 @@ function syncCursorAndButtons(state: State) {
   } else {
     state.board.toDefaultCursor();
   }
-  if (!touchDevice) {
-    return;
-  }
-  if (state.editing.kind !== "select") {
-    document.getElementById("select")!.classList.remove("select");
-  }
-  if (state.selected.length > 0) {
-    document.getElementById("select")!.classList.add("hidden");
-    document.getElementById("delete")!.classList.remove("hidden");
-  } else {
-    document.getElementById("select")!.classList.remove("hidden");
-    document.getElementById("delete")!.classList.add("hidden");
-  }
-  if (state.undos.length > 0) {
-    (document.getElementById("undo")! as HTMLButtonElement).disabled = false;
-  } else {
-    (document.getElementById("undo")! as HTMLButtonElement).disabled = true;
-  }
-  if (state.redos.length > 0) {
-    (document.getElementById("redo")! as HTMLButtonElement).disabled = false;
-  } else {
-    (document.getElementById("redo")! as HTMLButtonElement).disabled = true;
-  }
-}
-
-function initBoard(o: BoardOptions): void {
-  const svgEl = document.getElementById("board")!;
-  const backgroundEl = document.getElementById("board-background")!;
-  const clipRectEl = document.getElementById("board-clip-rect")!;
-  const selectorEl = document.getElementById("board-selector")!;
-  const viewBox = `${o.viewBox.x} ${o.viewBox.y} ${o.viewBox.width} ${o.viewBox.height}`;
-  svgEl.setAttributeNS(null, "viewBox", viewBox);
-  setRectangle(backgroundEl, o.viewBox);
-  setRectangle(clipRectEl, o.viewBox);
-  selectorEl.setAttributeNS(
-    null,
-    "stroke-width",
-    String(o.selectorStrokeWidth)
-  );
-  if (touchDevice) {
-    document.getElementById("help-touch")!.classList.remove("hidden");
-    document.getElementById("shortcut-buttons")!.classList.remove("hidden");
-  } else {
-    document.getElementById("help")!.classList.remove("hidden");
-  }
+  state.shortcuts.setSelectingReady(state.editing.kind === "select");
+  state.shortcuts.setSelecting(state.selected.length > 0);
+  state.shortcuts.setUndoDisabled(state.undos.length <= 0);
+  state.shortcuts.setRedoDisabled(state.redos.length <= 0);
 }
 
 (async () => {
@@ -834,15 +792,15 @@ function initBoard(o: BoardOptions): void {
       pathStrokeWidth: 0.02,
       selectorStrokeWidth: 0.01,
     };
-    initBoard(boardOptions);
-
+    new Help();
     const board = new Board(boardOptions);
     const state: State = {
       self: null,
       boardOptions,
       board,
+      shortcuts: new Shortcuts(),
       input: new Input(),
-      selector: new Selector(),
+      selector: new Selector(boardOptions),
       boardRect: board.calculateBoardRect(),
       websocket: null,
       undos: [],

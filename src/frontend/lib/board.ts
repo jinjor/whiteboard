@@ -9,6 +9,9 @@ type Size = { width: number; height: number };
 export type PixelPosition = { px: number; py: number };
 export type Rectangle = { x: number; y: number; width: number; height: number };
 
+const touchDevice =
+  window.ontouchstart != null || window.navigator.maxTouchPoints > 0;
+
 function getPixelPositionFromMouse(e: MouseEvent): PixelPosition {
   return {
     px: e.offsetX,
@@ -177,6 +180,12 @@ export class Board {
   private element: HTMLElement;
   constructor(private options: BoardOptions) {
     this.element = document.getElementById("board")!;
+    const backgroundEl = document.getElementById("board-background")!;
+    const clipRectEl = document.getElementById("board-clip-rect")!;
+    const viewBox = `${options.viewBox.x} ${options.viewBox.y} ${options.viewBox.width} ${options.viewBox.height}`;
+    this.element.setAttributeNS(null, "viewBox", viewBox);
+    setRectangle(backgroundEl, options.viewBox);
+    setRectangle(clipRectEl, options.viewBox);
   }
   calculateBoardRect(): {
     size: Size;
@@ -388,8 +397,13 @@ export class Input {
 }
 export class Selector {
   private element: HTMLElement;
-  constructor() {
+  constructor(options: BoardOptions) {
     this.element = document.getElementById("board-selector")!;
+    this.element.setAttributeNS(
+      null,
+      "stroke-width",
+      String(options.selectorStrokeWidth)
+    );
   }
   setRectangle(rect: Rectangle): void {
     setRectangle(this.element, rect);
@@ -399,5 +413,50 @@ export class Selector {
   }
   hide(): void {
     setStroke(this.element, "none");
+  }
+}
+
+export class Help {
+  constructor() {
+    if (touchDevice) {
+      document.getElementById("help-touch")!.classList.remove("hidden");
+    } else {
+      document.getElementById("help")!.classList.remove("hidden");
+    }
+  }
+}
+export class Shortcuts {
+  private selectButton: HTMLElement;
+  private deleteButton: HTMLElement;
+  private undoButton: HTMLButtonElement;
+  private redoButton: HTMLButtonElement;
+  constructor() {
+    this.selectButton = document.getElementById("select")!;
+    this.deleteButton = document.getElementById("delete")!;
+    this.undoButton = document.getElementById("undo")! as HTMLButtonElement;
+    this.redoButton = document.getElementById("redo")! as HTMLButtonElement;
+    if (touchDevice) {
+      document.getElementById("shortcut-buttons")!.classList.remove("hidden");
+    }
+  }
+  setSelectingReady(ready: boolean): void {
+    if (ready) {
+      this.selectButton.classList.remove("select");
+    }
+  }
+  setSelecting(selecting: boolean): void {
+    if (selecting) {
+      this.selectButton.classList.add("hidden");
+      this.deleteButton.classList.remove("hidden");
+    } else {
+      this.selectButton.classList.remove("hidden");
+      this.deleteButton.classList.add("hidden");
+    }
+  }
+  setUndoDisabled(disabled: boolean): void {
+    this.undoButton.disabled = disabled;
+  }
+  setRedoDisabled(disabled: boolean): void {
+    this.redoButton.disabled = disabled;
   }
 }
