@@ -33,7 +33,6 @@ UI
 - https://developers.cloudflare.com/workers/tutorials/build-a-slackbot
 
 TODO:
-- Safari で webscoket リクエストに cookie が送信されない件
 - エッジケースのバグ除去とリファクタリング
 - 文字がずれる問題
 - 選択中に切断したら選択解除
@@ -45,6 +44,12 @@ TODO:
 - 秘匿情報をロギングしない
 - ログアウト or revoke
 - HTML と JSON を正しく返し分ける
+- 何らかの原因で session user 数 > ブラウザ数になった？
+- manager の負荷を減らす
+- ua 独立のテスト
+- 切断の理由を表示
+- デプロイ方法をドキュメントに書く
+- 参加人数が多い時のアイコン表示
 - GitHub auth のアイコン
 - GitHub auth で org を optional に
 - GitHub 要らない説
