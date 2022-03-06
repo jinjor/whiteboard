@@ -446,8 +446,13 @@ export class Shortcuts {
       document.getElementById("shortcut-buttons")!.classList.remove("hidden");
     }
   }
+  isSelectingReady(): boolean {
+    return this.selectButton.classList.contains("select");
+  }
   setSelectingReady(ready: boolean): void {
     if (ready) {
+      this.selectButton.classList.add("select");
+    } else {
       this.selectButton.classList.remove("select");
     }
   }
@@ -465,5 +470,30 @@ export class Shortcuts {
   }
   setRedoDisabled(disabled: boolean): void {
     this.redoButton.disabled = disabled;
+  }
+  listenToButtons(o: {
+    clickUndo: () => void;
+    clickRedo: () => void;
+    clickSelect: () => void;
+    clickDelete: () => void;
+  }): () => void {
+    this.undoButton.onclick = () => {
+      o.clickUndo();
+    };
+    this.redoButton.onclick = () => {
+      o.clickRedo();
+    };
+    this.selectButton.onclick = () => {
+      o.clickSelect();
+    };
+    this.deleteButton.onclick = () => {
+      o.clickDelete();
+    };
+    return () => {
+      this.undoButton.onclick = null;
+      this.redoButton.onclick = null;
+      this.selectButton.onclick = null;
+      this.deleteButton.onclick = null;
+    };
   }
 }

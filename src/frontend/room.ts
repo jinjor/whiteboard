@@ -582,31 +582,23 @@ function listenToKeyboardEvents(state: State): () => void {
   };
 }
 function listenToShortcutButtons(state: State): () => void {
-  const undoButton = document.getElementById("undo")!;
-  const redoButton = document.getElementById("redo")!;
-  const selectButton = document.getElementById("select")!;
-  const deleteButton = document.getElementById("delete")!;
-  undoButton.onclick = () => {
-    undo(state);
-    syncCursorAndButtons(state);
-  };
-  redoButton.onclick = () => {
-    redo(state);
-    syncCursorAndButtons(state);
-  };
-  selectButton.onclick = () => {
-    selectButton.classList.add("select");
-  };
-  deleteButton.onclick = () => {
-    deleteSelectedObjects(state);
-    syncCursorAndButtons(state);
-  };
-  return () => {
-    undoButton.onclick = null;
-    redoButton.onclick = null;
-    selectButton.onclick = null;
-    deleteButton.onclick = null;
-  };
+  return state.shortcuts.listenToButtons({
+    clickUndo: () => {
+      undo(state);
+      syncCursorAndButtons(state);
+    },
+    clickRedo: () => {
+      redo(state);
+      syncCursorAndButtons(state);
+    },
+    clickSelect: () => {
+      state.shortcuts.setSelectingReady(true);
+    },
+    clickDelete: () => {
+      deleteSelectedObjects(state);
+      syncCursorAndButtons(state);
+    },
+  });
 }
 function updateInputElementPosition(state: State): void {
   if (state.editing.kind === "text") {
@@ -664,7 +656,7 @@ function listenToBoard(state: State): () => void {
       syncCursorAndButtons(state);
     },
     touchStart: (npos) => {
-      if (document.getElementById("select")!.classList.contains("select")) {
+      if (state.shortcuts.isSelectingReady()) {
         startSelecting(state, npos);
         return;
       }
@@ -679,7 +671,7 @@ function listenToBoard(state: State): () => void {
       return startDrawing(state, npos);
     },
     touchStartLong: (npos) => {
-      if (document.getElementById("select")!.classList.contains("select")) {
+      if (state.shortcuts.isSelectingReady()) {
         return;
       }
       if (state.editing.kind === "select") {
