@@ -27,9 +27,6 @@ function getPixelPositionFromTouch(
     py: touch.pageY - boardPosition.py,
   };
 }
-export function deleteObject(id: string): void {
-  document.getElementById(id)?.remove();
-}
 function createObjectElement<T extends string>(
   tagName: T,
   id: string
@@ -47,30 +44,7 @@ function createObjectElement<T extends string>(
   element.setAttributeNS(null, "clip-path", "url(#clip)");
   return element as any;
 }
-export function patchObject(id: ObjectId, key: string, value: any): void {
-  const element = document.getElementById(id)!;
-  switch (element.tagName) {
-    case "text": {
-      switch (key) {
-        case "position": {
-          setPosition(element, value);
-          break;
-        }
-      }
-      break;
-    }
-    case "path": {
-      switch (key) {
-        case "d": {
-          setD(element, value);
-          break;
-        }
-      }
-      break;
-    }
-  }
-}
-export function elementToObject(element: HTMLElement): ObjectBody | null {
+function elementToObject(element: HTMLElement): ObjectBody | null {
   const id = element.id;
   const kind = element.tagName;
   switch (kind) {
@@ -118,7 +92,7 @@ export function parseD(d: string): Position[] {
       y: parseFloat(y),
     }));
 }
-export function getText(element: HTMLElement | SVGElement): string {
+function getText(element: HTMLElement | SVGElement): string {
   return element.textContent!;
 }
 export function getPosition(element: HTMLElement | SVGElement): Position {
@@ -130,10 +104,7 @@ export function getPosition(element: HTMLElement | SVGElement): Position {
 export function getD(element: HTMLElement | SVGElement): string {
   return element.getAttributeNS(null, "d")!;
 }
-export function setRectangle(
-  element: HTMLElement | SVGElement,
-  rect: Rectangle
-) {
+function setRectangle(element: HTMLElement | SVGElement, rect: Rectangle) {
   setPosition(element, rect);
   setSize(element, rect);
 }
@@ -144,20 +115,17 @@ export function setPosition(
   element.setAttributeNS(null, "x", String(posision.x));
   element.setAttributeNS(null, "y", String(posision.y));
 }
-export function setSize(element: HTMLElement | SVGElement, size: Size) {
+function setSize(element: HTMLElement | SVGElement, size: Size) {
   element.setAttributeNS(null, "width", String(size.width));
   element.setAttributeNS(null, "height", String(size.height));
 }
 export function setD(element: HTMLElement | SVGElement, d: string) {
   element.setAttributeNS(null, "d", d);
 }
-export function setStroke(element: HTMLElement | SVGElement, stroke: string) {
+function setStroke(element: HTMLElement | SVGElement, stroke: string) {
   element.setAttributeNS(null, "stroke", stroke);
 }
-export function setSelected(
-  element: HTMLElement | SVGElement,
-  selected: boolean
-) {
+function setSelected(element: HTMLElement | SVGElement, selected: boolean) {
   const color = selected ? "red" : "black";
   switch (element.tagName) {
     case "text": {
@@ -266,6 +234,46 @@ export class Board {
     }
     element.setAttributeNS(null, "d", path.d);
     this.element.append(element);
+  }
+  hasObject(id: ObjectId): boolean {
+    return document.getElementById(id) != null;
+  }
+  getObject(id: ObjectId): ObjectBody | null {
+    const element = document.getElementById(id);
+    if (element == null) {
+      return null;
+    }
+    return elementToObject(element);
+  }
+  setObjectSelected(id: ObjectId, selected: boolean): void {
+    const element = document.getElementById(id)!;
+    setSelected(element, selected);
+  }
+  patchObject(id: ObjectId, key: string, value: any): void {
+    const element = document.getElementById(id)!;
+    switch (element.tagName) {
+      case "text": {
+        switch (key) {
+          case "position": {
+            setPosition(element, value);
+            break;
+          }
+        }
+        break;
+      }
+      case "path": {
+        switch (key) {
+          case "d": {
+            setD(element, value);
+            break;
+          }
+        }
+        break;
+      }
+    }
+  }
+  deleteObject(id: ObjectId): void {
+    document.getElementById(id)?.remove();
   }
   listenToBoardEvents(o: {
     getBoardRect: () => { position: PixelPosition; size: Size };

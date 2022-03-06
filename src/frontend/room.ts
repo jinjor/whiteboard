@@ -9,20 +9,16 @@ import {
 } from "../schema";
 import {
   Board,
-  deleteObject,
-  elementToObject,
   getD,
   getPosition,
   Help,
   Input,
   makeD,
   parseD,
-  patchObject,
   PixelPosition,
   Selector,
   setD,
   setPosition,
-  setSelected,
   Shortcuts,
 } from "./lib/board";
 import * as api from "./lib/api";
@@ -134,7 +130,7 @@ function connect(pageInfo: PageInfo, state: State, disableEditing: () => void) {
         break;
       }
       case "delete": {
-        deleteObject(data.id);
+        state.board.deleteObject(data.id);
         break;
       }
     }
@@ -303,8 +299,7 @@ function selectAllObjects(
     if (selected) {
       state.selected.push(object);
     }
-    const element = document.getElementById(object.id)!;
-    setSelected(element, selected);
+    state.board.setObjectSelected(object.id, selected);
   }
 }
 function continueSelecting(state: State, pos: Position): void {
@@ -398,8 +393,7 @@ function stopMoving(state: State, pos: Position): void {
     }
   }
   for (const object of state.selected) {
-    const element = document.getElementById(object.id)!;
-    setSelected(element, false);
+    state.board.setObjectSelected(object.id, false);
   }
   state.selected = [];
   state.editing = { kind: "none" };
@@ -434,12 +428,11 @@ function deleteSelectedObjects(state: State) {
   if (state.websocket != null) {
     const events = [];
     for (const { id } of state.selected) {
-      const element = document.getElementById(id);
-      if (element == null) {
+      const object = state.board.getObject(id);
+      if (object == null) {
         // 既に他の人が消していた場合
         continue;
       }
-      const object = elementToObject(element)!;
       const event = api.makeDeleteObjectEvent(object);
       events.push(event);
     }
@@ -451,30 +444,26 @@ function selectAll(state: State): void {
   const objects = getAllObjectsForSelect();
   for (const object of objects) {
     state.selected.push(object);
-    const element = document.getElementById(object.id)!;
-    setSelected(element, true);
+    state.board.setObjectSelected(object.id, true);
   }
 }
-function canApplyEvent(event: ActionEvent): boolean {
+function canApplyEvent(state: State, event: ActionEvent): boolean {
   switch (event.kind) {
     case "add": {
-      const element = document.getElementById(event.object.id);
-      return element == null;
+      return !state.board.hasObject(event.object.id);
     }
     case "patch": {
-      const element = document.getElementById(event.id);
-      if (element == null) {
+      const object = state.board.getObject(event.id);
+      if (object == null) {
         return false; // ?
       }
-      const object = elementToObject(element);
       return deepEqual((object as any)[event.key], event.value.old);
     }
     case "delete": {
-      const element = document.getElementById(event.object.id);
-      if (element == null) {
+      const object = state.board.getObject(event.object.id);
+      if (object == null) {
         return false; // ?
       }
-      const object = elementToObject(element);
       return deepEqual(object, event.object);
     }
   }
@@ -486,11 +475,11 @@ function doEventWithoutCheck(state: State, event: ActionEvent) {
       break;
     }
     case "patch": {
-      patchObject(event.id, event.key, event.value.new);
+      state.board.patchObject(event.id, event.key, event.value.new);
       break;
     }
     case "delete": {
-      deleteObject(event.object.id);
+      state.board.deleteObject(event.object.id);
       break;
     }
   }
@@ -540,7 +529,7 @@ function undo(state: State): void {
   }
   for (const event of action.events) {
     const invertedEvent = invertEvent(event);
-    if (!canApplyEvent(invertedEvent)) {
+    if (!canApplyEvent(state, invertedEvent)) {
       return;
     }
   }
@@ -559,7 +548,7 @@ function redo(state: State): void {
     return;
   }
   for (const event of action.events) {
-    if (!canApplyEvent(event)) {
+    if (!canApplyEvent(state, event)) {
       return;
     }
   }
