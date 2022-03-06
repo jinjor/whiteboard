@@ -9,16 +9,12 @@ import {
 } from "../schema";
 import {
   Board,
-  getD,
-  getPosition,
   Help,
   Input,
-  makeD,
-  parseD,
+  ObjectForSelect,
   PixelPosition,
+  Rectangle,
   Selector,
-  setD,
-  setPosition,
   Shortcuts,
 } from "./lib/board";
 import * as api from "./lib/api";
@@ -27,37 +23,10 @@ import { deepEqual } from "../deep-equal";
 import { appendCreateRoomButton, debugging } from "./lib/debug";
 
 type Size = { width: number; height: number };
-class Rectangle {
-  constructor(
-    public x: number,
-    public y: number,
-    public width: number,
-    public height: number
-  ) {}
-  get right() {
-    return this.x + this.width;
-  }
-  get bottom() {
-    return this.y + this.height;
-  }
-}
 type ActionEvent = AddEventBody | PatchEventBody | DeleteEventBody;
 type Action = {
   events: ActionEvent[];
 };
-type ObjectForSelect =
-  | {
-      kind: "text";
-      id: ObjectId;
-      bbox: Rectangle;
-      position: Position;
-    }
-  | {
-      kind: "path";
-      id: ObjectId;
-      bbox: Rectangle;
-      points: Position[];
-    };
 
 type EditingState =
   | { kind: "none" }
@@ -155,6 +124,29 @@ function generateObjectId(): ObjectId {
   // https://caniuse.com/mdn-api_crypto_randomuuid
   // return crypto.randomUUID();
 }
+function formatPosition(pos: Position): string {
+  return `${pos.x.toFixed(4)},${pos.y.toFixed(4)}`;
+}
+function makeD(points: Position[]) {
+  const [init, ...rest] = points;
+  const m = formatPosition(init);
+  if (rest.length <= 0) {
+    return `M${m}`;
+  }
+  const l = rest.map(formatPosition).join(" ");
+  return `M${m}L${l}`;
+}
+function parseD(d: string): Position[] {
+  return d
+    .slice(1) // remove M
+    .replace("L", " ")
+    .split(" ")
+    .map((s) => s.split(","))
+    .map(([x, y]) => ({
+      x: parseFloat(x),
+      y: parseFloat(y),
+    }));
+}
 function startDrawing(state: State, pos: Position): void {
   const id = generateObjectId();
   const points = [pos];
@@ -163,16 +155,13 @@ function startDrawing(state: State, pos: Position): void {
 function continueDrawing(state: State, pos: Position): void {
   if (state.editing.kind === "path") {
     const id = state.editing.id;
-    let element = document.getElementById(
-      id
-    ) as unknown as SVGPathElement | null;
     state.editing.points.push(pos);
     const d = makeD(state.editing.points);
-    if (element == null) {
+    if (state.board.hasObject(id)) {
+      state.board.updateD(id, d);
+    } else {
       const object = { id, kind: "path", d } as const;
       state.board.upsertPath(object);
-    } else {
-      setD(element, d);
     }
   }
 }
@@ -196,44 +185,31 @@ function stopDrawing(state: State, pos: Position): void {
   }
   state.editing = { kind: "none" };
 }
-
-function getAllObjectElements(): SVGElement[] {
-  return document.getElementsByClassName("object") as unknown as SVGElement[];
-}
-function getAllObjectsForSelect(): ObjectForSelect[] {
-  const elements = getAllObjectElements();
-  const objects: ObjectForSelect[] = [];
-  for (const element of elements) {
-    const { x, y, width, height } = (element as any).getBBox();
-    const bbox = new Rectangle(x, y, width, height);
-    switch (element.tagName) {
+function getAllObjectsForSelect(state: State): ObjectForSelect[] {
+  return state.board.getAllObjectsWithBoundingBox().map(({ object, bbox }) => {
+    switch (object.kind) {
       case "text": {
-        const position = getPosition(element);
-        objects.push({
+        return {
           kind: "text",
-          id: element.id,
-          position,
+          id: object.id,
+          position: object.position,
           bbox,
-        });
-        break;
+        };
       }
       case "path": {
-        const d = getD(element);
-        const points = parseD(d);
-        objects.push({
+        const points = parseD(object.d);
+        return {
           kind: "path",
-          id: element.id,
+          id: object.id,
           bbox,
           points,
-        });
-        break;
+        };
       }
     }
-  }
-  return objects;
+  });
 }
 function startSelecting(state: State, pos: Position): void {
-  const objects = getAllObjectsForSelect();
+  const objects = getAllObjectsForSelect(state);
   state.editing = { kind: "select", start: pos, objects };
   const rect = new Rectangle(pos.x, pos.y, 0, 0);
   state.selector.setRectangle(rect);
@@ -328,12 +304,11 @@ function continueMoving(state: State, pos: Position): void {
     const dx = pos.x - state.editing.start.x;
     const dy = pos.y - state.editing.start.y;
     for (const object of state.selected) {
-      const element = document.getElementById(object.id)!;
       switch (object.kind) {
         case "text": {
           const x = object.position.x + dx;
           const y = object.position.y + dy;
-          setPosition(element, { x, y });
+          state.board.updatePosition(object.id, { x, y });
           break;
         }
         case "path": {
@@ -342,7 +317,7 @@ function continueMoving(state: State, pos: Position): void {
             y: p.y + dy,
           }));
           const d = makeD(points);
-          setD(element, d);
+          state.board.updateD(object.id, d);
           break;
         }
       }
@@ -400,7 +375,7 @@ function stopMoving(state: State, pos: Position): void {
 }
 function createText(state: State, pos: Position): void {
   state.editing = { kind: "text", position: pos };
-  updateInputElementPosition(state);
+  updateInputPosition(state);
   state.input.showAndFocus();
 }
 function stopEditingText(state: State): void {
@@ -441,7 +416,7 @@ function deleteSelectedObjects(state: State) {
   state.selected = [];
 }
 function selectAll(state: State): void {
-  const objects = getAllObjectsForSelect();
+  const objects = getAllObjectsForSelect(state);
   for (const object of objects) {
     state.selected.push(object);
     state.board.setObjectSelected(object.id, true);
@@ -600,7 +575,7 @@ function listenToShortcutButtons(state: State): () => void {
     },
   });
 }
-function updateInputElementPosition(state: State): void {
+function updateInputPosition(state: State): void {
   if (state.editing.kind === "text") {
     const ppos = state.board.toPixelPosition(
       state.boardRect.size,
@@ -612,7 +587,7 @@ function updateInputElementPosition(state: State): void {
 function listenToWindowEvents(state: State): () => void {
   window.onresize = () => {
     state.boardRect = state.board.calculateBoardRect();
-    updateInputElementPosition(state);
+    updateInputPosition(state);
   };
   return () => {
     window.onresize = null;

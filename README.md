@@ -33,7 +33,7 @@ UI
 - https://developers.cloudflare.com/workers/tutorials/build-a-slackbot
 
 TODO:
-- エッジケースのバグ除去とリファクタリング
+- エッジケースのバグ除去
 - 文字がずれる問題
 - 選択中に切断したら選択解除
 - 部屋がユーザーでいっぱいだった時の表示

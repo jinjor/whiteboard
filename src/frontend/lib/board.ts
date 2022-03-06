@@ -7,7 +7,33 @@ import {
 } from "../../schema";
 type Size = { width: number; height: number };
 export type PixelPosition = { px: number; py: number };
-export type Rectangle = { x: number; y: number; width: number; height: number };
+export class Rectangle {
+  constructor(
+    public x: number,
+    public y: number,
+    public width: number,
+    public height: number
+  ) {}
+  get right() {
+    return this.x + this.width;
+  }
+  get bottom() {
+    return this.y + this.height;
+  }
+}
+export type ObjectForSelect =
+  | {
+      kind: "text";
+      id: ObjectId;
+      bbox: Rectangle;
+      position: Position;
+    }
+  | {
+      kind: "path";
+      id: ObjectId;
+      bbox: Rectangle;
+      points: Position[];
+    };
 
 const touchDevice =
   window.ontouchstart != null || window.navigator.maxTouchPoints > 0;
@@ -44,7 +70,7 @@ function createObjectElement<T extends string>(
   element.setAttributeNS(null, "clip-path", "url(#clip)");
   return element as any;
 }
-function elementToObject(element: HTMLElement): ObjectBody | null {
+function elementToObject(element: HTMLElement | SVGElement): ObjectBody | null {
   const id = element.id;
   const kind = element.tagName;
   switch (kind) {
@@ -69,49 +95,23 @@ function elementToObject(element: HTMLElement): ObjectBody | null {
   }
   return null;
 }
-function formatPosition(pos: Position): string {
-  return `${pos.x.toFixed(4)},${pos.y.toFixed(4)}`;
-}
-export function makeD(points: Position[]) {
-  const [init, ...rest] = points;
-  const m = formatPosition(init);
-  if (rest.length <= 0) {
-    return `M${m}`;
-  }
-  const l = rest.map(formatPosition).join(" ");
-  return `M${m}L${l}`;
-}
-export function parseD(d: string): Position[] {
-  return d
-    .slice(1) // remove M
-    .replace("L", " ")
-    .split(" ")
-    .map((s) => s.split(","))
-    .map(([x, y]) => ({
-      x: parseFloat(x),
-      y: parseFloat(y),
-    }));
-}
 function getText(element: HTMLElement | SVGElement): string {
   return element.textContent!;
 }
-export function getPosition(element: HTMLElement | SVGElement): Position {
+function getPosition(element: HTMLElement | SVGElement): Position {
   return {
     x: parseFloat(element.getAttributeNS(null, "x")!),
     y: parseFloat(element.getAttributeNS(null, "y")!),
   };
 }
-export function getD(element: HTMLElement | SVGElement): string {
+function getD(element: HTMLElement | SVGElement): string {
   return element.getAttributeNS(null, "d")!;
 }
 function setRectangle(element: HTMLElement | SVGElement, rect: Rectangle) {
   setPosition(element, rect);
   setSize(element, rect);
 }
-export function setPosition(
-  element: HTMLElement | SVGElement,
-  posision: Position
-) {
+function setPosition(element: HTMLElement | SVGElement, posision: Position) {
   element.setAttributeNS(null, "x", String(posision.x));
   element.setAttributeNS(null, "y", String(posision.y));
 }
@@ -119,7 +119,7 @@ function setSize(element: HTMLElement | SVGElement, size: Size) {
   element.setAttributeNS(null, "width", String(size.width));
   element.setAttributeNS(null, "height", String(size.height));
 }
-export function setD(element: HTMLElement | SVGElement, d: string) {
+function setD(element: HTMLElement | SVGElement, d: string) {
   element.setAttributeNS(null, "d", d);
 }
 function setStroke(element: HTMLElement | SVGElement, stroke: string) {
@@ -235,6 +235,18 @@ export class Board {
     element.setAttributeNS(null, "d", path.d);
     this.element.append(element);
   }
+  updatePosition(id: ObjectId, pos: Position): void {
+    const element = document.getElementById(id);
+    if (element != null) {
+      setPosition(element, pos);
+    }
+  }
+  updateD(id: ObjectId, d: string): void {
+    const element = document.getElementById(id);
+    if (element != null) {
+      setD(element, d);
+    }
+  }
   hasObject(id: ObjectId): boolean {
     return document.getElementById(id) != null;
   }
@@ -244,6 +256,21 @@ export class Board {
       return null;
     }
     return elementToObject(element);
+  }
+  getAllObjectsWithBoundingBox(): { object: ObjectBody; bbox: Rectangle }[] {
+    const elements = document.getElementsByClassName(
+      "object"
+    ) as unknown as SVGElement[];
+    const objects = [];
+    for (const element of elements) {
+      const { x, y, width, height } = (element as any).getBBox();
+      const bbox = new Rectangle(x, y, width, height);
+      const object = elementToObject(element);
+      if (object != null) {
+        objects.push({ object, bbox });
+      }
+    }
+    return objects;
   }
   setObjectSelected(id: ObjectId, selected: boolean): void {
     const element = document.getElementById(id)!;
