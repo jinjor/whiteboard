@@ -162,7 +162,9 @@ function connect(pageInfo: PageInfo, state: State, disableEditing: () => void) {
   });
 }
 function generateObjectId(): ObjectId {
-  return (crypto as any).randomUUID(); // TODO: 型が古そう
+  return String(Date.now()).padStart(36, "0");
+  // https://caniuse.com/mdn-api_crypto_randomuuid
+  // return crypto.randomUUID();
 }
 function startDrawing(state: State, pos: Position): void {
   const id = generateObjectId();
