@@ -231,17 +231,18 @@ export class Board {
   toDefaultCursor() {
     this.element.style.removeProperty("cursor");
   }
-  upsertObject(object: ObjectBody, boardOptions: BoardOptions): void {
+  upsertObject(object: ObjectBody): void {
     switch (object.kind) {
       case "text": {
-        return this.upsertText(object, boardOptions.textFontSize);
+        return this.upsertText(object);
       }
       case "path": {
-        return this.upsertPath(object, boardOptions.pathStrokeWidth);
+        return this.upsertPath(object);
       }
     }
   }
-  upsertText(text: TextBody, fontSize: number) {
+  upsertText(text: TextBody) {
+    const fontSize = this.options.textFontSize;
     let element = document.getElementById(text.id) as unknown as SVGTextElement;
     if (element == null) {
       element = createObjectElement("text", text.id);
@@ -252,7 +253,8 @@ export class Board {
     element.setAttributeNS(null, "y", String(text.position.y));
     this.element.append(element);
   }
-  upsertPath(path: PathBody, strokeWidth: number) {
+  upsertPath(path: PathBody) {
+    const strokeWidth = this.options.pathStrokeWidth;
     let element = document.getElementById(
       path.id
     ) as unknown as SVGPathElement | null;
@@ -265,20 +267,17 @@ export class Board {
     element.setAttributeNS(null, "d", path.d);
     this.element.append(element);
   }
-  listenToBoardEvents(
-    boardOptions: BoardOptions,
-    o: {
-      getBoardRect: () => { position: PixelPosition; size: Size };
-      doubleClick: (pos: Position) => void;
-      mouseDown: (pos: Position, isRight: boolean) => void;
-      touchStart: (pos: Position) => void;
-      touchStartLong: (pos: Position) => void;
-      mouseMove: (pos: Position) => void;
-      touchMove: (pos: Position) => void;
-      mouseUp: (pos: Position) => void;
-      touchEnd: (pos: Position) => void;
-    }
-  ): () => void {
+  listenToBoardEvents(o: {
+    getBoardRect: () => { position: PixelPosition; size: Size };
+    doubleClick: (pos: Position) => void;
+    mouseDown: (pos: Position, isRight: boolean) => void;
+    touchStart: (pos: Position) => void;
+    touchStartLong: (pos: Position) => void;
+    mouseMove: (pos: Position) => void;
+    touchMove: (pos: Position) => void;
+    mouseUp: (pos: Position) => void;
+    touchEnd: (pos: Position) => void;
+  }): () => void {
     this.element.ondblclick = (e: MouseEvent) => {
       e.preventDefault();
       const boardRect = o.getBoardRect();

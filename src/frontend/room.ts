@@ -9,7 +9,6 @@ import {
 } from "../schema";
 import {
   Board,
-  BoardOptions,
   deleteObject,
   elementToObject,
   getD,
@@ -72,7 +71,6 @@ type EditingState =
   | { kind: "text"; position: Position };
 type State = {
   self: UserId | null;
-  boardOptions: BoardOptions;
   board: Board;
   shortcuts: Shortcuts;
   input: Input;
@@ -117,7 +115,7 @@ function connect(pageInfo: PageInfo, state: State, disableEditing: () => void) {
           addMember(member, member.id === state.self);
         }
         for (const key of Object.keys(data.objects)) {
-          state.board.upsertObject(data.objects[key], state.boardOptions);
+          state.board.upsertObject(data.objects[key]);
         }
         break;
       }
@@ -132,7 +130,7 @@ function connect(pageInfo: PageInfo, state: State, disableEditing: () => void) {
         break;
       }
       case "upsert": {
-        state.board.upsertObject(data.object, state.boardOptions);
+        state.board.upsertObject(data.object);
         break;
       }
       case "delete": {
@@ -176,7 +174,7 @@ function continueDrawing(state: State, pos: Position): void {
     const d = makeD(state.editing.points);
     if (element == null) {
       const object = { id, kind: "path", d } as const;
-      state.board.upsertPath(object, state.boardOptions.pathStrokeWidth);
+      state.board.upsertPath(object);
     } else {
       setD(element, d);
     }
@@ -484,7 +482,7 @@ function canApplyEvent(event: ActionEvent): boolean {
 function doEventWithoutCheck(state: State, event: ActionEvent) {
   switch (event.kind) {
     case "add": {
-      state.board.upsertObject(event.object, state.boardOptions);
+      state.board.upsertObject(event.object);
       break;
     }
     case "patch": {
@@ -648,7 +646,7 @@ function listenToInputEvents(state: State): () => void {
   return () => state.input.unlisten();
 }
 function listenToBoard(state: State): () => void {
-  return state.board.listenToBoardEvents(state.boardOptions, {
+  return state.board.listenToBoardEvents({
     getBoardRect: () => {
       return state.boardRect;
     },
@@ -796,7 +794,6 @@ function syncCursorAndButtons(state: State) {
     const board = new Board(boardOptions);
     const state: State = {
       self: null,
-      boardOptions,
       board,
       shortcuts: new Shortcuts(),
       input: new Input(),
@@ -813,7 +810,7 @@ function syncCursorAndButtons(state: State) {
       const objects = await api.getObjects(roomInfo.id);
       if (objects != null) {
         for (const key of Object.keys(objects)) {
-          state.board.upsertObject(objects[key], state.boardOptions);
+          state.board.upsertObject(objects[key]);
         }
       }
     } else {
