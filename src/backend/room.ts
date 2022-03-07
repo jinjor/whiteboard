@@ -44,7 +44,6 @@ const roomRouter = Router()
   })
   .get("/objects", async (request: Request, state: RoomState) => {
     const objects = await state.getObjects();
-    console.log(objects);
     return new Response(JSON.stringify(objects));
   })
   .all("*", () => new Response("Not found.", { status: 404 }));
@@ -177,7 +176,7 @@ class RoomState {
             }
           }
         }
-      } catch (e: unknown) {
+      } catch (e) {
         if (e instanceof InvalidEvent) {
           webSocket.close(1007, "invalid_data");
           return;
@@ -235,8 +234,8 @@ export class ChatRoom implements DurableObject {
     this.state = new RoomState(controller, env);
   }
   async fetch(request: Request) {
-    return roomRouter.handle(request, this.state).catch((error: any) => {
-      console.log(error.stack);
+    return roomRouter.handle(request, this.state).catch((error: unknown) => {
+      console.log(error);
       return new Response("unexpected error", { status: 500 });
     });
   }

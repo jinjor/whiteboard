@@ -336,11 +336,7 @@ const authRouter = Router()
     const digest = await hmacSha256(sigBaseString, env.SLACK_SIGNING_SECRET);
     const expectedSignature = `v0=${digest}`;
     if (actualSignature !== expectedSignature) {
-      console.log(
-        "signature does not match",
-        actualSignature,
-        expectedSignature
-      );
+      console.log("signature does not match");
       return new Response("invalid request", { status: 403 });
     }
     const params = new URLSearchParams(body);
@@ -566,8 +562,8 @@ export default {
     }
     return await authRouter
       .handle(request, env, context)
-      .catch((error: any) => {
-        console.log(error.stack);
+      .catch((error: unknown) => {
+        console.log(error);
         return new Response("unexpected error", { status: 500 });
       });
   },

@@ -55,7 +55,6 @@ export class SlackOAuth implements OAuth {
   }
   async createInitialSession(accessToken: string): Promise<string> {
     const slackUser = await getUser(accessToken);
-    console.log("slack user:", slackUser);
     const id = "sl/" + slackUser.name;
     const name = slackUser.name;
     const image = slackUser.image_48;

@@ -34,10 +34,12 @@ export class RateLimiter implements DurableObject {
     this.state = new RateLimiterState();
   }
   async fetch(request: Request) {
-    return rateLimitRouter.handle(request, this.state).catch((error: any) => {
-      console.log("RateLimiter:", error);
-      return new Response("unexpected error", { status: 500 });
-    });
+    return rateLimitRouter
+      .handle(request, this.state)
+      .catch((error: unknown) => {
+        console.log("RateLimiter:", error);
+        return new Response("unexpected error", { status: 500 });
+      });
   }
 }
 

@@ -56,7 +56,6 @@ class RoomManagerState {
         activeRooms++;
       }
     }
-    console.log("activeRooms:", activeRooms);
     if (activeRooms >= this.MAX_ACTIVE_ROOMS) {
       return null;
     }
