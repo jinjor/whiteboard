@@ -494,7 +494,7 @@ function preserveSession(req: Request, res: Response): Response {
       path: "/",
       httpOnly: true,
       maxAge: 60 * 60 * 24 * 7, // 1 week
-      secure: true, // TODO: switch
+      secure: true,
       sameSite: "strict",
     })
   );

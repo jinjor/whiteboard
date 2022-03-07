@@ -67,7 +67,7 @@ function createRedirectToFormResponse(
         path: "/",
         httpOnly: true,
         maxAge: 60,
-        secure: true, // TODO: switch
+        secure: true,
         sameSite: "lax", // strict だと直後に cookie を送信してくれない
       }),
       Location: oauth.getFormUrl(request),
@@ -102,7 +102,7 @@ export async function handleCallback(
           path: "/",
           httpOnly: true,
           maxAge: 60 * 60 * 24 * 7, // 1 week
-          secure: true, // TODO: switch
+          secure: true,
           sameSite: "lax", // strict だと直後に cookie を送信してくれない
         }),
         Location: cookie.original_url ?? `/`,
