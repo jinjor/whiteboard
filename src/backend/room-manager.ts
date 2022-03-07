@@ -117,8 +117,7 @@ const roomManagerRouter = Router()
     return new Response("null");
   })
   .get("/config", async (request: Request, state: RoomManagerState) => {
-    const config = await request.json();
-    return new Response(JSON.stringify(config));
+    return new Response(JSON.stringify(state.getConfig()));
   })
   .patch("/config", async (request: Request, state: RoomManagerState) => {
     const config = await request.json();

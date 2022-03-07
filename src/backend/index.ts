@@ -409,7 +409,7 @@ const authRouter = Router()
               left >= 3600
                 ? Math.floor(left / 3600) + " hours"
                 : Math.floor(left / 60) + " minutes";
-            return `${i}: ${formatted} left`;
+            return `[${i}] ${formatted} left`;
           }),
         ].join("\n");
         const blocks = [

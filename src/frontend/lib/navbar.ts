@@ -5,11 +5,9 @@ export function updateStatus(
   title: string,
   reason?: string
 ): void {
-  const containerElement = document.getElementById("status")!;
-  containerElement.classList.add(kind);
-
   const buttonElement = document.getElementById("status-button")!;
   buttonElement.classList.remove("active", "inactive", "error");
+  buttonElement.classList.add(kind);
   buttonElement.classList.remove("hidden");
   buttonElement.textContent = title;
 
