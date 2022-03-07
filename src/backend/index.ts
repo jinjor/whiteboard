@@ -17,6 +17,7 @@ import {
 } from "@cloudflare/kv-asset-handler";
 import { RoomInfo, SessionUser, User } from "../schema";
 import { check, handleCallback, OAuth } from "./oauth";
+import { Config } from "./config";
 
 type Env = {
   manager: DurableObjectNamespace;
@@ -393,18 +394,19 @@ const authRouter = Router()
       case "status": {
         const singletonId = env.manager.idFromName("singleton");
         const managerStub = env.manager.get(singletonId);
-        const res = await managerStub.fetch("https://dummy-url/rooms");
-        const rooms = (await res.json()) as RoomInfo[];
+        const configRes = await managerStub.fetch("https://dummy-url/config");
+        const config = (await configRes.json()) as Partial<Config>;
+        const roomsRes = await managerStub.fetch("https://dummy-url/rooms");
+        const rooms = (await roomsRes.json()) as RoomInfo[];
         const activeRooms = rooms
           .filter((room) => room.active)
           .sort((r1, r2) => {
             return r1.activeUntil - r2.activeUntil;
           });
-        const maxActiveRooms = 10; // TODO: use variable
         const now = Date.now();
         const message = [
           `Total rooms: ${rooms.length}`,
-          `Active rooms: ${activeRooms.length} / ${maxActiveRooms}`,
+          `Active rooms: ${activeRooms.length} / ${config.MAX_ACTIVE_ROOMS}`,
           ...activeRooms.map((room, i) => {
             const left = (room.activeUntil - now) / 1000; // seconds
             const formatted =

@@ -53,29 +53,37 @@
         border-color: red;
       }
       #status {
+        margin-left: 20px;
+      }
+      #status-button {
         height: 40px;
         border-radius: 20px;
         border: solid 1px #333;
         background: #fff;
         color: #333;
-        margin-left: 20px;
         display: inline-flex;
         align-items: center;
         justify-content: center;
         padding-left: 15px;
         padding-right: 15px;
       }
-      #status.active {
-        border-color: #47f;
+      #status-button.active {
         color: #05a;
+        border-color: #47f;
       }
-      #status.inactive {
-        border-color: #aaa;
+      #status-button.inactive {
         color: #888;
+        border-color: #aaa;
       }
-      #status.error {
-        border-color: #f00;
+      #status-button.error {
         color: #a00;
+        border-color: #f00;
+      }
+      #status-reason {
+        margin-top: 5px;
+        padding-left: 15px;
+        font-size: 14px;
+        color: #888;
       }
       #help,
       #help-touch {
@@ -85,11 +93,10 @@
         margin-right: 20px;
         margin-bottom: 10px;
         text-align: right;
-        color: #ccc;
         font-size: 14px;
         line-height: 1.4;
       }
-      #shortcuts {
+      .shortcuts {
         pointer-events: none;
       }
       #shortcut-buttons {
@@ -126,16 +133,22 @@
         background-color: #a00;
         color: #fff;
       }
+      .text-help {
+        color: #ccc;
+      }
     </style>
   </head>
   <body>
     <div id="container">
       <nav>
-        <div id="status" class="hidden"></div>
+        <div id="status">
+          <div id="status-button" class="hidden"></div>
+          <div id="status-reason" class="hidden"></div>
+        </div>
         <div id="members"></div>
       </nav>
       <div id="help" class="hidden">
-        <div id="shortcuts">
+        <div class="text-help shortcuts">
           <div>Double-click: Text</div>
           <div>Right-drag: Select</div>
           <div>Select & Drag: Move</div>
@@ -180,7 +193,7 @@
             </svg>
           </button>
         </div>
-        <div id="shortcuts">
+        <div class="text-help shortcuts">
           <div>Long tap: Text</div>
           <div>Select & Drag: Move</div>
         </div>

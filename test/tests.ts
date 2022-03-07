@@ -211,7 +211,8 @@ describe("Whiteboard", function () {
     await useWebsocket("tester", `/api/rooms/${id}/websocket`, async () => {});
   });
   it("does not accept websocket connection to invalid rooms", async function () {
-    // TODO: なぜか Miniflare が 500 を返す
+    // TODO: miniflare が修正したらステータスコードをチェックしたい
+    // https://github.com/cloudflare/miniflare/issues/174
     await assert.rejects(async () => {
       await useWebsocket("a", `/foo`, async () => {});
     });

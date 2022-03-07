@@ -15,7 +15,7 @@ const roomRouter = Router()
     return new Response("null");
   })
   .post("/deactivate", async (request: Request, state: RoomState) => {
-    await state.disconnectAllSessions();
+    await state.disconnectAllSessions("room_got_inactive");
     return new Response("null");
   })
   .post("/cooldown", async (request: Request, state: RoomState) => {
@@ -78,15 +78,15 @@ class RoomState {
       this.MAX_ACTIVE_USERS = config.MAX_ACTIVE_USERS;
     }
   }
-  async disconnectAllSessions() {
+  async disconnectAllSessions(reasonCode: string) {
     while (this.sessions.length > 0) {
       const session = this.sessions.pop()!;
-      session.webSocket.close(1001);
+      session.webSocket.close(1001, reasonCode);
     }
   }
   async cooldown() {
     if (Date.now() - this.lastTimestamp > this.HOT_DURATION) {
-      this.disconnectAllSessions();
+      this.disconnectAllSessions("no_recent_activity");
     }
   }
   canStart(userId: string): boolean {
@@ -117,7 +117,7 @@ class RoomState {
       () => this.env.limiters.get(limiterId),
       (err) => {
         console.log(err);
-        webSocket.close(1011);
+        webSocket.close(1011, "rate_limit_exceeded");
       }
     );
 
@@ -130,7 +130,7 @@ class RoomState {
     for (let i = this.sessions.length - 1; i >= 0; i--) {
       const session = this.sessions[i];
       if (session.user.id === user.id) {
-        session.webSocket.close(1001);
+        session.webSocket.close(1001, "duplicated_self");
         this.sessions.splice(i, 1);
       }
     }
@@ -179,11 +179,11 @@ class RoomState {
         }
       } catch (e: unknown) {
         if (e instanceof InvalidEvent) {
-          webSocket.close(1007);
+          webSocket.close(1007, "invalid_data");
           return;
         }
         console.log(e);
-        webSocket.close(1011, "Something went wrong.");
+        webSocket.close(1011, "unexpected");
       }
     });
     webSocket.addEventListener("error", (e) => {

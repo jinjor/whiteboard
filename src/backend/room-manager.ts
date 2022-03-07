@@ -17,6 +17,13 @@ class RoomManagerState {
     this.storage = storage;
     this.updateConfig(defaultConfig);
   }
+  getConfig(): Partial<Config> {
+    return {
+      MAX_ACTIVE_ROOMS: this.MAX_ACTIVE_ROOMS,
+      LIVE_DURATION: this.LIVE_DURATION,
+      ACTIVE_DURATION: this.ACTIVE_DURATION,
+    };
+  }
   updateConfig(config: Partial<Config>): void {
     if (config.MAX_ACTIVE_ROOMS != null) {
       this.MAX_ACTIVE_ROOMS = config.MAX_ACTIVE_ROOMS;
@@ -109,6 +116,10 @@ const roomManagerRouter = Router()
   .delete("/", async (request: Request, state: RoomManagerState) => {
     await state.reset();
     return new Response("null");
+  })
+  .get("/config", async (request: Request, state: RoomManagerState) => {
+    const config = await request.json();
+    return new Response(JSON.stringify(config));
   })
   .patch("/config", async (request: Request, state: RoomManagerState) => {
     const config = await request.json();

@@ -1,5 +1,6 @@
 import {
   AddEventBody,
+  CloseReason,
   DeleteEventBody,
   ObjectId,
   PatchEventBody,
@@ -105,19 +106,38 @@ function connect(pageInfo: PageInfo, state: State, disableEditing: () => void) {
     }
   });
   ws.addEventListener("close", (event) => {
-    console.log("WebSocket closed: " + event.code + " " + event.reason);
+    const reason = event.reason as CloseReason;
+    console.log("WebSocket closed: " + event.code + " " + reason);
     state.websocket = null;
     disableEditing();
-    updateStatus("inactive", "Disconnected");
-    // TODO: reconnect
+    if (reason === "unexpected") {
+      updateStatus("error", "Error", formatCloseReason(reason));
+    } else {
+      updateStatus("error", "Disconnected", formatCloseReason(reason));
+    }
   });
   ws.addEventListener("error", (event) => {
     console.log("WebSocket error:", event);
     state.websocket = null;
     disableEditing();
-    updateStatus("error", "Error");
-    // TODO: reconnect
+    updateStatus("error", "Error", formatCloseReason("unexpected"));
   });
+}
+function formatCloseReason(reason: CloseReason): string {
+  switch (reason) {
+    case "room_got_inactive":
+      return "Session closed because this room got inactive.";
+    case "no_recent_activity":
+      return "Session closed because there are no activity recently.";
+    case "rate_limit_exceeded":
+      return "Session closed because too many requests are sent.";
+    case "duplicated_self":
+      return "Session closed because you opened this room on another tab or window.";
+    case "invalid_data":
+      return "Session closed because invalid data is sent to server.";
+    case "unexpected":
+      return "Something went wrong.";
+  }
 }
 function generateObjectId(): ObjectId {
   return String(Date.now()).padStart(36, "0");

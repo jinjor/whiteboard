@@ -98,3 +98,10 @@ export type SessionUser = {
   name: string;
   image: string | null;
 };
+export type CloseReason =
+  | "room_got_inactive"
+  | "no_recent_activity"
+  | "rate_limit_exceeded"
+  | "duplicated_self"
+  | "invalid_data"
+  | "unexpected";

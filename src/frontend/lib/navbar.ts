@@ -2,13 +2,25 @@ import { SessionUserId, SessionUser } from "../../schema";
 
 export function updateStatus(
   kind: "active" | "inactive" | "error",
-  text: string
+  title: string,
+  reason?: string
 ): void {
-  const element = document.getElementById("status")!;
-  element.classList.remove("hidden");
-  element.classList.remove("active", "inactive", "error");
-  element.classList.add(kind);
-  element.textContent = text;
+  const containerElement = document.getElementById("status")!;
+  containerElement.classList.add(kind);
+
+  const buttonElement = document.getElementById("status-button")!;
+  buttonElement.classList.remove("active", "inactive", "error");
+  buttonElement.classList.remove("hidden");
+  buttonElement.textContent = title;
+
+  const reasonElement = document.getElementById("status-reason")!;
+  if (reason != null) {
+    reasonElement.textContent = reason;
+    reasonElement.classList.remove("hidden");
+  } else {
+    reasonElement.classList.add("hidden");
+    reasonElement.textContent = "";
+  }
 }
 
 export function addMember(member: SessionUser, self: boolean): void {
