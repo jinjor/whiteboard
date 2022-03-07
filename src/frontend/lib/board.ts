@@ -35,6 +35,7 @@ export type ObjectForSelect =
       points: Position[];
     };
 
+const isMac = window.navigator.userAgent.toLowerCase().indexOf("mac os x") >= 0;
 const touchDevice =
   window.ontouchstart != null || window.navigator.maxTouchPoints > 0;
 
@@ -455,7 +456,11 @@ export class Help {
     if (touchDevice) {
       document.getElementById("help-touch")!.classList.remove("hidden");
     } else {
-      document.getElementById("help")!.classList.remove("hidden");
+      const helpElement = document.getElementById("help")!;
+      helpElement.classList.remove("hidden");
+      if (isMac) {
+        helpElement.classList.add("mac");
+      }
     }
   }
 }

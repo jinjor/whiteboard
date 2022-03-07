@@ -96,6 +96,12 @@
         font-size: 14px;
         line-height: 1.4;
       }
+      #help.mac .hidden-mac {
+        display: none !important;
+      }
+      #help:not(.mac) .shown-mac {
+        display: none !important;
+      }
       .shortcuts {
         pointer-events: none;
       }
@@ -153,9 +159,20 @@
           <div>Right-drag: Select</div>
           <div>Select & Drag: Move</div>
           <div>Select & Backspace: Delete</div>
-          <div>Ctrl(⌘) + A: Select All</div>
-          <div>Ctrl(⌘) + Z: Undo</div>
-          <div>Ctrl(⌘) + Shift + Z, Ctrl(⌘) + Y: Redo</div>
+          <div>
+            <span class="hidden-mac">Ctrl</span
+            ><span class="shown-mac">⌘</span> + A: Select All
+          </div>
+          <div>
+            <span class="hidden-mac">Ctrl</span
+            ><span class="shown-mac">⌘</span> + Z: Undo
+          </div>
+          <div>
+            <span class="hidden-mac">Ctrl</span
+            ><span class="shown-mac">⌘</span> + Shift + Z,
+            <span class="hidden-mac">Ctrl</span
+            ><span class="shown-mac">⌘</span> + Y: Redo
+          </div>
         </div>
       </div>
       <div id="help-touch" class="hidden">
