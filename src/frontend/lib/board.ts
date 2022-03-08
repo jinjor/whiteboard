@@ -194,10 +194,20 @@ export class Board {
     const py = ((npos.y / viewBoxHeight - offsetY) / scaleY) * height;
     return { px, py };
   }
-  toMovingCursor() {
+  getFonrSizeInPixel(boardSize: Size): number {
+    const { width, height } = boardSize;
+    const viewBoxWidth = this.options.viewBox.width;
+    const viewBoxHeight = this.options.viewBox.height;
+    const actualRatioPerExpectedRatio =
+      width / height / (viewBoxWidth / viewBoxHeight);
+    const scaleY = Math.max(1 / actualRatioPerExpectedRatio, 1);
+    const fontSize = this.options.textFontSize;
+    return (fontSize / viewBoxHeight / scaleY) * height;
+  }
+  toMovingCursor(): void {
     this.element.style.cursor = "move";
   }
-  toDefaultCursor() {
+  toDefaultCursor(): void {
     this.element.style.removeProperty("cursor");
   }
   upsertObject(object: ObjectBody): void {
@@ -210,11 +220,12 @@ export class Board {
       }
     }
   }
-  upsertText(text: TextBody) {
+  upsertText(text: TextBody): void {
     const fontSize = this.options.textFontSize;
     let element = document.getElementById(text.id) as unknown as SVGTextElement;
     if (element == null) {
       element = createObjectElement("text", text.id);
+      element.setAttributeNS(null, "dominant-baseline", "central");
       element.setAttributeNS(null, "font-size", String(fontSize));
     }
     element.textContent = text.text;
@@ -222,7 +233,7 @@ export class Board {
     element.setAttributeNS(null, "y", String(text.position.y));
     this.element.append(element);
   }
-  upsertPath(path: PathBody) {
+  upsertPath(path: PathBody): void {
     const strokeWidth = this.options.pathStrokeWidth;
     let element = document.getElementById(
       path.id
@@ -399,15 +410,24 @@ export class Board {
 
 export class Input {
   private element: HTMLInputElement;
+  private elementHeight: number;
+  private elementFontSize = 14; // 縮尺の基準、なんでもいい
   constructor() {
     this.element = document.getElementById("input")! as HTMLInputElement;
+    // フォントサイズを先に指定、一瞬表示して外枠のサイズを測る
+    this.element.style.fontSize = `${this.elementFontSize}px`;
+    this.element.classList.remove("hidden");
+    this.elementHeight = this.element.getBoundingClientRect().height;
+    this.element.classList.add("hidden");
   }
   getText(): string {
     return this.element.value;
   }
-  setPosition(pos: PixelPosition): void {
+  setPosition(pos: PixelPosition, fontSizePx: number): void {
+    const scale = fontSizePx / this.elementFontSize;
     this.element.style.left = `${pos.px}px`;
-    this.element.style.top = `${pos.py}px`;
+    this.element.style.top = `${pos.py - (this.elementHeight * scale) / 2}px`;
+    this.element.style.transform = `scale(${scale})`;
   }
   showAndFocus(): void {
     this.element.classList.remove("hidden");
