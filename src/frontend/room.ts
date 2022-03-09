@@ -601,8 +601,9 @@ function updateInputPosition(state: State): void {
       state.boardRect.size,
       state.editing.position
     );
-    const fontSizePx = state.board.getFonrSizeInPixel(state.boardRect.size);
-    state.input.setPosition(ppos, fontSizePx);
+    const fontSizePx = state.board.getFontSizeInPixel(state.boardRect.size);
+    const width = state.boardRect.size.width - ppos.px;
+    state.input.setPosition(ppos, width, fontSizePx);
   }
 }
 function listenToWindowEvents(state: State): () => void {

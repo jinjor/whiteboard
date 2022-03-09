@@ -37,7 +37,6 @@ UI
 
 TODO:
 - エッジケースのバグ除去
-- 右端でテキスト入力したときに画面がずれる
 - 選択中に切断したら選択解除
 - 部屋がユーザーでいっぱいだった時の表示
 - Slack のマークダウン
@@ -52,6 +51,7 @@ TODO:
 - 参加人数が多い時のアイコン表示
 - Cloudflare が何らかの原因で 1006 で切断する？
 - RateLimit 復活する？
+- Firefox と Safari でテキストがややずれる
 - GitHub auth のアイコン
 - GitHub auth で org を optional に
 - GitHub 要らない説

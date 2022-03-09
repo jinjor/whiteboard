@@ -194,7 +194,7 @@ export class Board {
     const py = ((npos.y / viewBoxHeight - offsetY) / scaleY) * height;
     return { px, py };
   }
-  getFonrSizeInPixel(boardSize: Size): number {
+  getFontSizeInPixel(boardSize: Size): number {
     const { width, height } = boardSize;
     const viewBoxWidth = this.options.viewBox.width;
     const viewBoxHeight = this.options.viewBox.height;
@@ -423,10 +423,11 @@ export class Input {
   getText(): string {
     return this.element.value;
   }
-  setPosition(pos: PixelPosition, fontSizePx: number): void {
+  setPosition(pos: PixelPosition, width: number, fontSizePx: number): void {
     const scale = fontSizePx / this.elementFontSize;
     this.element.style.left = `${pos.px}px`;
     this.element.style.top = `${pos.py - (this.elementHeight * scale) / 2}px`;
+    this.element.style.width = `${width / scale}px`;
     this.element.style.transform = `scale(${scale})`;
   }
   showAndFocus(): void {
