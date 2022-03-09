@@ -497,7 +497,53 @@ describe("Whiteboard", function () {
     ]);
     assert.strictEqual(code, 1001);
   });
-  it("closes connection with 1007 when receiving invalid data", async function () {
+  it("closes connection with 1007 when receiving invalid data (add)", async function () {
+    const roomId = await createRoom();
+    const invalidCommands = [
+      {
+        kind: "add",
+        object: {
+          id: "a".repeat(36),
+          kind: "text",
+          text: "foo",
+          position: { x: 0 }, // missing `y`
+        },
+      },
+      {
+        kind: "add",
+        object: {
+          id: "a".repeat(36),
+          kind: "text",
+          text: "foo",
+          position: { x: 0, y: 0, z: 0 },
+        },
+      },
+      {
+        kind: "add",
+        object: {
+          id: "a".repeat(36),
+          kind: "text",
+          text: "a".repeat(1001),
+          position: { x: 0, y: 0 },
+        },
+      },
+    ];
+    for (const command of invalidCommands) {
+      const code = await useWebsocket(
+        "a",
+        `/api/rooms/${roomId}/websocket`,
+        async (ws: WebSocket) => {
+          ws.send(JSON.stringify(command));
+          await setTimeout(100);
+        }
+      ).catch((e) => {
+        const { code } = JSON.parse(e.message);
+        return code;
+      });
+      assert.strictEqual(code, 1007);
+    }
+  });
+  it("closes connection with 1007 when receiving invalid data (patch)", async function () {
     const roomId = await createRoom();
     const code = await useWebsocket(
       "a",
@@ -510,8 +556,17 @@ describe("Whiteboard", function () {
               id: "a".repeat(36),
               kind: "text",
               text: "foo",
-              position: { x: 0 }, // missing `y`
+              position: { x: 0, y: 0 }, // missing `y`
             },
+          })
+        );
+        await setTimeout(100);
+        ws.send(
+          JSON.stringify({
+            kind: "patch",
+            id: "a".repeat(36),
+            key: "text",
+            value: { old: "foo", new: "a".repeat(1001) },
           })
         );
         await setTimeout(100);

@@ -18,11 +18,17 @@ export type TextBody = {
   id: ObjectId;
   kind: "text";
   position: Position;
+  /**
+   * @maxLength 1000
+   */
   text: string;
 };
 export type PathBody = {
   id: ObjectId;
   kind: "path";
+  /**
+   * @maxLength 10000
+   */
   d: string;
 };
 export type ObjectBody = TextBody | PathBody;
