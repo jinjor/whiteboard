@@ -16,6 +16,7 @@
 - active な部屋は同時に 10 個まで
 - 部屋に入れる人数は 10 人まで
 - 同じ人が複数接続したら最後の接続以外が切れる
+- 同じアカウントでもブラウザが違えば別人として扱われる
 
 UI
 - draw(drag)
@@ -35,7 +36,6 @@ UI
 - https://developers.cloudflare.com/workers/tutorials/build-a-slackbot
 
 TODO:
-- 余分なフィールド、巨大データ対策
 - エッジケースのバグ除去
 - 右端でテキスト入力したときに画面がずれる
 - 選択中に切断したら選択解除
@@ -51,6 +51,7 @@ TODO:
 - デプロイ方法をドキュメントに書く
 - 参加人数が多い時のアイコン表示
 - Cloudflare が何らかの原因で 1006 で切断する？
+- RateLimit 復活する？
 - GitHub auth のアイコン
 - GitHub auth で org を optional に
 - GitHub 要らない説
