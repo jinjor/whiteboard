@@ -567,11 +567,15 @@ function listenToKeyboardEvents(state: State): () => void {
     }
     if ((ctrl && e.key === "y") || (ctrl && shift && e.key === "z")) {
       e.preventDefault();
-      return redo(state);
+      redo(state);
+      syncCursorAndButtons(state);
+      return;
     }
     if (ctrl && e.key === "z") {
       e.preventDefault();
-      return undo(state);
+      undo(state);
+      syncCursorAndButtons(state);
+      return;
     }
   };
   return () => {
