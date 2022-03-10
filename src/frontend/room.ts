@@ -101,6 +101,8 @@ function connect(pageInfo: PageInfo, state: State, disableEditing: () => void) {
       }
       case "delete": {
         state.board.deleteObject(data.id);
+        unselectObject(state, data.id);
+        syncCursorAndButtons(state);
         break;
       }
     }
@@ -122,6 +124,14 @@ function connect(pageInfo: PageInfo, state: State, disableEditing: () => void) {
     disableEditing();
     updateStatus("error", "Error", formatCloseReason("unexpected"));
   });
+}
+function unselectObject(state: State, objectId: ObjectId) {
+  for (let i = state.selected.length - 1; i >= 0; i--) {
+    const objectForSelect = state.selected[i];
+    if (objectForSelect.id === objectId) {
+      state.selected.splice(i, 1);
+    }
+  }
 }
 function formatCloseReason(reason: CloseReason): string {
   switch (reason) {
