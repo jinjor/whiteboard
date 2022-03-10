@@ -595,14 +595,23 @@ function listenToKeyboardEvents(state: State): () => void {
 function listenToShortcutButtons(state: State): () => void {
   return state.shortcuts.listenToButtons({
     clickUndo: () => {
+      if (state.editing.kind === "text") {
+        stopEditingText(state);
+      }
       undo(state);
       syncCursorAndButtons(state);
     },
     clickRedo: () => {
+      if (state.editing.kind === "text") {
+        stopEditingText(state);
+      }
       redo(state);
       syncCursorAndButtons(state);
     },
     clickSelect: () => {
+      if (state.editing.kind === "text") {
+        stopEditingText(state);
+      }
       state.shortcuts.setSelectingReady(true);
     },
     clickDelete: () => {
@@ -648,38 +657,30 @@ function listenToBoard(state: State): () => void {
       createText(state, npos);
     },
     mouseDown: (npos, isRight) => {
+      if (state.editing.kind === "text") {
+        stopEditingText(state);
+      }
       if (isRight) {
         startSelecting(state, npos);
       } else {
         if (state.selected.length > 0) {
           startMoving(state, npos);
         } else {
-          switch (state.editing.kind) {
-            case "text": {
-              stopEditingText(state);
-              break;
-            }
-            default: {
-              startDrawing(state, npos);
-              break;
-            }
-          }
+          startDrawing(state, npos);
         }
       }
       syncCursorAndButtons(state);
     },
     touchStart: (npos) => {
+      if (state.editing.kind === "text") {
+        stopEditingText(state);
+      }
       if (state.shortcuts.isSelectingReady()) {
         startSelecting(state, npos);
         return;
       }
       if (state.selected.length > 0) {
         return startMoving(state, npos);
-      }
-      switch (state.editing.kind) {
-        case "text": {
-          return stopEditingText(state);
-        }
       }
       return startDrawing(state, npos);
     },
