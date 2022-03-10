@@ -525,6 +525,7 @@ function undo(state: State): void {
   for (const event of action.events) {
     const invertedEvent = invertEvent(event);
     if (!canApplyEvent(state, invertedEvent)) {
+      undo(state);
       return;
     }
   }
@@ -544,6 +545,7 @@ function redo(state: State): void {
   }
   for (const event of action.events) {
     if (!canApplyEvent(state, event)) {
+      redo(state);
       return;
     }
   }
