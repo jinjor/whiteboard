@@ -1,5 +1,5 @@
-export const debugging = location.protocol === "http:";
-import * as api from "./api";
+export const debugging = () => window.location.protocol === "http:";
+import { api } from "./api";
 
 export async function appendCreateRoomButton(
   parent: HTMLElement
@@ -10,7 +10,7 @@ export async function appendCreateRoomButton(
   button.onclick = async () => {
     const roomInfo = await api.createRoom();
     if (roomInfo != null) {
-      location.href = "/rooms/" + roomInfo.id;
+      window.location.href = "/rooms/" + roomInfo.id;
     }
   };
   div.append(button);

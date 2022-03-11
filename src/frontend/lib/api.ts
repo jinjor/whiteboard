@@ -8,7 +8,16 @@ import {
   TextBody,
 } from "../../schema";
 
-export async function getRoomInfo(roomId: string): Promise<RoomInfo | null> {
+export const api = {
+  getRoomInfo,
+  getObjects,
+  createRoom,
+  createWebsocket,
+  send,
+};
+export type API = typeof api;
+
+async function getRoomInfo(roomId: string): Promise<RoomInfo | null> {
   const res = await fetch("/api/rooms/" + roomId);
   if (res.status !== 200) {
     return null;
@@ -17,7 +26,7 @@ export async function getRoomInfo(roomId: string): Promise<RoomInfo | null> {
   return roomInfo;
 }
 
-export async function getObjects(roomId: string): Promise<Objects | null> {
+async function getObjects(roomId: string): Promise<Objects | null> {
   const res = await fetch("/api/rooms/" + roomId + "/objects");
   if (res.status !== 200) {
     return null;
@@ -26,7 +35,7 @@ export async function getObjects(roomId: string): Promise<Objects | null> {
   return objects;
 }
 
-export async function createRoom(): Promise<RoomInfo | null> {
+async function createRoom(): Promise<RoomInfo | null> {
   const res = await fetch("/api/rooms/", {
     method: "POST",
   });
@@ -36,11 +45,11 @@ export async function createRoom(): Promise<RoomInfo | null> {
   return await res.json();
 }
 
-export function createWebsocket(wsRoot: string, roomId: string): WebSocket {
+function createWebsocket(wsRoot: string, roomId: string): WebSocket {
   return new WebSocket(`${wsRoot}/api/rooms/${roomId}/websocket`);
 }
 
-export function send(websocket: WebSocket, event: RequestEventBody): void {
+function send(websocket: WebSocket, event: RequestEventBody): void {
   websocket.send(JSON.stringify(event));
 }
 

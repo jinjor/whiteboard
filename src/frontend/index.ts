@@ -1,7 +1,7 @@
 import { appendCreateRoomButton, debugging } from "./lib/debug";
 
 (async () => {
-  if (debugging) {
+  if (debugging()) {
     await appendCreateRoomButton(document.body);
   }
 })();
