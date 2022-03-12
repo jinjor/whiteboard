@@ -7,6 +7,7 @@ import {
   SessionUserId,
   SessionUser,
 } from "../../schema";
+import { testing } from "./debug";
 
 type Size = { width: number; height: number };
 export type PixelPosition = { px: number; py: number };
@@ -99,6 +100,25 @@ function elementToObject(element: HTMLElement | SVGElement): ObjectBody | null {
     }
   }
   return null;
+}
+function getBBox(element: HTMLElement | SVGElement): Rectangle {
+  const { x, y, width, height } = (element as any).getBBox();
+  return new Rectangle(x, y, width, height);
+}
+function getBBoxMock(object: ObjectBody): Rectangle {
+  switch (object.kind) {
+    case "text": {
+      return new Rectangle(object.position.x, object.position.y, 1, 1);
+    }
+    case "path": {
+      const [x, y] = object.d
+        .split("M")[1]
+        .split("L")[0]
+        .split(",")
+        .map((s) => parseFloat(s));
+      return new Rectangle(x, y, 1, 1);
+    }
+  }
 }
 function getText(element: HTMLElement | SVGElement): string {
   return element.textContent!;
@@ -292,10 +312,9 @@ export class Board {
     ) as unknown as SVGElement[];
     const objects = [];
     for (const element of elements) {
-      const { x, y, width, height } = (element as any).getBBox();
-      const bbox = new Rectangle(x, y, width, height);
       const object = elementToObject(element);
       if (object != null) {
+        const bbox = testing() ? getBBoxMock(object) : getBBox(element);
         objects.push({ object, bbox });
       }
     }
@@ -439,6 +458,9 @@ export class Input {
   }
   getText(): string {
     return this.element.value;
+  }
+  setText(value: string): void {
+    this.element.value = value;
   }
   setPosition(pos: PixelPosition, width: number, fontSizePx: number): void {
     const scale = fontSizePx / this.elementFontSize;

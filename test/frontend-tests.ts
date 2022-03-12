@@ -201,6 +201,21 @@ describe("frontend", () => {
     assert.ok(object.kind === "path");
     assert.strictEqual(object.d, "M0.0000,0.0000L1.0000,1.0000");
   });
+  it("creates a text", async () => {
+    const api = apiForActiveRoom(() => {});
+    const state = createState(api);
+    const effect = () => {};
+    const u = (e: ApplicationEvent) => update(e, state, effect);
+    await u({ kind: "room:init" });
+    await u({ kind: "board:double_click", position: { x: 0, y: 0 } });
+    state.input.setText("foo");
+    await u({ kind: "input:enter" });
+    const objects = state.board.getAllObjects();
+    assert.strictEqual(objects.length, 1);
+    const object = objects[0];
+    assert.ok(object.kind === "text");
+    assert.strictEqual(object.text, "foo");
+  });
 });
 function apiForActiveRoom(send: (event: RequestEventBody) => void): API {
   return {
