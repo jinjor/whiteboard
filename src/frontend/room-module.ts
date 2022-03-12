@@ -3,12 +3,12 @@ import {
   Board,
   Help,
   Input,
+  NavBar,
   Rectangle,
   Selector,
   Shortcuts,
 } from "./lib/board";
 import { API } from "./lib/api";
-import { updateStatus } from "./lib/navbar";
 import { appendCreateRoomButton, debugging } from "./lib/debug";
 import { State, ApplicationEvent, update } from "./logic";
 
@@ -155,34 +155,39 @@ function connect(
   });
 }
 
+export function createState(api: API): State {
+  const boardOptions = {
+    viewBox: new Rectangle(0, 0, 16, 9),
+    textFontSize: 0.3,
+    pathStrokeWidth: 0.02,
+    selectorStrokeWidth: 0.01,
+  };
+  const board = new Board(boardOptions);
+  return {
+    api,
+    self: null,
+    board,
+    navBar: new NavBar(),
+    help: new Help(),
+    shortcuts: new Shortcuts(),
+    input: new Input(),
+    selector: new Selector(boardOptions),
+    boardRect: board.calculateBoardRect(),
+    websocket: null,
+    undos: [],
+    redos: [],
+    editing: { kind: "none" },
+    selected: [],
+  };
+}
+
 export async function run(api: API) {
+  const state = createState(api);
   const pageInfo = getPageInfo();
   const roomInfo = await api.getRoomInfo(pageInfo.roomId);
   if (roomInfo != null) {
-    const boardOptions = {
-      viewBox: new Rectangle(0, 0, 16, 9),
-      textFontSize: 0.3,
-      pathStrokeWidth: 0.02,
-      selectorStrokeWidth: 0.01,
-    };
-    const board = new Board(boardOptions);
-    const state: State = {
-      api,
-      self: null,
-      board,
-      help: new Help(),
-      shortcuts: new Shortcuts(),
-      input: new Input(),
-      selector: new Selector(boardOptions),
-      boardRect: board.calculateBoardRect(),
-      websocket: null,
-      undos: [],
-      redos: [],
-      editing: { kind: "none" },
-      selected: [],
-    };
     if (!roomInfo.active) {
-      updateStatus("inactive", "Inactive");
+      state.navBar.updateStatus("inactive", "Inactive");
       const objects = await state.api.getObjects(roomInfo.id);
       if (objects != null) {
         for (const key of Object.keys(objects)) {

@@ -12,6 +12,7 @@ import {
   Board,
   Help,
   Input,
+  NavBar,
   ObjectForSelect,
   PixelPosition,
   Rectangle,
@@ -25,7 +26,6 @@ import {
   makePatchObjectEventFromPath,
   makePatchObjectEventFromText,
 } from "./lib/api";
-import { addMember, deleteMember, updateStatus } from "./lib/navbar";
 import { deepEqual } from "../deep-equal";
 
 type Size = { width: number; height: number };
@@ -45,6 +45,7 @@ export type State = {
   api: API;
   self: UserId | null;
   board: Board;
+  navBar: NavBar;
   help: Help;
   shortcuts: Shortcuts;
   input: Input;
@@ -257,7 +258,7 @@ export function update(
     }
     case "ws:open": {
       state.websocket = e.websocket;
-      updateStatus("active", "Connected");
+      state.navBar.updateStatus("active", "Connected");
       return;
     }
     case "ws:close": {
@@ -266,16 +267,24 @@ export function update(
       state.websocket = null;
       disableEditing();
       if (reason === "unexpected") {
-        updateStatus("error", "Error", formatCloseReason(reason));
+        state.navBar.updateStatus("error", "Error", formatCloseReason(reason));
       } else {
-        updateStatus("error", "Disconnected", formatCloseReason(reason));
+        state.navBar.updateStatus(
+          "error",
+          "Disconnected",
+          formatCloseReason(reason)
+        );
       }
       return;
     }
     case "ws:error": {
       state.websocket = null;
       disableEditing();
-      updateStatus("error", "Error", formatCloseReason("unexpected"));
+      state.navBar.updateStatus(
+        "error",
+        "Error",
+        formatCloseReason("unexpected")
+      );
       return;
     }
     case "ws:message": {
@@ -284,7 +293,7 @@ export function update(
         case "init": {
           state.self = data.self;
           for (const member of data.members) {
-            addMember(member, member.id === state.self);
+            state.navBar.addMember(member, member.id === state.self);
           }
           for (const key of Object.keys(data.objects)) {
             state.board.upsertObject(data.objects[key]);
@@ -293,12 +302,12 @@ export function update(
         }
         case "join": {
           const member = data.user;
-          addMember(member, member.id === state.self);
+          state.navBar.addMember(member, member.id === state.self);
           break;
         }
         case "quit": {
           const member = data.id;
-          deleteMember(member);
+          state.navBar.deleteMember(member);
           break;
         }
         case "upsert": {
