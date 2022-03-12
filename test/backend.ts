@@ -4,7 +4,6 @@ import fetch, { Response } from "node-fetch";
 import { setTimeout } from "timers/promises";
 import kill from "tree-kill";
 import WebSocket from "ws";
-import { deepEqual } from "../src/deep-equal";
 import { Config } from "../src/backend/config";
 
 const port = "8787";
@@ -52,31 +51,7 @@ async function createRoom(): Promise<string> {
   return roomInfo.id;
 }
 
-describe("deepEqual", function () {
-  it("works", function () {
-    assert.deepStrictEqual(deepEqual(undefined, undefined), true);
-    assert.deepStrictEqual(deepEqual(null, null), true);
-    assert.deepStrictEqual(deepEqual(null, undefined), false);
-    assert.deepStrictEqual(deepEqual(0, 0), true);
-    assert.deepStrictEqual(deepEqual(0, 1), false);
-    assert.deepStrictEqual(deepEqual("", ""), true);
-    assert.deepStrictEqual(deepEqual("0", ""), false);
-    assert.deepStrictEqual(deepEqual("0", "1"), false);
-    assert.deepStrictEqual(deepEqual(0, "0"), false);
-    assert.deepStrictEqual(deepEqual([], []), true);
-    assert.deepStrictEqual(deepEqual([0], [0]), true);
-    assert.deepStrictEqual(deepEqual([0], [1]), false);
-    assert.deepStrictEqual(deepEqual([0], [0, 1]), false);
-    assert.deepStrictEqual(deepEqual([1, 0], [0, 1]), false);
-    assert.deepStrictEqual(deepEqual({}, {}), true);
-    assert.deepStrictEqual(deepEqual({ a: 0 }, { a: 0 }), true);
-    assert.deepStrictEqual(deepEqual({ a: 0 }, { a: 1 }), false);
-    assert.deepStrictEqual(deepEqual({ a: 0 }, { b: 0 }), false);
-    assert.deepStrictEqual(deepEqual({}, { a: undefined }), false);
-  });
-});
-
-describe("Whiteboard", function () {
+describe("backend", function () {
   this.timeout(10 * 1000);
   let p: ChildProcess;
   before(async function () {
