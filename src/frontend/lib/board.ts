@@ -273,6 +273,19 @@ export class Board {
     }
     return elementToObject(element);
   }
+  getAllObjects(): ObjectBody[] {
+    const elements = document.getElementsByClassName(
+      "object"
+    ) as unknown as SVGElement[];
+    const objects = [];
+    for (const element of elements) {
+      const object = elementToObject(element);
+      if (object != null) {
+        objects.push(object);
+      }
+    }
+    return objects;
+  }
   getAllObjectsWithBoundingBox(): { object: ObjectBody; bbox: Rectangle }[] {
     const elements = document.getElementsByClassName(
       "object"
