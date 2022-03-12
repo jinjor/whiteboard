@@ -207,7 +207,30 @@ describe("frontend", () => {
     const effect = () => {};
     const u = (e: ApplicationEvent) => update(e, state, effect);
     await u({ kind: "room:init" });
+    await u({
+      kind: "ws:open",
+      websocket: new WebSocket(`ws://dummy`),
+    });
     await u({ kind: "board:double_click", position: { x: 0, y: 0 } });
+    state.input.setText("foo");
+    await u({ kind: "input:enter" });
+    const objects = state.board.getAllObjects();
+    assert.strictEqual(objects.length, 1);
+    const object = objects[0];
+    assert.ok(object.kind === "text");
+    assert.strictEqual(object.text, "foo");
+  });
+  it("creates a text (touch device)", async () => {
+    const api = apiForActiveRoom(() => {});
+    const state = createState(api);
+    const effect = () => {};
+    const u = (e: ApplicationEvent) => update(e, state, effect);
+    await u({ kind: "room:init" });
+    await u({
+      kind: "ws:open",
+      websocket: new WebSocket(`ws://dummy`),
+    });
+    await u({ kind: "board:touch_start_long", position: { x: 0, y: 0 } });
     state.input.setText("foo");
     await u({ kind: "input:enter" });
     const objects = state.board.getAllObjects();
