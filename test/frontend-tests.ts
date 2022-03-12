@@ -1,13 +1,6 @@
+import * as assert from "assert";
 import { JSDOM } from "jsdom";
-import {
-  Selector,
-  Input,
-  Shortcuts,
-  Rectangle,
-  Board,
-  Help,
-} from "../src/frontend/lib/board";
-import { run } from "../src/frontend/room-module";
+import { update, createState } from "../src/frontend/logic";
 
 describe("frontend", () => {
   beforeEach(() => {
@@ -102,40 +95,41 @@ describe("frontend", () => {
           </div>
          </body>
        </html>`,
-      { url: "http://localhost" }
+      { url: "http://example.com/rooms/a" }
     );
     (global as any).window = dom.window;
     global.document = dom.window.document;
     global.WebSocket = dom.window.WebSocket;
   });
-  it("initializes components in testing environment", () => {
-    const boardOptions = {
-      viewBox: new Rectangle(0, 0, 16, 9),
-      textFontSize: 0.3,
-      pathStrokeWidth: 0.02,
-      selectorStrokeWidth: 0.01,
-    };
-    new Board(boardOptions);
-    new Selector(boardOptions);
-    new Input();
-    new Help();
-    new Shortcuts();
-  });
-  it("runs with minimal mock in testing environment", async () => {
-    await run({
+  it("creates websocket at initialization", async () => {
+    const trace: number[] = [];
+    const state = createState({
       getRoomInfo: async () => {
-        return null;
+        trace.push(1);
+        return {
+          id: "a",
+          active: true,
+          createdAt: Date.now(),
+          activeUntil: Date.now() + 1000,
+          aliveUntil: Date.now() + 2000,
+        };
       },
       getObjects: async () => {
-        return null;
+        throw new Error();
       },
       createRoom: async () => {
-        return null;
+        throw new Error();
       },
       createWebsocket: (wsRoot: string, roomId: string) => {
+        assert.strictEqual(roomId, "a");
+        trace.push(2);
         return new WebSocket(`${wsRoot}/api/rooms/${roomId}/websocket`);
       },
-      send: () => {},
+      send: () => {
+        throw new Error();
+      },
     });
+    await update({ kind: "room:init" }, state, () => {});
+    assert.deepStrictEqual(trace, [1, 2]);
   });
 });

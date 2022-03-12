@@ -1,4 +1,5 @@
 export const debugging = () => window.location.protocol === "http:";
+export const testing = () => window.location.hostname === "example.com";
 import { api } from "./api";
 
 export async function appendCreateRoomButton(
