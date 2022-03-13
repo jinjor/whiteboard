@@ -1,8 +1,13 @@
 import * as assert from "assert";
 import { JSDOM } from "jsdom";
 import { API } from "../src/frontend/lib/api";
-import { update, createState, ApplicationEvent } from "../src/frontend/logic";
-import { RequestEventBody } from "../src/schema";
+import {
+  update,
+  createState,
+  ApplicationEvent,
+  State,
+} from "../src/frontend/logic";
+import { Position, RequestEventBody } from "../src/schema";
 import * as fs from "fs";
 import * as path from "path";
 const html = fs.readFileSync(
@@ -334,20 +339,8 @@ describe("frontend", () => {
     const u = (e: ApplicationEvent) => update(e, state, effect);
     await u({ kind: "room:init" });
     await u({ kind: "ws:open", websocket: new WebSocket(`ws://dummy`) });
-    {
-      await u({
-        kind: "board:mouse_down",
-        position: { x: 0, y: 0 },
-        isRight: false,
-      });
-      await u({ kind: "board:mouse_move", position: { x: 1, y: 1 } });
-      await u({ kind: "board:mouse_up", position: { x: 1, y: 1 } });
-    }
-    {
-      await u({ kind: "board:double_click", position: { x: 0, y: 0 } });
-      state.input.setText("foo");
-      await u({ kind: "input:enter" });
-    }
+    await drawLine(u, { x: 0, y: 0 }, { x: 1, y: 1 });
+    await addText(u, state, { x: 0, y: 0 }, "foo");
     const objects = state.board.getAllObjects();
     requests.length = 0;
     await u({ kind: "ws:close", code: 1000, reason: "" });
@@ -383,29 +376,11 @@ describe("frontend", () => {
     const u = (e: ApplicationEvent) => update(e, state, effect);
     await u({ kind: "room:init" });
     await u({ kind: "ws:open", websocket: new WebSocket(`ws://dummy`) });
-    {
-      await u({
-        kind: "board:mouse_down",
-        position: { x: 0, y: 0 },
-        isRight: false,
-      });
-      await u({ kind: "board:mouse_move", position: { x: 1, y: 1 } });
-      await u({ kind: "board:mouse_up", position: { x: 1, y: 1 } });
-    }
-    {
-      await u({ kind: "board:double_click", position: { x: 0, y: 0 } });
-      state.input.setText("foo");
-      await u({ kind: "input:enter" });
-    }
+    await drawLine(u, { x: 0, y: 0 }, { x: 1, y: 1 });
+    await addText(u, state, { x: 0, y: 0 }, "foo");
     const objects = state.board.getAllObjects();
     requests.length = 0;
-    await u({
-      kind: "board:mouse_down",
-      position: { x: 0, y: 0 },
-      isRight: true,
-    });
-    await u({ kind: "board:mouse_move", position: { x: 1, y: 1 } });
-    await u({ kind: "board:mouse_up", position: { x: 1, y: 1 } });
+    await select(u, { x: 0, y: 0 }, { x: 1, y: 1 });
     await u({
       kind: "board:mouse_down",
       position: { x: 10, y: 10 },
@@ -430,20 +405,8 @@ describe("frontend", () => {
     const u = (e: ApplicationEvent) => update(e, state, effect);
     await u({ kind: "room:init" });
     await u({ kind: "ws:open", websocket: new WebSocket(`ws://dummy`) });
-    {
-      await u({
-        kind: "board:mouse_down",
-        position: { x: 0, y: 0 },
-        isRight: false,
-      });
-      await u({ kind: "board:mouse_move", position: { x: 1, y: 1 } });
-      await u({ kind: "board:mouse_up", position: { x: 1, y: 1 } });
-    }
-    {
-      await u({ kind: "board:double_click", position: { x: 0, y: 0 } });
-      state.input.setText("foo");
-      await u({ kind: "input:enter" });
-    }
+    await drawLine(u, { x: 0, y: 0 }, { x: 1, y: 1 });
+    await addText(u, state, { x: 0, y: 0 }, "foo");
     requests.length = 0;
     await u({
       kind: "board:mouse_down",
@@ -470,28 +433,10 @@ describe("frontend", () => {
     const u = (e: ApplicationEvent) => update(e, state, effect);
     await u({ kind: "room:init" });
     await u({ kind: "ws:open", websocket: new WebSocket(`ws://dummy`) });
-    {
-      await u({
-        kind: "board:mouse_down",
-        position: { x: 0, y: 0 },
-        isRight: false,
-      });
-      await u({ kind: "board:mouse_move", position: { x: 1, y: 1 } });
-      await u({ kind: "board:mouse_up", position: { x: 1, y: 1 } });
-    }
-    {
-      await u({ kind: "board:double_click", position: { x: 0, y: 0 } });
-      state.input.setText("foo");
-      await u({ kind: "input:enter" });
-    }
+    await drawLine(u, { x: 0, y: 0 }, { x: 1, y: 1 });
+    await addText(u, state, { x: 0, y: 0 }, "foo");
     requests.length = 0;
-    await u({
-      kind: "board:mouse_down",
-      position: { x: 0, y: 0 },
-      isRight: true,
-    });
-    await u({ kind: "board:mouse_move", position: { x: 1, y: 1 } });
-    await u({ kind: "board:mouse_up", position: { x: 1, y: 1 } });
+    await select(u, { x: 0, y: 0 }, { x: 1, y: 1 });
     assert.strictEqual(state.selector.isShown(), false);
     assert.strictEqual(state.selected.length, 2);
     assert.strictEqual(state.board.getSelectedObjectIds().length, 2);
@@ -525,4 +470,40 @@ function apiForActiveRoom(send: (event: RequestEventBody) => void): API {
       send(event);
     },
   };
+}
+async function drawLine(
+  u: (e: ApplicationEvent) => void,
+  start: Position,
+  end: Position
+) {
+  await u({
+    kind: "board:mouse_down",
+    position: start,
+    isRight: false,
+  });
+  await u({ kind: "board:mouse_move", position: end });
+  await u({ kind: "board:mouse_up", position: end });
+}
+async function addText(
+  u: (e: ApplicationEvent) => void,
+  state: State,
+  position: Position,
+  text: string
+) {
+  await u({ kind: "board:double_click", position });
+  state.input.setText(text);
+  await u({ kind: "input:enter" });
+}
+async function select(
+  u: (e: ApplicationEvent) => void,
+  start: Position,
+  end: Position
+) {
+  await u({
+    kind: "board:mouse_down",
+    position: start,
+    isRight: true,
+  });
+  await u({ kind: "board:mouse_move", position: end });
+  await u({ kind: "board:mouse_up", position: end });
 }
