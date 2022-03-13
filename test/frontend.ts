@@ -9,7 +9,6 @@ const html = fs.readFileSync(
   path.resolve(__dirname, "../../../src/frontend/room.html"),
   "utf8"
 );
-
 describe("frontend", () => {
   beforeEach(() => {
     const dom = new JSDOM(html, { url: "http://example.com/rooms/a" });
@@ -108,10 +107,7 @@ describe("frontend", () => {
     const u = (e: ApplicationEvent) => update(e, state, effect);
     await u({ kind: "room:init" });
     await u({ kind: "ws:open", websocket: new WebSocket(`ws://dummy`) });
-    await u({
-      kind: "board:touch_start",
-      position: { x: 0, y: 0 },
-    });
+    await u({ kind: "board:touch_start", position: { x: 0, y: 0 } });
     await u({ kind: "board:touch_move", position: { x: 1, y: 1 } });
     await u({ kind: "board:touch_end", position: { x: 1, y: 1 } });
     const objects = state.board.getAllObjects();
@@ -180,7 +176,10 @@ describe("frontend", () => {
       isRight: true,
     });
     await u({ kind: "board:mouse_move", position: { x: 1, y: 1 } });
+    assert.strictEqual(state.selector.isShown(), true);
+    assert.strictEqual(state.selected.length, 1);
     await u({ kind: "board:mouse_up", position: { x: 1, y: 1 } });
+    assert.strictEqual(state.selector.isShown(), false);
     await u({
       kind: "board:mouse_down",
       position: { x: 10, y: 10 },
@@ -220,7 +219,10 @@ describe("frontend", () => {
       isRight: true,
     });
     await u({ kind: "board:mouse_move", position: { x: 1, y: 1 } });
+    assert.strictEqual(state.selector.isShown(), true);
+    assert.strictEqual(state.selected.length, 1);
     await u({ kind: "board:mouse_up", position: { x: 1, y: 1 } });
+    assert.strictEqual(state.selector.isShown(), false);
     await u({
       kind: "board:mouse_down",
       position: { x: 10, y: 10 },
@@ -237,10 +239,7 @@ describe("frontend", () => {
       kind: "patch",
       id: object.id,
       key: "position",
-      value: {
-        old: { x: 0, y: 0 },
-        new: { x: 2, y: 3 },
-      },
+      value: { old: { x: 0, y: 0 }, new: { x: 2, y: 3 } },
     });
   });
   it("does not add objects if websocket is disconnected", async () => {
@@ -280,7 +279,7 @@ describe("frontend", () => {
     assert.deepStrictEqual(objects, []);
     assert.deepStrictEqual(requests, []);
   });
-  it("does not add objects if websocket is disconnected (white editing)", async () => {
+  it("does not add objects if websocket is disconnected (while editing)", async () => {
     const requests: RequestEventBody[] = [];
     const api = apiForActiveRoom((e) => requests.push(e));
     const state = createState(api);
@@ -296,6 +295,7 @@ describe("frontend", () => {
       });
       await u({ kind: "board:mouse_move", position: { x: 1, y: 1 } });
       await u({ kind: "ws:close", code: 1000, reason: "" });
+      assert.deepStrictEqual(state.board.getAllObjects(), []);
       await u({ kind: "board:mouse_up", position: { x: 1, y: 1 } });
     }
     {
@@ -303,6 +303,7 @@ describe("frontend", () => {
       await u({ kind: "board:touch_start", position: { x: 0, y: 0 } });
       await u({ kind: "board:touch_move", position: { x: 1, y: 1 } });
       await u({ kind: "ws:close", code: 1000, reason: "" });
+      assert.deepStrictEqual(state.board.getAllObjects(), []);
       await u({ kind: "board:touch_end", position: { x: 1, y: 1 } });
     }
     {
@@ -354,7 +355,10 @@ describe("frontend", () => {
       isRight: true,
     });
     await u({ kind: "board:mouse_move", position: { x: 1, y: 1 } });
+    assert.strictEqual(state.selector.isShown(), false);
+    assert.strictEqual(state.selected.length, 0);
     await u({ kind: "board:mouse_up", position: { x: 1, y: 1 } });
+    assert.strictEqual(state.selected.length, 0);
     await u({
       kind: "board:mouse_down",
       position: { x: 10, y: 10 },
@@ -367,7 +371,7 @@ describe("frontend", () => {
     }
     assert.deepStrictEqual(requests, []);
   });
-  it.skip("does not move objects if websocket is disconnected (white editing)", async () => {
+  it.skip("does not move objects if websocket is disconnected (while moving)", async () => {
     const requests: RequestEventBody[] = [];
     const api = apiForActiveRoom((e) => requests.push(e));
     const state = createState(api);
@@ -405,10 +409,11 @@ describe("frontend", () => {
     });
     await u({ kind: "board:mouse_move", position: { x: 12, y: 13 } });
     await u({ kind: "ws:close", code: 1000, reason: "" });
-    await u({ kind: "board:mouse_up", position: { x: 12, y: 13 } });
+    assert.deepStrictEqual(state.selected, []);
     for (const object of objects) {
       assert.deepStrictEqual(object, state.board.getObject(object.id));
     }
+    await u({ kind: "board:mouse_up", position: { x: 12, y: 13 } });
     assert.deepStrictEqual(requests, []);
   });
 });

@@ -134,6 +134,7 @@ export async function update(
     case "room:disable_editing": {
       if (state.unlisten != null) {
         state.unlisten();
+        state.unlisten = null;
       }
       return;
     }
@@ -314,6 +315,7 @@ export async function update(
       const reason = e.reason as CloseReason;
       console.log("WebSocket closed: " + e.code + " " + reason);
       state.websocket = null;
+      rollbackAllTemporaryStates(state);
       effect({ kind: "room:disable_editing" });
       if (reason === "unexpected") {
         state.navBar.updateStatus("error", "Error", formatCloseReason(reason));
@@ -328,6 +330,7 @@ export async function update(
     }
     case "ws:error": {
       state.websocket = null;
+      rollbackAllTemporaryStates(state);
       effect({ kind: "room:disable_editing" });
       state.navBar.updateStatus(
         "error",
@@ -536,6 +539,9 @@ function getAllObjectsForSelect(state: State): ObjectForSelect[] {
   });
 }
 function startSelecting(state: State, pos: Position): void {
+  if (state.websocket == null) {
+    return;
+  }
   const objects = getAllObjectsForSelect(state);
   state.editing = { kind: "select", start: pos, objects };
   const rect = new Rectangle(pos.x, pos.y, 0, 0);
@@ -883,6 +889,40 @@ function syncCursorAndButtons(state: State) {
   state.shortcuts.setSelecting(state.selected.length > 0);
   state.shortcuts.setUndoDisabled(state.undos.length <= 0);
   state.shortcuts.setRedoDisabled(state.redos.length <= 0);
+}
+
+function rollbackAllTemporaryStates(state: State) {
+  switch (state.editing.kind) {
+    case "text": {
+      state.input.hideAndReset();
+      break;
+    }
+    case "path": {
+      state.board.deleteObject(state.editing.id);
+      break;
+    }
+    case "select": {
+      state.selected = [];
+      state.selector.hide();
+      break;
+    }
+    case "move": {
+      // TODO: conflict を考慮しないと戻せない
+      // for(const object of state.selected) {
+      //   switch(object.kind) {
+      //     case "text": {
+      //       break;
+      //     }
+      //     case "path": {
+      //       break;
+      //     }
+      //   }
+      // }
+      state.selected = [];
+    }
+  }
+  state.editing = { kind: "none" };
+  syncCursorAndButtons(state);
 }
 
 function listenToKeyboardEvents(

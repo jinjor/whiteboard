@@ -163,6 +163,9 @@ function setSelected(element: HTMLElement | SVGElement, selected: boolean) {
     }
   }
 }
+function getStroke(element: HTMLElement | SVGElement): string | null {
+  return element.getAttributeNS(null, "stroke");
+}
 export type BoardOptions = {
   viewBox: Rectangle;
   textFontSize: number;
@@ -508,6 +511,9 @@ export class Selector {
   }
   hide(): void {
     setStroke(this.element, "none");
+  }
+  isShown(): boolean {
+    return getStroke(this.element) === "red";
   }
 }
 
