@@ -40,7 +40,9 @@ TODO:
   - 画面外で mouse up しても選択が終了しない => 終了させる
     - 画面に戻ってきて左クリックすると選択範囲が残る
   - 選択中にオブジェクトが移動されたり消されたらどうなる？
+    - bbox を更新していない気がする
   - ドラッグ中のオブジェクトが移動されたり消されたらどうなる？
+- Disconnected, Inactive 状態に気づきにくい
 - 部屋がユーザーでいっぱいだった時の表示
 - Slack のマークダウン
 - ステータス表示を洗練させる
@@ -50,11 +52,11 @@ TODO:
 - 何らかの原因で session user 数 > ブラウザ数になった？
 - manager の負荷を減らす
 - ua 独立のテスト
-- デプロイ方法をドキュメントに書く
 - 参加人数が多い時のアイコン表示
 - Cloudflare が何らかの原因で 1006 で切断する？
 - RateLimit 復活する？
 - Firefox と Safari でテキストがややずれる
+- デプロイ方法を確認
 - GitHub auth のアイコン
 - GitHub auth で org を optional に
 - GitHub 要らない説
@@ -70,3 +72,30 @@ TODO:
 
 メモ：
 - logo のフォントは Verdana
+
+
+## Deploy
+
+未確認
+
+1. Cloudflare アカウントを用意、 Workers と Durable Objects を使える状態にする（有料プラン）
+1. wrangler.toml の `account_id` を更新
+1. `npm ci`
+1. `npx wrangler login`
+1. `npx wrangler deploy`
+1. Slack アプリを作る
+   - Slash command
+      - `/wb`: `https://whiteboard.{}.workers.dev/app/slack`
+   - OAuth
+      - Redirect URL: `https://whiteboard.{}.workers.dev/callback/slack`
+      - Bot Token Scopes: `commands`
+      - User Token Scopes: `identity.avatar`, `identity.basic`
+1. Slack アプリをワークスペースにインストール
+1. `npx wrangler secret put <name>`
+   - AUTH_TYPE: `slack`
+   - COOKIE_SECRET: `xxxxxxx`
+   - DEBUG_API: `false`
+   - SLACK_APP: `true`
+   - SLACK_CLIENT_ID: `xxxxx`
+   - SLACK_CLIENT_SECRET: `xxxxx`
+   - SLACK_SIGNING_SECRET: `xxxxx`
