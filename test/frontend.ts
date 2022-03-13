@@ -191,6 +191,134 @@ describe("frontend", () => {
       },
     ]);
   });
+  it("moves a path", async () => {
+    const requests: RequestEventBody[] = [];
+    const api = apiForActiveRoom((e) => requests.push(e));
+    const state = createState(api);
+    const effect = () => {};
+    const u = (e: ApplicationEvent) => update(e, state, effect);
+    await u({ kind: "room:init" });
+    await u({
+      kind: "ws:open",
+      websocket: new WebSocket(`ws://dummy`),
+    });
+    await u({
+      kind: "board:mouse_down",
+      position: { x: 0, y: 0 },
+      isRight: false,
+    });
+    await u({ kind: "board:mouse_move", position: { x: 1, y: 1 } });
+    await u({ kind: "board:mouse_up", position: { x: 1, y: 1 } });
+    await u({
+      kind: "board:mouse_down",
+      position: { x: 0, y: 0 },
+      isRight: true,
+    });
+    await u({ kind: "board:mouse_move", position: { x: 1, y: 1 } });
+    await u({ kind: "board:mouse_up", position: { x: 1, y: 1 } });
+    await u({
+      kind: "board:mouse_down",
+      position: { x: 10, y: 10 },
+      isRight: false,
+    });
+    await u({ kind: "board:mouse_move", position: { x: 12, y: 13 } });
+    await u({ kind: "board:mouse_up", position: { x: 12, y: 13 } });
+    const objects = state.board.getAllObjects();
+    assert.strictEqual(objects.length, 1);
+    const object = objects[0];
+    assert.ok(object.kind === "path");
+    assert.strictEqual(object.d, "M2.0000,3.0000L3.0000,4.0000");
+    assert.deepStrictEqual(requests[1], {
+      kind: "patch",
+      id: object.id,
+      key: "d",
+      value: {
+        old: "M0.0000,0.0000L1.0000,1.0000",
+        new: "M2.0000,3.0000L3.0000,4.0000",
+      },
+    });
+  });
+  it("moves a text", async () => {
+    const requests: RequestEventBody[] = [];
+    const api = apiForActiveRoom((e) => requests.push(e));
+    const state = createState(api);
+    const effect = () => {};
+    const u = (e: ApplicationEvent) => update(e, state, effect);
+    await u({ kind: "room:init" });
+    await u({
+      kind: "ws:open",
+      websocket: new WebSocket(`ws://dummy`),
+    });
+    await u({ kind: "board:double_click", position: { x: 0, y: 0 } });
+    state.input.setText("foo");
+    await u({ kind: "input:enter" });
+    await u({
+      kind: "board:mouse_down",
+      position: { x: 0, y: 0 },
+      isRight: true,
+    });
+    await u({ kind: "board:mouse_move", position: { x: 1, y: 1 } });
+    await u({ kind: "board:mouse_up", position: { x: 1, y: 1 } });
+    await u({
+      kind: "board:mouse_down",
+      position: { x: 10, y: 10 },
+      isRight: false,
+    });
+    await u({ kind: "board:mouse_move", position: { x: 12, y: 13 } });
+    await u({ kind: "board:mouse_up", position: { x: 12, y: 13 } });
+    const objects = state.board.getAllObjects();
+    assert.strictEqual(objects.length, 1);
+    const object = objects[0];
+    assert.ok(object.kind === "text");
+    assert.deepStrictEqual(object.position, { x: 2, y: 3 });
+    assert.deepStrictEqual(requests[1], {
+      kind: "patch",
+      id: object.id,
+      key: "position",
+      value: {
+        old: { x: 0, y: 0 },
+        new: { x: 2, y: 3 },
+      },
+    });
+  });
+  it("does not commit if websocket is disconnected", async () => {
+    const requests: RequestEventBody[] = [];
+    const api = apiForActiveRoom((e) => requests.push(e));
+    const state = createState(api);
+    const effect = () => {};
+    const u = (e: ApplicationEvent) => update(e, state, effect);
+    await u({ kind: "room:init" });
+    {
+      await u({
+        kind: "board:mouse_down",
+        position: { x: 0, y: 0 },
+        isRight: false,
+      });
+      await u({ kind: "board:mouse_move", position: { x: 1, y: 1 } });
+      await u({ kind: "board:mouse_up", position: { x: 1, y: 1 } });
+    }
+    {
+      await u({
+        kind: "board:touch_start",
+        position: { x: 0, y: 0 },
+      });
+      await u({ kind: "board:touch_move", position: { x: 1, y: 1 } });
+      await u({ kind: "board:touch_end", position: { x: 1, y: 1 } });
+    }
+    {
+      await u({ kind: "board:double_click", position: { x: 0, y: 0 } });
+      state.input.setText("foo");
+      await u({ kind: "input:enter" });
+    }
+    {
+      await u({ kind: "board:touch_start_long", position: { x: 0, y: 0 } });
+      state.input.setText("foo");
+      await u({ kind: "input:enter" });
+    }
+    const objects = state.board.getAllObjects();
+    assert.deepStrictEqual(objects, []);
+    assert.deepStrictEqual(requests, []);
+  });
 });
 function apiForActiveRoom(send: (event: RequestEventBody) => void): API {
   return {

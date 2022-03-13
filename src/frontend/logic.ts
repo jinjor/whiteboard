@@ -492,18 +492,19 @@ function stopDrawing(state: State, pos: Position): void {
   if (state.editing.kind === "path") {
     const points = state.editing.points;
     state.editing.points = [];
-    if (points.length >= 2) {
-      if (state.websocket != null) {
-        const object = {
-          id: state.editing.id,
-          kind: "path",
-          d: makeD(points),
-        } as const;
-        const event = makeAddObjectEvent(object);
-        doAction(state, {
-          events: [event],
-        });
-      }
+    const canCommit = points.length >= 2 && state.websocket != null;
+    if (canCommit) {
+      const object = {
+        id: state.editing.id,
+        kind: "path",
+        d: makeD(points),
+      } as const;
+      const event = makeAddObjectEvent(object);
+      doAction(state, {
+        events: [event],
+      });
+    } else {
+      state.board.deleteObject(state.editing.id);
     }
   }
   state.editing = { kind: "none" };
@@ -553,19 +554,19 @@ function isObjectSelected(object: ObjectForSelect, rect: Rectangle): boolean {
     return true;
   }
   const fullyContained =
-    orect.x > rect.x &&
-    orect.right < rect.right &&
-    orect.y > rect.y &&
-    orect.bottom < rect.bottom;
+    orect.x >= rect.x &&
+    orect.right <= rect.right &&
+    orect.y >= rect.y &&
+    orect.bottom <= rect.bottom;
   if (fullyContained) {
     return true;
   }
   for (const point of getPointsInObject(object)) {
     const contained =
-      point.x > rect.x &&
-      point.x < rect.right &&
-      point.y > rect.y &&
-      point.y < rect.bottom;
+      point.x >= rect.x &&
+      point.x <= rect.right &&
+      point.y >= rect.y &&
+      point.y <= rect.bottom;
     if (contained) {
       return true;
     }
@@ -649,7 +650,8 @@ function continueMoving(state: State, pos: Position): void {
 }
 function stopMoving(state: State, pos: Position): void {
   if (state.editing.kind === "move") {
-    if (state.websocket != null) {
+    const canCommit = state.websocket != null;
+    if (canCommit) {
       const dx = pos.x - state.editing.start.x;
       const dy = pos.y - state.editing.start.y;
       const events: ActionEvent[] = [];
@@ -700,18 +702,17 @@ function createText(state: State, pos: Position): void {
 function stopEditingText(state: State): void {
   if (state.editing.kind === "text") {
     const text = state.input.getText();
-    if (text.length > 0) {
-      if (state.websocket != null) {
-        const position = state.editing.position;
-        const object = {
-          id: generateObjectId(),
-          kind: "text",
-          text,
-          position: { x: position.x, y: position.y },
-        } as const;
-        const event = makeAddObjectEvent(object);
-        doAction(state, { events: [event] });
-      }
+    const canCommit = text.length > 0 && state.websocket != null;
+    if (canCommit) {
+      const position = state.editing.position;
+      const object = {
+        id: generateObjectId(),
+        kind: "text",
+        text,
+        position: { x: position.x, y: position.y },
+      } as const;
+      const event = makeAddObjectEvent(object);
+      doAction(state, { events: [event] });
     }
   }
   state.editing = { kind: "none" };
