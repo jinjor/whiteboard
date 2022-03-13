@@ -371,7 +371,7 @@ describe("frontend", () => {
     }
     assert.deepStrictEqual(requests, []);
   });
-  it.skip("does not move objects if websocket is disconnected (while moving)", async () => {
+  it("does not move objects if websocket is disconnected (while moving)", async () => {
     const requests: RequestEventBody[] = [];
     const api = apiForActiveRoom((e) => requests.push(e));
     const state = createState(api);

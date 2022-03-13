@@ -364,11 +364,50 @@ export async function update(
         }
         case "upsert": {
           state.board.upsertObject(data.object);
+          if (state.editing.kind === "select") {
+            for (const object of state.editing.objects) {
+              if (object.id === data.object.id) {
+                if (object.kind === "text" && data.object.kind === "text") {
+                  object.position = data.object.position;
+                } else if (
+                  object.kind === "path" &&
+                  data.object.kind === "path"
+                ) {
+                  object.points = parseD(data.object.d);
+                }
+              }
+            }
+          }
+          for (const object of state.selected) {
+            if (object.id === data.object.id) {
+              if (object.kind === "text" && data.object.kind === "text") {
+                object.position = data.object.position;
+              } else if (
+                object.kind === "path" &&
+                data.object.kind === "path"
+              ) {
+                object.points = parseD(data.object.d);
+              }
+            }
+          }
           break;
         }
         case "delete": {
           state.board.deleteObject(data.id);
-          unselectObject(state, data.id);
+          if (state.editing.kind === "select") {
+            for (let i = state.editing.objects.length - 1; i >= 0; i--) {
+              const objectForSelect = state.editing.objects[i];
+              if (objectForSelect.id === data.id) {
+                state.editing.objects.splice(i, 1);
+              }
+            }
+          }
+          for (let i = state.selected.length - 1; i >= 0; i--) {
+            const objectForSelect = state.selected[i];
+            if (objectForSelect.id === data.id) {
+              state.selected.splice(i, 1);
+            }
+          }
           syncCursorAndButtons(state);
           break;
         }
@@ -421,14 +460,6 @@ function getPageInfo(): PageInfo {
   };
 }
 
-function unselectObject(state: State, objectId: ObjectId) {
-  for (let i = state.selected.length - 1; i >= 0; i--) {
-    const objectForSelect = state.selected[i];
-    if (objectForSelect.id === objectId) {
-      state.selected.splice(i, 1);
-    }
-  }
-}
 function formatCloseReason(reason: CloseReason): string {
   switch (reason) {
     case "room_got_inactive":
@@ -907,17 +938,18 @@ function rollbackAllTemporaryStates(state: State) {
       break;
     }
     case "move": {
-      // TODO: conflict を考慮しないと戻せない
-      // for(const object of state.selected) {
-      //   switch(object.kind) {
-      //     case "text": {
-      //       break;
-      //     }
-      //     case "path": {
-      //       break;
-      //     }
-      //   }
-      // }
+      for (const object of state.selected) {
+        switch (object.kind) {
+          case "text": {
+            state.board.updatePosition(object.id, object.position);
+            break;
+          }
+          case "path": {
+            state.board.updateD(object.id, makeD(object.points));
+            break;
+          }
+        }
+      }
       state.selected = [];
     }
   }
