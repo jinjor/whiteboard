@@ -577,6 +577,9 @@ export class Shortcuts {
       this.selectButton.classList.remove("select");
     }
   }
+  isSelecting(): boolean {
+    return this.selectButton.classList.contains("hidden");
+  }
   setSelecting(selecting: boolean): void {
     if (selecting) {
       this.selectButton.classList.add("hidden");
@@ -586,8 +589,14 @@ export class Shortcuts {
       this.deleteButton.classList.add("hidden");
     }
   }
+  isUndoDisabled(): boolean {
+    return this.undoButton.disabled;
+  }
   setUndoDisabled(disabled: boolean): void {
     this.undoButton.disabled = disabled;
+  }
+  isRedoDisabled(): boolean {
+    return this.redoButton.disabled;
   }
   setRedoDisabled(disabled: boolean): void {
     this.redoButton.disabled = disabled;

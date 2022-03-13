@@ -195,6 +195,7 @@ export async function update(
     }
     case "input:enter": {
       stopEditingText(state);
+      syncCursorAndButtons(state);
       return;
     }
     case "board:double_click": {
