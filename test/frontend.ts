@@ -7,7 +7,7 @@ import {
   ApplicationEvent,
   State,
 } from "../src/frontend/logic";
-import { Position, RequestEventBody } from "../src/schema";
+import { ObjectId, Position, RequestEventBody } from "../src/schema";
 import * as fs from "fs";
 import * as path from "path";
 const html = fs.readFileSync(
@@ -599,6 +599,80 @@ describe("frontend", () => {
     assert.strictEqual(state.board.getSelectedObjectIds().length, 0);
     assert.deepStrictEqual(requests[1], { kind: "delete", object });
   });
+  const undoTextExpected = (id: ObjectId) => [
+    {
+      kind: "add",
+      object: {
+        id,
+        kind: "text",
+        position: { x: 0, y: 0 },
+        text: "foo",
+      },
+    },
+    {
+      kind: "patch",
+      id,
+      key: "position",
+      value: { old: { x: 0, y: 0 }, new: { x: 1, y: 1 } },
+    },
+    {
+      kind: "delete",
+      object: {
+        id,
+        kind: "text",
+        position: { x: 1, y: 1 },
+        text: "foo",
+      },
+    },
+    {
+      kind: "add",
+      object: {
+        id,
+        kind: "text",
+        position: { x: 1, y: 1 },
+        text: "foo",
+      },
+    },
+    {
+      kind: "patch",
+      id,
+      key: "position",
+      value: { old: { x: 1, y: 1 }, new: { x: 0, y: 0 } },
+    },
+    {
+      kind: "delete",
+      object: {
+        id,
+        kind: "text",
+        position: { x: 0, y: 0 },
+        text: "foo",
+      },
+    },
+    {
+      kind: "add",
+      object: {
+        id,
+        kind: "text",
+        position: { x: 0, y: 0 },
+        text: "foo",
+      },
+    },
+    {
+      kind: "patch",
+      id,
+      key: "position",
+      value: { old: { x: 0, y: 0 }, new: { x: 1, y: 1 } },
+    },
+    {
+      kind: "delete",
+      object: {
+        id,
+        kind: "text",
+        position: { x: 1, y: 1 },
+        text: "foo",
+      },
+    },
+  ];
   it("do undo/redo text", async () => {
     const requests: RequestEventBody[] = [];
     const api = apiForActiveRoom((e) => requests.push(e));
@@ -639,80 +713,210 @@ describe("frontend", () => {
     await u({ kind: "key:redo" });
     assert.strictEqual(state.shortcuts.isUndoDisabled(), false);
     assert.strictEqual(state.shortcuts.isRedoDisabled(), true);
-    assert.deepStrictEqual(requests, [
-      {
-        kind: "add",
-        object: {
-          id,
-          kind: "text",
-          position: { x: 0, y: 0 },
-          text: "foo",
-        },
-      },
-      {
-        kind: "patch",
+    assert.deepStrictEqual(requests, undoTextExpected(id));
+  });
+  it("do undo/redo text (touch device)", async () => {
+    const requests: RequestEventBody[] = [];
+    const api = apiForActiveRoom((e) => requests.push(e));
+    const state = createState(api);
+    const effect = () => {};
+    const u = (e: ApplicationEvent) => update(e, state, effect);
+    await u({ kind: "room:init" });
+    await u({ kind: "ws:open", websocket: new WebSocket(`ws://dummy`) });
+    assert.strictEqual(state.shortcuts.isUndoDisabled(), true);
+    assert.strictEqual(state.shortcuts.isRedoDisabled(), true);
+    await addTextTouch(u, state, { x: 0, y: 0 }, "foo");
+    assert.strictEqual(state.shortcuts.isUndoDisabled(), false);
+    assert.strictEqual(state.shortcuts.isRedoDisabled(), true);
+    const id = state.board.getAllObjects()[0].id;
+    await selectTouch(u, { x: 0, y: 0 }, { x: 1, y: 1 });
+    await moveTouch(u, { x: 0, y: 0 }, { x: 1, y: 1 });
+    assert.strictEqual(state.shortcuts.isUndoDisabled(), false);
+    assert.strictEqual(state.shortcuts.isRedoDisabled(), true);
+    await selectTouch(u, { x: 0, y: 0 }, { x: 1, y: 1 });
+    await u({ kind: "shortcut_button:delete" });
+    assert.strictEqual(state.shortcuts.isUndoDisabled(), false);
+    assert.strictEqual(state.shortcuts.isRedoDisabled(), true);
+    await u({ kind: "shortcut_button:undo" });
+    assert.strictEqual(state.shortcuts.isUndoDisabled(), false);
+    assert.strictEqual(state.shortcuts.isRedoDisabled(), false);
+    await u({ kind: "shortcut_button:undo" });
+    assert.strictEqual(state.shortcuts.isUndoDisabled(), false);
+    assert.strictEqual(state.shortcuts.isRedoDisabled(), false);
+    await u({ kind: "shortcut_button:undo" });
+    assert.strictEqual(state.shortcuts.isUndoDisabled(), true);
+    assert.strictEqual(state.shortcuts.isRedoDisabled(), false);
+    await u({ kind: "shortcut_button:redo" });
+    assert.strictEqual(state.shortcuts.isUndoDisabled(), false);
+    assert.strictEqual(state.shortcuts.isRedoDisabled(), false);
+    await u({ kind: "shortcut_button:redo" });
+    assert.strictEqual(state.shortcuts.isUndoDisabled(), false);
+    assert.strictEqual(state.shortcuts.isRedoDisabled(), false);
+    await u({ kind: "shortcut_button:redo" });
+    assert.strictEqual(state.shortcuts.isUndoDisabled(), false);
+    assert.strictEqual(state.shortcuts.isRedoDisabled(), true);
+    assert.deepStrictEqual(requests, undoTextExpected(id));
+  });
+  const undoPathExpected = (id: ObjectId) => [
+    {
+      kind: "add",
+      object: {
         id,
-        key: "position",
-        value: { old: { x: 0, y: 0 }, new: { x: 1, y: 1 } },
+        kind: "path",
+        d: "M0.0000,0.0000L1.0000,1.0000",
       },
-      {
-        kind: "delete",
-        object: {
-          id,
-          kind: "text",
-          position: { x: 1, y: 1 },
-          text: "foo",
-        },
+    },
+    {
+      kind: "patch",
+      id,
+      key: "d",
+      value: {
+        old: "M0.0000,0.0000L1.0000,1.0000",
+        new: "M1.0000,1.0000L2.0000,2.0000",
       },
-      {
-        kind: "add",
-        object: {
-          id,
-          kind: "text",
-          position: { x: 1, y: 1 },
-          text: "foo",
-        },
-      },
-      {
-        kind: "patch",
+    },
+    {
+      kind: "delete",
+      object: {
         id,
-        key: "position",
-        value: { old: { x: 1, y: 1 }, new: { x: 0, y: 0 } },
+        kind: "path",
+        d: "M1.0000,1.0000L2.0000,2.0000",
       },
-      {
-        kind: "delete",
-        object: {
-          id,
-          kind: "text",
-          position: { x: 0, y: 0 },
-          text: "foo",
-        },
-      },
-      {
-        kind: "add",
-        object: {
-          id,
-          kind: "text",
-          position: { x: 0, y: 0 },
-          text: "foo",
-        },
-      },
-      {
-        kind: "patch",
+    },
+    {
+      kind: "add",
+      object: {
         id,
-        key: "position",
-        value: { old: { x: 0, y: 0 }, new: { x: 1, y: 1 } },
+        kind: "path",
+        d: "M1.0000,1.0000L2.0000,2.0000",
       },
-      {
-        kind: "delete",
-        object: {
-          id,
-          kind: "text",
-          position: { x: 1, y: 1 },
-          text: "foo",
-        },
+    },
+    {
+      kind: "patch",
+      id,
+      key: "d",
+      value: {
+        old: "M1.0000,1.0000L2.0000,2.0000",
+        new: "M0.0000,0.0000L1.0000,1.0000",
       },
-    ]);
+    },
+    {
+      kind: "delete",
+      object: {
+        id,
+        kind: "path",
+        d: "M0.0000,0.0000L1.0000,1.0000",
+      },
+    },
+    {
+      kind: "add",
+      object: {
+        id,
+        kind: "path",
+        d: "M0.0000,0.0000L1.0000,1.0000",
+      },
+    },
+    {
+      kind: "patch",
+      id,
+      key: "d",
+      value: {
+        old: "M0.0000,0.0000L1.0000,1.0000",
+        new: "M1.0000,1.0000L2.0000,2.0000",
+      },
+    },
+    {
+      kind: "delete",
+      object: {
+        id,
+        kind: "path",
+        d: "M1.0000,1.0000L2.0000,2.0000",
+      },
+    },
+  ];
+  it("do undo/redo path", async () => {
+    const requests: RequestEventBody[] = [];
+    const api = apiForActiveRoom((e) => requests.push(e));
+    const state = createState(api);
+    const effect = () => {};
+    const u = (e: ApplicationEvent) => update(e, state, effect);
+    await u({ kind: "room:init" });
+    await u({ kind: "ws:open", websocket: new WebSocket(`ws://dummy`) });
+    assert.strictEqual(state.shortcuts.isUndoDisabled(), true);
+    assert.strictEqual(state.shortcuts.isRedoDisabled(), true);
+    await drawLine(u, { x: 0, y: 0 }, { x: 1, y: 1 });
+    assert.strictEqual(state.shortcuts.isUndoDisabled(), false);
+    assert.strictEqual(state.shortcuts.isRedoDisabled(), true);
+    const id = state.board.getAllObjects()[0].id;
+    await select(u, { x: 0, y: 0 }, { x: 1, y: 1 });
+    await move(u, { x: 0, y: 0 }, { x: 1, y: 1 });
+    assert.strictEqual(state.shortcuts.isUndoDisabled(), false);
+    assert.strictEqual(state.shortcuts.isRedoDisabled(), true);
+    await select(u, { x: 0, y: 0 }, { x: 1, y: 1 });
+    await u({ kind: "key:delete" });
+    assert.strictEqual(state.shortcuts.isUndoDisabled(), false);
+    assert.strictEqual(state.shortcuts.isRedoDisabled(), true);
+    await u({ kind: "key:undo" });
+    assert.strictEqual(state.shortcuts.isUndoDisabled(), false);
+    assert.strictEqual(state.shortcuts.isRedoDisabled(), false);
+    await u({ kind: "key:undo" });
+    assert.strictEqual(state.shortcuts.isUndoDisabled(), false);
+    assert.strictEqual(state.shortcuts.isRedoDisabled(), false);
+    await u({ kind: "key:undo" });
+    assert.strictEqual(state.shortcuts.isUndoDisabled(), true);
+    assert.strictEqual(state.shortcuts.isRedoDisabled(), false);
+    await u({ kind: "key:redo" });
+    assert.strictEqual(state.shortcuts.isUndoDisabled(), false);
+    assert.strictEqual(state.shortcuts.isRedoDisabled(), false);
+    await u({ kind: "key:redo" });
+    assert.strictEqual(state.shortcuts.isUndoDisabled(), false);
+    assert.strictEqual(state.shortcuts.isRedoDisabled(), false);
+    await u({ kind: "key:redo" });
+    assert.strictEqual(state.shortcuts.isUndoDisabled(), false);
+    assert.strictEqual(state.shortcuts.isRedoDisabled(), true);
+    assert.deepStrictEqual(requests, undoPathExpected(id));
+  });
+  it("do undo/redo path (touch device)", async () => {
+    const requests: RequestEventBody[] = [];
+    const api = apiForActiveRoom((e) => requests.push(e));
+    const state = createState(api);
+    const effect = () => {};
+    const u = (e: ApplicationEvent) => update(e, state, effect);
+    await u({ kind: "room:init" });
+    await u({ kind: "ws:open", websocket: new WebSocket(`ws://dummy`) });
+    assert.strictEqual(state.shortcuts.isUndoDisabled(), true);
+    assert.strictEqual(state.shortcuts.isRedoDisabled(), true);
+    await drawLineTouch(u, { x: 0, y: 0 }, { x: 1, y: 1 });
+    assert.strictEqual(state.shortcuts.isUndoDisabled(), false);
+    assert.strictEqual(state.shortcuts.isRedoDisabled(), true);
+    const id = state.board.getAllObjects()[0].id;
+    await selectTouch(u, { x: 0, y: 0 }, { x: 1, y: 1 });
+    await moveTouch(u, { x: 0, y: 0 }, { x: 1, y: 1 });
+    assert.strictEqual(state.shortcuts.isUndoDisabled(), false);
+    assert.strictEqual(state.shortcuts.isRedoDisabled(), true);
+    await selectTouch(u, { x: 0, y: 0 }, { x: 1, y: 1 });
+    await u({ kind: "shortcut_button:delete" });
+    assert.strictEqual(state.shortcuts.isUndoDisabled(), false);
+    assert.strictEqual(state.shortcuts.isRedoDisabled(), true);
+    await u({ kind: "shortcut_button:undo" });
+    assert.strictEqual(state.shortcuts.isUndoDisabled(), false);
+    assert.strictEqual(state.shortcuts.isRedoDisabled(), false);
+    await u({ kind: "shortcut_button:undo" });
+    assert.strictEqual(state.shortcuts.isUndoDisabled(), false);
+    assert.strictEqual(state.shortcuts.isRedoDisabled(), false);
+    await u({ kind: "shortcut_button:undo" });
+    assert.strictEqual(state.shortcuts.isUndoDisabled(), true);
+    assert.strictEqual(state.shortcuts.isRedoDisabled(), false);
+    await u({ kind: "shortcut_button:redo" });
+    assert.strictEqual(state.shortcuts.isUndoDisabled(), false);
+    assert.strictEqual(state.shortcuts.isRedoDisabled(), false);
+    await u({ kind: "shortcut_button:redo" });
+    assert.strictEqual(state.shortcuts.isUndoDisabled(), false);
+    assert.strictEqual(state.shortcuts.isRedoDisabled(), false);
+    await u({ kind: "shortcut_button:redo" });
+    assert.strictEqual(state.shortcuts.isUndoDisabled(), false);
+    assert.strictEqual(state.shortcuts.isRedoDisabled(), true);
+    assert.deepStrictEqual(requests, undoPathExpected(id));
   });
 });
 function apiForActiveRoom(send: (event: RequestEventBody) => void): API {
@@ -811,7 +1015,6 @@ async function moveTouch(
   start: Position,
   end: Position
 ) {
-  await u({ kind: "shortcut_button:select" });
   await u({ kind: "board:touch_start", position: start });
   await u({ kind: "board:touch_move", position: end });
   await u({ kind: "board:touch_end", position: end });
