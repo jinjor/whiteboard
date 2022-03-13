@@ -168,13 +168,7 @@ describe("frontend", () => {
     const u = (e: ApplicationEvent) => update(e, state, effect);
     await u({ kind: "room:init" });
     await u({ kind: "ws:open", websocket: new WebSocket(`ws://dummy`) });
-    await u({
-      kind: "board:mouse_down",
-      position: { x: 0, y: 0 },
-      isRight: false,
-    });
-    await u({ kind: "board:mouse_move", position: { x: 1, y: 1 } });
-    await u({ kind: "board:mouse_up", position: { x: 1, y: 1 } });
+    await drawLine(u, { x: 0, y: 0 }, { x: 1, y: 1 });
     await u({
       kind: "board:mouse_down",
       position: { x: 0, y: 0 },
@@ -208,6 +202,44 @@ describe("frontend", () => {
       },
     });
   });
+  it("moves a path (touch device)", async () => {
+    const requests: RequestEventBody[] = [];
+    const api = apiForActiveRoom((e) => requests.push(e));
+    const state = createState(api);
+    const effect = () => {};
+    const u = (e: ApplicationEvent) => update(e, state, effect);
+    await u({ kind: "room:init" });
+    await u({ kind: "ws:open", websocket: new WebSocket(`ws://dummy`) });
+    await drawLineTouch(u, { x: 0, y: 0 }, { x: 1, y: 1 });
+    await u({ kind: "shortcut_button:select" });
+    await u({ kind: "board:touch_start", position: { x: 0, y: 0 } });
+    await u({ kind: "board:touch_move", position: { x: 1, y: 1 } });
+    assert.strictEqual(state.selector.isShown(), true);
+    assert.strictEqual(state.selected.length, 1);
+    assert.strictEqual(state.board.getSelectedObjectIds().length, 1);
+    await u({ kind: "board:touch_end", position: { x: 1, y: 1 } });
+    assert.strictEqual(state.selector.isShown(), false);
+    await u({
+      kind: "board:touch_start",
+      position: { x: 10, y: 10 },
+    });
+    await u({ kind: "board:touch_move", position: { x: 12, y: 13 } });
+    await u({ kind: "board:touch_end", position: { x: 12, y: 13 } });
+    const objects = state.board.getAllObjects();
+    assert.strictEqual(objects.length, 1);
+    const object = objects[0];
+    assert.ok(object.kind === "path");
+    assert.strictEqual(object.d, "M2.0000,3.0000L3.0000,4.0000");
+    assert.deepStrictEqual(requests[1], {
+      kind: "patch",
+      id: object.id,
+      key: "d",
+      value: {
+        old: "M0.0000,0.0000L1.0000,1.0000",
+        new: "M2.0000,3.0000L3.0000,4.0000",
+      },
+    });
+  });
   it("moves a text", async () => {
     const requests: RequestEventBody[] = [];
     const api = apiForActiveRoom((e) => requests.push(e));
@@ -216,9 +248,7 @@ describe("frontend", () => {
     const u = (e: ApplicationEvent) => update(e, state, effect);
     await u({ kind: "room:init" });
     await u({ kind: "ws:open", websocket: new WebSocket(`ws://dummy`) });
-    await u({ kind: "board:double_click", position: { x: 0, y: 0 } });
-    state.input.setText("foo");
-    await u({ kind: "input:enter" });
+    await addText(u, state, { x: 0, y: 0 }, "foo");
     await u({
       kind: "board:mouse_down",
       position: { x: 0, y: 0 },
@@ -237,6 +267,38 @@ describe("frontend", () => {
     });
     await u({ kind: "board:mouse_move", position: { x: 12, y: 13 } });
     await u({ kind: "board:mouse_up", position: { x: 12, y: 13 } });
+    const objects = state.board.getAllObjects();
+    assert.strictEqual(objects.length, 1);
+    const object = objects[0];
+    assert.ok(object.kind === "text");
+    assert.deepStrictEqual(object.position, { x: 2, y: 3 });
+    assert.deepStrictEqual(requests[1], {
+      kind: "patch",
+      id: object.id,
+      key: "position",
+      value: { old: { x: 0, y: 0 }, new: { x: 2, y: 3 } },
+    });
+  });
+  it("moves a text (touch device)", async () => {
+    const requests: RequestEventBody[] = [];
+    const api = apiForActiveRoom((e) => requests.push(e));
+    const state = createState(api);
+    const effect = () => {};
+    const u = (e: ApplicationEvent) => update(e, state, effect);
+    await u({ kind: "room:init" });
+    await u({ kind: "ws:open", websocket: new WebSocket(`ws://dummy`) });
+    await addText(u, state, { x: 0, y: 0 }, "foo");
+    await u({ kind: "shortcut_button:select" });
+    await u({ kind: "board:touch_start", position: { x: 0, y: 0 } });
+    await u({ kind: "board:touch_move", position: { x: 1, y: 1 } });
+    assert.strictEqual(state.selector.isShown(), true);
+    assert.strictEqual(state.selected.length, 1);
+    assert.strictEqual(state.board.getSelectedObjectIds().length, 1);
+    await u({ kind: "board:touch_end", position: { x: 1, y: 1 } });
+    assert.strictEqual(state.selector.isShown(), false);
+    await u({ kind: "board:touch_start", position: { x: 10, y: 10 } });
+    await u({ kind: "board:touch_move", position: { x: 12, y: 13 } });
+    await u({ kind: "board:touch_end", position: { x: 12, y: 13 } });
     const objects = state.board.getAllObjects();
     assert.strictEqual(objects.length, 1);
     const object = objects[0];
@@ -445,6 +507,90 @@ describe("frontend", () => {
     assert.strictEqual(state.selected.length, 0);
     assert.strictEqual(state.board.getSelectedObjectIds().length, 0);
   });
+  it("deletes a path", async () => {
+    const requests: RequestEventBody[] = [];
+    const api = apiForActiveRoom((e) => requests.push(e));
+    const state = createState(api);
+    const effect = () => {};
+    const u = (e: ApplicationEvent) => update(e, state, effect);
+    await u({ kind: "room:init" });
+    await u({ kind: "ws:open", websocket: new WebSocket(`ws://dummy`) });
+    await drawLine(u, { x: 0, y: 0 }, { x: 1, y: 1 });
+    await select(u, { x: 0, y: 0 }, { x: 1, y: 1 });
+    assert.strictEqual(state.selector.isShown(), false);
+    assert.strictEqual(state.selected.length, 1);
+    assert.strictEqual(state.board.getSelectedObjectIds().length, 1);
+    const objects = state.board.getAllObjects();
+    assert.strictEqual(objects.length, 1);
+    const object = objects[0];
+    await u({ kind: "key:delete" });
+    assert.strictEqual(state.selected.length, 0);
+    assert.strictEqual(state.board.getSelectedObjectIds().length, 0);
+    assert.deepStrictEqual(requests[1], { kind: "delete", object });
+  });
+  it("deletes a path (touch device)", async () => {
+    const requests: RequestEventBody[] = [];
+    const api = apiForActiveRoom((e) => requests.push(e));
+    const state = createState(api);
+    const effect = () => {};
+    const u = (e: ApplicationEvent) => update(e, state, effect);
+    await u({ kind: "room:init" });
+    await u({ kind: "ws:open", websocket: new WebSocket(`ws://dummy`) });
+    await drawLineTouch(u, { x: 0, y: 0 }, { x: 1, y: 1 });
+    await selectTouch(u, { x: 0, y: 0 }, { x: 1, y: 1 });
+    assert.strictEqual(state.selector.isShown(), false);
+    assert.strictEqual(state.selected.length, 1);
+    assert.strictEqual(state.board.getSelectedObjectIds().length, 1);
+    const objects = state.board.getAllObjects();
+    assert.strictEqual(objects.length, 1);
+    const object = objects[0];
+    await u({ kind: "shortcut_button:delete" });
+    assert.strictEqual(state.selected.length, 0);
+    assert.strictEqual(state.board.getSelectedObjectIds().length, 0);
+    assert.deepStrictEqual(requests[1], { kind: "delete", object });
+  });
+  it("deletes a text", async () => {
+    const requests: RequestEventBody[] = [];
+    const api = apiForActiveRoom((e) => requests.push(e));
+    const state = createState(api);
+    const effect = () => {};
+    const u = (e: ApplicationEvent) => update(e, state, effect);
+    await u({ kind: "room:init" });
+    await u({ kind: "ws:open", websocket: new WebSocket(`ws://dummy`) });
+    await addText(u, state, { x: 0, y: 0 }, "foo");
+    await select(u, { x: 0, y: 0 }, { x: 1, y: 1 });
+    assert.strictEqual(state.selector.isShown(), false);
+    assert.strictEqual(state.selected.length, 1);
+    assert.strictEqual(state.board.getSelectedObjectIds().length, 1);
+    const objects = state.board.getAllObjects();
+    assert.strictEqual(objects.length, 1);
+    const object = objects[0];
+    await u({ kind: "key:delete" });
+    assert.strictEqual(state.selected.length, 0);
+    assert.strictEqual(state.board.getSelectedObjectIds().length, 0);
+    assert.deepStrictEqual(requests[1], { kind: "delete", object });
+  });
+  it("deletes a text (touch device)", async () => {
+    const requests: RequestEventBody[] = [];
+    const api = apiForActiveRoom((e) => requests.push(e));
+    const state = createState(api);
+    const effect = () => {};
+    const u = (e: ApplicationEvent) => update(e, state, effect);
+    await u({ kind: "room:init" });
+    await u({ kind: "ws:open", websocket: new WebSocket(`ws://dummy`) });
+    await addTextTouch(u, state, { x: 0, y: 0 }, "foo");
+    await selectTouch(u, { x: 0, y: 0 }, { x: 1, y: 1 });
+    assert.strictEqual(state.selector.isShown(), false);
+    assert.strictEqual(state.selected.length, 1);
+    assert.strictEqual(state.board.getSelectedObjectIds().length, 1);
+    const objects = state.board.getAllObjects();
+    assert.strictEqual(objects.length, 1);
+    const object = objects[0];
+    await u({ kind: "shortcut_button:delete" });
+    assert.strictEqual(state.selected.length, 0);
+    assert.strictEqual(state.board.getSelectedObjectIds().length, 0);
+    assert.deepStrictEqual(requests[1], { kind: "delete", object });
+  });
 });
 function apiForActiveRoom(send: (event: RequestEventBody) => void): API {
   return {
@@ -476,13 +622,18 @@ async function drawLine(
   start: Position,
   end: Position
 ) {
-  await u({
-    kind: "board:mouse_down",
-    position: start,
-    isRight: false,
-  });
+  await u({ kind: "board:mouse_down", position: start, isRight: false });
   await u({ kind: "board:mouse_move", position: end });
   await u({ kind: "board:mouse_up", position: end });
+}
+async function drawLineTouch(
+  u: (e: ApplicationEvent) => void,
+  start: Position,
+  end: Position
+) {
+  await u({ kind: "board:touch_start", position: start });
+  await u({ kind: "board:touch_move", position: end });
+  await u({ kind: "board:touch_end", position: end });
 }
 async function addText(
   u: (e: ApplicationEvent) => void,
@@ -494,16 +645,32 @@ async function addText(
   state.input.setText(text);
   await u({ kind: "input:enter" });
 }
+async function addTextTouch(
+  u: (e: ApplicationEvent) => void,
+  state: State,
+  position: Position,
+  text: string
+) {
+  await u({ kind: "board:touch_start_long", position });
+  state.input.setText(text);
+  await u({ kind: "input:enter" });
+}
 async function select(
   u: (e: ApplicationEvent) => void,
   start: Position,
   end: Position
 ) {
-  await u({
-    kind: "board:mouse_down",
-    position: start,
-    isRight: true,
-  });
+  await u({ kind: "board:mouse_down", position: start, isRight: true });
   await u({ kind: "board:mouse_move", position: end });
   await u({ kind: "board:mouse_up", position: end });
+}
+async function selectTouch(
+  u: (e: ApplicationEvent) => void,
+  start: Position,
+  end: Position
+) {
+  await u({ kind: "shortcut_button:select" });
+  await u({ kind: "board:touch_start", position: start });
+  await u({ kind: "board:touch_move", position: end });
+  await u({ kind: "board:touch_end", position: end });
 }
