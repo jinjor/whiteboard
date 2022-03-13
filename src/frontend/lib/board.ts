@@ -167,6 +167,17 @@ function setSelected(element: HTMLElement | SVGElement, selected: boolean) {
     }
   }
 }
+function isObjectSelected(element: HTMLElement | SVGElement): boolean {
+  switch (element.tagName) {
+    case "text": {
+      return element.getAttributeNS(null, "fill") === "red";
+    }
+    case "path": {
+      return element.getAttributeNS(null, "stroke") === "red";
+    }
+  }
+  return false;
+}
 function getStroke(element: HTMLElement | SVGElement): string | null {
   return element.getAttributeNS(null, "stroke");
 }
@@ -300,10 +311,11 @@ export class Board {
     }
     return elementToObject(element);
   }
+  private getAllObjectElements(): SVGElement[] {
+    return document.getElementsByClassName("object") as unknown as SVGElement[];
+  }
   getAllObjects(): ObjectBody[] {
-    const elements = document.getElementsByClassName(
-      "object"
-    ) as unknown as SVGElement[];
+    const elements = this.getAllObjectElements();
     const objects = [];
     for (const element of elements) {
       const object = elementToObject(element);
@@ -314,9 +326,7 @@ export class Board {
     return objects;
   }
   getAllObjectsWithBoundingBox(): { object: ObjectBody; bbox: Rectangle }[] {
-    const elements = document.getElementsByClassName(
-      "object"
-    ) as unknown as SVGElement[];
+    const elements = this.getAllObjectElements();
     const objects = [];
     for (const element of elements) {
       const object = elementToObject(element);
@@ -330,6 +340,15 @@ export class Board {
   setObjectSelected(id: ObjectId, selected: boolean): void {
     const element = document.getElementById(id)!;
     setSelected(element, selected);
+  }
+  getSelectedObjectIds(): ObjectId[] {
+    const ids = [];
+    for (const element of this.getAllObjectElements()) {
+      if (isObjectSelected(element)) {
+        ids.push(element.id);
+      }
+    }
+    return ids;
   }
   patchObject(id: ObjectId, key: string, value: any): void {
     const element = document.getElementById(id)!;

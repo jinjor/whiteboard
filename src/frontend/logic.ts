@@ -29,6 +29,7 @@ import {
 } from "./lib/api";
 import { deepEqual } from "../deep-equal";
 import { appendCreateRoomButton, debugging, testing } from "./lib/debug";
+import { v4 as uuidv4 } from "uuid";
 
 type Size = { width: number; height: number };
 type ActionEvent = AddEventBody | PatchEventBody | DeleteEventBody;
@@ -478,7 +479,7 @@ function formatCloseReason(reason: CloseReason): string {
   }
 }
 function generateObjectId(): ObjectId {
-  return String(Date.now()).padStart(36, "0");
+  return uuidv4();
   // https://caniuse.com/mdn-api_crypto_randomuuid
   // return crypto.randomUUID();
 }
@@ -934,7 +935,6 @@ function rollbackAllTemporaryStates(state: State) {
       break;
     }
     case "select": {
-      state.selected = [];
       state.selector.hide();
       break;
     }
@@ -951,9 +951,12 @@ function rollbackAllTemporaryStates(state: State) {
           }
         }
       }
-      state.selected = [];
     }
   }
+  for (const object of state.selected) {
+    state.board.setObjectSelected(object.id, false);
+  }
+  state.selected = [];
   state.editing = { kind: "none" };
   syncCursorAndButtons(state);
 }

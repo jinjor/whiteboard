@@ -178,6 +178,7 @@ describe("frontend", () => {
     await u({ kind: "board:mouse_move", position: { x: 1, y: 1 } });
     assert.strictEqual(state.selector.isShown(), true);
     assert.strictEqual(state.selected.length, 1);
+    assert.strictEqual(state.board.getSelectedObjectIds().length, 1);
     await u({ kind: "board:mouse_up", position: { x: 1, y: 1 } });
     assert.strictEqual(state.selector.isShown(), false);
     await u({
@@ -221,6 +222,7 @@ describe("frontend", () => {
     await u({ kind: "board:mouse_move", position: { x: 1, y: 1 } });
     assert.strictEqual(state.selector.isShown(), true);
     assert.strictEqual(state.selected.length, 1);
+    assert.strictEqual(state.board.getSelectedObjectIds().length, 1);
     await u({ kind: "board:mouse_up", position: { x: 1, y: 1 } });
     assert.strictEqual(state.selector.isShown(), false);
     await u({
@@ -357,8 +359,10 @@ describe("frontend", () => {
     await u({ kind: "board:mouse_move", position: { x: 1, y: 1 } });
     assert.strictEqual(state.selector.isShown(), false);
     assert.strictEqual(state.selected.length, 0);
+    assert.strictEqual(state.board.getSelectedObjectIds().length, 0);
     await u({ kind: "board:mouse_up", position: { x: 1, y: 1 } });
     assert.strictEqual(state.selected.length, 0);
+    assert.strictEqual(state.board.getSelectedObjectIds().length, 0);
     await u({
       kind: "board:mouse_down",
       position: { x: 10, y: 10 },
@@ -409,12 +413,92 @@ describe("frontend", () => {
     });
     await u({ kind: "board:mouse_move", position: { x: 12, y: 13 } });
     await u({ kind: "ws:close", code: 1000, reason: "" });
-    assert.deepStrictEqual(state.selected, []);
+    assert.strictEqual(state.selector.isShown(), false);
+    assert.deepStrictEqual(state.selected.length, 0);
+    assert.strictEqual(state.board.getSelectedObjectIds().length, 0);
     for (const object of objects) {
       assert.deepStrictEqual(object, state.board.getObject(object.id));
     }
     await u({ kind: "board:mouse_up", position: { x: 12, y: 13 } });
     assert.deepStrictEqual(requests, []);
+  });
+  it("cancel selection if websocket is disconnected (white selecting)", async () => {
+    const requests: RequestEventBody[] = [];
+    const api = apiForActiveRoom((e) => requests.push(e));
+    const state = createState(api);
+    const effect = () => {};
+    const u = (e: ApplicationEvent) => update(e, state, effect);
+    await u({ kind: "room:init" });
+    await u({ kind: "ws:open", websocket: new WebSocket(`ws://dummy`) });
+    {
+      await u({
+        kind: "board:mouse_down",
+        position: { x: 0, y: 0 },
+        isRight: false,
+      });
+      await u({ kind: "board:mouse_move", position: { x: 1, y: 1 } });
+      await u({ kind: "board:mouse_up", position: { x: 1, y: 1 } });
+    }
+    {
+      await u({ kind: "board:double_click", position: { x: 0, y: 0 } });
+      state.input.setText("foo");
+      await u({ kind: "input:enter" });
+    }
+    requests.length = 0;
+    await u({
+      kind: "board:mouse_down",
+      position: { x: 0, y: 0 },
+      isRight: true,
+    });
+    await u({ kind: "board:mouse_move", position: { x: 1, y: 1 } });
+    assert.strictEqual(state.selector.isShown(), true);
+    assert.strictEqual(state.selected.length, 2);
+    assert.strictEqual(state.board.getSelectedObjectIds().length, 2);
+    await u({ kind: "ws:close", code: 1000, reason: "" });
+    assert.strictEqual(state.selector.isShown(), false);
+    assert.strictEqual(state.selected.length, 0);
+    assert.strictEqual(state.board.getSelectedObjectIds().length, 0);
+    await u({ kind: "board:mouse_up", position: { x: 1, y: 1 } });
+    assert.strictEqual(state.selected.length, 0);
+    assert.strictEqual(state.board.getSelectedObjectIds().length, 0);
+  });
+  it("cancel selection if websocket is disconnected (after selecting)", async () => {
+    const requests: RequestEventBody[] = [];
+    const api = apiForActiveRoom((e) => requests.push(e));
+    const state = createState(api);
+    const effect = () => {};
+    const u = (e: ApplicationEvent) => update(e, state, effect);
+    await u({ kind: "room:init" });
+    await u({ kind: "ws:open", websocket: new WebSocket(`ws://dummy`) });
+    {
+      await u({
+        kind: "board:mouse_down",
+        position: { x: 0, y: 0 },
+        isRight: false,
+      });
+      await u({ kind: "board:mouse_move", position: { x: 1, y: 1 } });
+      await u({ kind: "board:mouse_up", position: { x: 1, y: 1 } });
+    }
+    {
+      await u({ kind: "board:double_click", position: { x: 0, y: 0 } });
+      state.input.setText("foo");
+      await u({ kind: "input:enter" });
+    }
+    requests.length = 0;
+    await u({
+      kind: "board:mouse_down",
+      position: { x: 0, y: 0 },
+      isRight: true,
+    });
+    await u({ kind: "board:mouse_move", position: { x: 1, y: 1 } });
+    await u({ kind: "board:mouse_up", position: { x: 1, y: 1 } });
+    assert.strictEqual(state.selector.isShown(), false);
+    assert.strictEqual(state.selected.length, 2);
+    assert.strictEqual(state.board.getSelectedObjectIds().length, 2);
+    await u({ kind: "ws:close", code: 1000, reason: "" });
+    assert.strictEqual(state.selector.isShown(), false);
+    assert.strictEqual(state.selected.length, 0);
+    assert.strictEqual(state.board.getSelectedObjectIds().length, 0);
   });
 });
 function apiForActiveRoom(send: (event: RequestEventBody) => void): API {
