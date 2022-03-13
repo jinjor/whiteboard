@@ -19,6 +19,7 @@ describe("deepEqual", function () {
     assert.deepStrictEqual(deepEqual([1, 0], [0, 1]), false);
     assert.deepStrictEqual(deepEqual({}, {}), true);
     assert.deepStrictEqual(deepEqual({ a: 0 }, { a: 0 }), true);
+    assert.deepStrictEqual(deepEqual({ a: 0, b: 1 }, { b: 1, a: 0 }), true);
     assert.deepStrictEqual(deepEqual({ a: 0 }, { a: 1 }), false);
     assert.deepStrictEqual(deepEqual({ a: 0 }, { b: 0 }), false);
     assert.deepStrictEqual(deepEqual({}, { a: undefined }), false);
