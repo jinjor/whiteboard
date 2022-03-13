@@ -141,10 +141,14 @@ export async function update(
       return;
     }
     case "key:delete": {
-      return deleteSelectedObjects(state);
+      deleteSelectedObjects(state);
+      syncCursorAndButtons(state);
+      return;
     }
     case "key:select_all": {
-      return selectAll(state);
+      selectAll(state);
+      syncCursorAndButtons(state);
+      return;
     }
     case "key:redo": {
       redo(state);
