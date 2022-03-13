@@ -16,6 +16,7 @@ import {
   ObjectForSelect,
   PixelPosition,
   Rectangle,
+  SelectedObject,
   Selector,
   Shortcuts,
 } from "./lib/board";
@@ -56,7 +57,7 @@ export type State = {
   undos: Action[];
   redos: Action[];
   editing: EditingState;
-  selected: ObjectForSelect[];
+  selected: SelectedObject[];
   unlisten: (() => void) | null;
 };
 

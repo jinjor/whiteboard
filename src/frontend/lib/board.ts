@@ -25,19 +25,23 @@ export class Rectangle {
     return this.y + this.height;
   }
 }
-export type ObjectForSelect =
-  | {
-      kind: "text";
-      id: ObjectId;
-      bbox: Rectangle;
-      position: Position;
-    }
-  | {
-      kind: "path";
-      id: ObjectId;
-      bbox: Rectangle;
-      points: Position[];
-    };
+
+type TextForSelect = {
+  kind: "text";
+  id: ObjectId;
+  bbox: Rectangle;
+  position: Position;
+};
+type PathForSelect = {
+  kind: "path";
+  id: ObjectId;
+  bbox: Rectangle;
+  points: Position[];
+};
+export type ObjectForSelect = TextForSelect | PathForSelect;
+export type SelectedObject =
+  | Omit<TextForSelect, "bbox">
+  | Omit<PathForSelect, "bbox">;
 
 const isMac = () =>
   window.navigator.userAgent.toLowerCase().indexOf("mac os x") >= 0;
