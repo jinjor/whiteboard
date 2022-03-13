@@ -79,11 +79,16 @@ describe("frontend", () => {
     assert.deepStrictEqual(trace, [1, 2]);
   });
   it("creates a path", async () => {
-    const api = apiForActiveRoom(() => {});
+    const requests: RequestEventBody[] = [];
+    const api = apiForActiveRoom((e) => requests.push(e));
     const state = createState(api);
     const effect = () => {};
     const u = (e: ApplicationEvent) => update(e, state, effect);
     await u({ kind: "room:init" });
+    await u({
+      kind: "ws:open",
+      websocket: new WebSocket(`ws://dummy`),
+    });
     await u({
       kind: "board:mouse_down",
       position: { x: 0, y: 0 },
@@ -96,13 +101,24 @@ describe("frontend", () => {
     const object = objects[0];
     assert.ok(object.kind === "path");
     assert.strictEqual(object.d, "M0.0000,0.0000L1.0000,1.0000");
+    assert.deepStrictEqual(requests, [
+      {
+        kind: "add",
+        object,
+      },
+    ]);
   });
   it("creates a path (touch device)", async () => {
-    const api = apiForActiveRoom(() => {});
+    const requests: RequestEventBody[] = [];
+    const api = apiForActiveRoom((e) => requests.push(e));
     const state = createState(api);
     const effect = () => {};
     const u = (e: ApplicationEvent) => update(e, state, effect);
     await u({ kind: "room:init" });
+    await u({
+      kind: "ws:open",
+      websocket: new WebSocket(`ws://dummy`),
+    });
     await u({
       kind: "board:touch_start",
       position: { x: 0, y: 0 },
@@ -114,9 +130,16 @@ describe("frontend", () => {
     const object = objects[0];
     assert.ok(object.kind === "path");
     assert.strictEqual(object.d, "M0.0000,0.0000L1.0000,1.0000");
+    assert.deepStrictEqual(requests, [
+      {
+        kind: "add",
+        object,
+      },
+    ]);
   });
   it("creates a text", async () => {
-    const api = apiForActiveRoom(() => {});
+    const requests: RequestEventBody[] = [];
+    const api = apiForActiveRoom((e) => requests.push(e));
     const state = createState(api);
     const effect = () => {};
     const u = (e: ApplicationEvent) => update(e, state, effect);
@@ -133,9 +156,17 @@ describe("frontend", () => {
     const object = objects[0];
     assert.ok(object.kind === "text");
     assert.strictEqual(object.text, "foo");
+    assert.deepStrictEqual(object.position, { x: 0, y: 0 });
+    assert.deepStrictEqual(requests, [
+      {
+        kind: "add",
+        object,
+      },
+    ]);
   });
   it("creates a text (touch device)", async () => {
-    const api = apiForActiveRoom(() => {});
+    const requests: RequestEventBody[] = [];
+    const api = apiForActiveRoom((e) => requests.push(e));
     const state = createState(api);
     const effect = () => {};
     const u = (e: ApplicationEvent) => update(e, state, effect);
@@ -152,6 +183,13 @@ describe("frontend", () => {
     const object = objects[0];
     assert.ok(object.kind === "text");
     assert.strictEqual(object.text, "foo");
+    assert.deepStrictEqual(object.position, { x: 0, y: 0 });
+    assert.deepStrictEqual(requests, [
+      {
+        kind: "add",
+        object,
+      },
+    ]);
   });
 });
 function apiForActiveRoom(send: (event: RequestEventBody) => void): API {
