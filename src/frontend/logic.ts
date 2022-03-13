@@ -471,6 +471,9 @@ function parseD(d: string): Position[] {
     }));
 }
 function startDrawing(state: State, pos: Position): void {
+  if (state.websocket == null) {
+    return;
+  }
   const id = generateObjectId();
   const points = [pos];
   state.editing = { kind: "path", points, id };
@@ -621,6 +624,9 @@ function stopSelecting(state: State, pos: Position): void {
 }
 
 function startMoving(state: State, pos: Position): void {
+  if (state.websocket == null) {
+    return;
+  }
   state.editing = { kind: "move", start: pos };
 }
 function continueMoving(state: State, pos: Position): void {
