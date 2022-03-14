@@ -864,6 +864,8 @@ function doAction(state: State, action: Action) {
   state.undos.push(action);
   state.redos = [];
 }
+type UndoStrategy = "skip_on_conflict" | "break_on_conflict";
+const undoStrategy: UndoStrategy = "skip_on_conflict";
 function undo(state: State): void {
   if (state.websocket == null) {
     return;
@@ -875,7 +877,16 @@ function undo(state: State): void {
   for (const event of action.events) {
     const invertedEvent = invertEvent(event);
     if (!canApplyEvent(state, invertedEvent)) {
-      undo(state);
+      switch (undoStrategy) {
+        case "skip_on_conflict": {
+          undo(state);
+          break;
+        }
+        case "break_on_conflict": {
+          state.undos.length = 0;
+          break;
+        }
+      }
       return;
     }
   }
@@ -895,7 +906,16 @@ function redo(state: State): void {
   }
   for (const event of action.events) {
     if (!canApplyEvent(state, event)) {
-      redo(state);
+      switch (undoStrategy) {
+        case "skip_on_conflict": {
+          redo(state);
+          break;
+        }
+        case "break_on_conflict": {
+          state.redos.length = 0;
+          break;
+        }
+      }
       return;
     }
   }
