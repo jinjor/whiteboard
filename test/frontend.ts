@@ -918,6 +918,27 @@ describe("frontend", () => {
     assert.strictEqual(state.shortcuts.isRedoDisabled(), true);
     assert.deepStrictEqual(requests, undoPathExpected(id));
   });
+  it("send multiple commands at one undo/redo action", async () => {
+    const requests: RequestEventBody[] = [];
+    const api = apiForActiveRoom((e) => requests.push(e));
+    const state = createState(api);
+    const effect = () => {};
+    const u = (e: ApplicationEvent) => update(e, state, effect);
+    await u({ kind: "room:init" });
+    await u({ kind: "ws:open", websocket: new WebSocket(`ws://dummy`) });
+    assert.strictEqual(state.shortcuts.isUndoDisabled(), true);
+    assert.strictEqual(state.shortcuts.isRedoDisabled(), true);
+    await drawLine(u, { x: 0, y: 0 }, { x: 1, y: 1 });
+    await drawLine(u, { x: 0, y: 0 }, { x: 1, y: 1 });
+    await select(u, { x: 0, y: 0 }, { x: 1, y: 1 });
+    await u({ kind: "shortcut_button:delete" });
+    await u({ kind: "key:undo" });
+    await u({ kind: "key:redo" });
+    assert.deepStrictEqual(
+      requests.map((r) => r.kind),
+      ["add", "add", "delete", "delete", "add", "add", "delete", "delete"]
+    );
+  });
 });
 function apiForActiveRoom(send: (event: RequestEventBody) => void): API {
   return {
