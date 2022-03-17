@@ -36,9 +36,6 @@ UI
 - https://developers.cloudflare.com/workers/tutorials/build-a-slackbot
 
 TODO:
-- エッジケースのバグ除去
-  - 画面外で mouse up しても選択が終了しない => 終了させる
-    - 画面に戻ってきて左クリックすると選択範囲が残る
 - 部屋がユーザーでいっぱいだった時の表示
 - Slack のマークダウン
 - ステータス表示を洗練させる

@@ -205,6 +205,10 @@ export async function update(
       return;
     }
     case "board:mouse_down": {
+      if (state.editing.kind === "select") {
+        stopSelecting(state, e.position);
+        return;
+      }
       if (state.editing.kind === "text") {
         stopEditingText(state);
       }
