@@ -816,6 +816,7 @@ function deleteSelectedObjects(state: State) {
   state.selected = [];
 }
 function selectAll(state: State): void {
+  state.selected = [];
   const objects = getAllObjectsForSelect(state);
   for (const object of objects) {
     state.selected.push(object);

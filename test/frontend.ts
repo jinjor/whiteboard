@@ -1417,6 +1417,22 @@ describe("frontend", () => {
       assert.strictEqual(state.editing.kind, "none");
     }
   });
+  it("handle 'select_all' shortcut", async () => {
+    const requests: RequestEventBody[] = [];
+    const api = apiForActiveRoom((e) => requests.push(e));
+    const state = createState(api);
+    const effect = () => {};
+    const u = (e: ApplicationEvent) => update(e, state, effect);
+    await u({ kind: "room:init" });
+    await u({ kind: "ws:open", websocket: new WebSocket(`ws://dummy`) });
+    await drawLine(u, { x: 0, y: 0 }, { x: 1, y: 1 });
+    await u({ kind: "key:select_all" });
+    assert.strictEqual(state.selected.length, 1);
+    assert.strictEqual(state.board.getSelectedObjectIds().length, 1);
+    await u({ kind: "key:select_all" });
+    assert.strictEqual(state.selected.length, 1);
+    assert.strictEqual(state.board.getSelectedObjectIds().length, 1);
+  });
 });
 function apiForActiveRoom(send: (event: RequestEventBody) => void): API {
   return {
