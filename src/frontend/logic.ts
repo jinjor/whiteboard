@@ -20,6 +20,7 @@ import {
   SelectedObject,
   Selector,
   Shortcuts,
+  UserEnvironment,
 } from "./lib/board";
 import {
   API,
@@ -448,7 +449,10 @@ export async function update(
   }
 }
 
-export function createState(api: API): State {
+export function createState(
+  api: API,
+  env: UserEnvironment = { isMac: false, isTouchDevice: false }
+): State {
   const boardOptions = {
     viewBox: new Rectangle(0, 0, 16, 9),
     textFontSize: 0.3,
@@ -461,8 +465,8 @@ export function createState(api: API): State {
     self: null,
     board,
     navBar: new NavBar(),
-    help: new Help(),
-    shortcuts: new Shortcuts(),
+    help: new Help(env),
+    shortcuts: new Shortcuts(env),
     input: new Input(),
     selector: new Selector(boardOptions),
     boardRect: board.calculateBoardRect(),

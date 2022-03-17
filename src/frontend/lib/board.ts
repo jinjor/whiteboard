@@ -42,11 +42,10 @@ export type ObjectForSelect = TextForSelect | PathForSelect;
 export type SelectedObject =
   | Omit<TextForSelect, "bbox">
   | Omit<PathForSelect, "bbox">;
-
-const isMac = () =>
-  window.navigator.userAgent.toLowerCase().indexOf("mac os x") >= 0;
-const touchDevice = () =>
-  window.ontouchstart != null || window.navigator.maxTouchPoints > 0;
+export type UserEnvironment = {
+  isMac: boolean;
+  isTouchDevice: boolean;
+};
 
 function getPixelPositionFromMouse(e: MouseEvent): PixelPosition {
   return {
@@ -555,13 +554,13 @@ export class Selector {
 }
 
 export class Help {
-  constructor() {
-    if (touchDevice()) {
+  constructor(env: UserEnvironment) {
+    if (env.isTouchDevice) {
       document.getElementById("help-touch")!.classList.remove("hidden");
     } else {
       const helpElement = document.getElementById("help")!;
       helpElement.classList.remove("hidden");
-      if (isMac()) {
+      if (env.isMac) {
         helpElement.classList.add("mac");
       }
     }
@@ -572,12 +571,12 @@ export class Shortcuts {
   private deleteButton: HTMLElement;
   private undoButton: HTMLButtonElement;
   private redoButton: HTMLButtonElement;
-  constructor() {
+  constructor(env: UserEnvironment) {
     this.selectButton = document.getElementById("select")!;
     this.deleteButton = document.getElementById("delete")!;
     this.undoButton = document.getElementById("undo")! as HTMLButtonElement;
     this.redoButton = document.getElementById("redo")! as HTMLButtonElement;
-    if (touchDevice()) {
+    if (env.isTouchDevice) {
       document.getElementById("shortcut-buttons")!.classList.remove("hidden");
     }
   }
