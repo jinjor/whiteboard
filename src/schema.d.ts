@@ -6,7 +6,6 @@ export type ObjectId = string;
 export type UserId = string;
 export type Timestamp = number;
 export type ObjectHead = {
-  id: ObjectId;
   lastEditedAt: Timestamp;
   lastEditedBy: UserId;
 };
