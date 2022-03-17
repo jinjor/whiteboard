@@ -1,11 +1,11 @@
 import {
-  ObjectBody,
+  Object_,
   ObjectId,
   Objects,
-  PathBody,
+  Path,
   RequestEventBody,
   RoomInfo,
-  TextBody,
+  Text,
 } from "../../schema";
 
 export const api = {
@@ -53,22 +53,22 @@ function send(websocket: WebSocket, event: RequestEventBody): void {
   websocket.send(JSON.stringify(event));
 }
 
-export function makeAddObjectEvent(object: ObjectBody): RequestEventBody {
+export function makeAddObjectEvent(object: Object_): RequestEventBody {
   return {
     kind: "add",
     object,
   };
 }
-export function makeDeleteObjectEvent(object: ObjectBody): RequestEventBody {
+export function makeDeleteObjectEvent(object: Object_): RequestEventBody {
   return {
     kind: "delete",
     object,
   };
 }
-export function makePatchObjectEventFromText<K extends keyof TextBody>(
+export function makePatchObjectEventFromText<K extends keyof Text>(
   id: ObjectId,
   key: K & string,
-  value: { old: TextBody[K]; new: TextBody[K] }
+  value: { old: Text[K]; new: Text[K] }
 ): RequestEventBody {
   return {
     kind: "patch",
@@ -77,10 +77,10 @@ export function makePatchObjectEventFromText<K extends keyof TextBody>(
     value,
   };
 }
-export function makePatchObjectEventFromPath<K extends keyof PathBody>(
+export function makePatchObjectEventFromPath<K extends keyof Path>(
   id: ObjectId,
   key: K & string,
-  value: { old: PathBody[K]; new: PathBody[K] }
+  value: { old: Path[K]; new: Path[K] }
 ): RequestEventBody {
   return {
     kind: "patch",

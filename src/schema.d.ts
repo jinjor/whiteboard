@@ -5,15 +5,11 @@
 export type ObjectId = string;
 export type UserId = string;
 export type Timestamp = number;
-export type ObjectHead = {
-  lastEditedAt: Timestamp;
-  lastEditedBy: UserId;
-};
 export type Position = {
   x: number;
   y: number;
 };
-export type TextBody = {
+export type Text = {
   id: ObjectId;
   kind: "text";
   position: Position;
@@ -22,7 +18,7 @@ export type TextBody = {
    */
   text: string;
 };
-export type PathBody = {
+export type Path = {
   id: ObjectId;
   kind: "path";
   /**
@@ -30,8 +26,7 @@ export type PathBody = {
    */
   d: string;
 };
-export type ObjectBody = TextBody | PathBody;
-export type Object_ = ObjectHead & ObjectBody;
+export type Object_ = Text | Path;
 export type Objects = Record<ObjectId, Object_>;
 export type RequestEventHead = {
   requestedBy: UserId;
@@ -39,7 +34,7 @@ export type RequestEventHead = {
 };
 export type AddEventBody = {
   kind: "add";
-  object: ObjectBody;
+  object: Object_;
 };
 export type PatchEventBody = {
   kind: "patch";
@@ -49,7 +44,7 @@ export type PatchEventBody = {
 };
 export type DeleteEventBody = {
   kind: "delete";
-  object: ObjectBody;
+  object: Object_;
 };
 export type InitEventBody = {
   kind: "init";

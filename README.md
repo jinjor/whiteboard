@@ -39,7 +39,6 @@ TODO:
 - エッジケースのバグ除去
   - 画面外で mouse up しても選択が終了しない => 終了させる
     - 画面に戻ってきて左クリックすると選択範囲が残る
-  - ドラッグ中のオブジェクトが移動されたり消されたらどうなる？
 - Disconnected, Inactive 状態に気づきにくい
 - 部屋がユーザーでいっぱいだった時の表示
 - Slack のマークダウン
@@ -59,7 +58,6 @@ TODO:
 - GitHub auth で org を optional に
 - GitHub 要らない説
 - dev 環境
-- updatedAt, updatedBy 要らないかも
 - キャプチャ
 - 有効期限を表示
 - 再接続

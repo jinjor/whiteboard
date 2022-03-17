@@ -2,7 +2,7 @@ import {
   AddEventBody,
   CloseReason,
   DeleteEventBody,
-  ObjectBody,
+  Object_,
   ObjectId,
   PatchEventBody,
   Position,
@@ -583,7 +583,7 @@ function getAllObjectsForSelect(state: State): ObjectForSelect[] {
   });
 }
 function makeObjectForSelect(
-  object: ObjectBody,
+  object: Object_,
   bbox: Rectangle
 ): ObjectForSelect {
   switch (object.kind) {

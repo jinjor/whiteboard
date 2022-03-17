@@ -610,10 +610,6 @@ describe("backend", function () {
     assert.strictEqual(mes1.filter((m) => m.kind === "upsert").length, 0);
     assert.strictEqual(mes2.filter((m) => m.kind === "upsert").length, 1);
     assert.strictEqual(mes3.filter((m) => m.kind === "upsert").length, 0);
-    assert.strictEqual(
-      mes2.find((m) => m.kind === "upsert")?.object.lastEditedBy,
-      senderId
-    );
   });
   it("provides objects from a room", async function () {
     {
@@ -651,7 +647,6 @@ describe("backend", function () {
       const res = await request("GET", `/api/rooms/${id}/objects`);
       assert.strictEqual(res.status, 200);
       const objects = await res.json();
-      removeMetaInfoFromObjects(objects);
       assert.deepStrictEqual(objects, {
         [object.id]: object,
       });
@@ -1050,13 +1045,6 @@ describe("backend", function () {
     );
     return mes[0].objects;
   }
-  function removeMetaInfoFromObjects(objects: any): void {
-    Object.keys(objects).forEach((key) => {
-      const object = objects[key];
-      delete object.lastEditedAt;
-      delete object.lastEditedBy;
-    });
-  }
   async function assertReceivedEditingEventsAndFinalObjects(
     events: any[],
     expected: {
@@ -1082,16 +1070,9 @@ describe("backend", function () {
       JSON.stringify(edits2)
     );
     for (let i = 0; i < edits2.length; i++) {
-      const editEvent = edits2[i];
-      if (editEvent.object != null) {
-        assert.strictEqual(editEvent.object.lastEditedBy, senderId);
-        delete editEvent.object.lastEditedAt;
-        delete editEvent.object.lastEditedBy;
-      }
       assert.deepStrictEqual(edits2[i], expected.events[i]);
     }
     const objects = await getCurrentObjects(roomId, receiverId);
-    removeMetaInfoFromObjects(objects);
     assert.deepStrictEqual(objects, expected.objects);
   }
 });

@@ -1,9 +1,9 @@
 import {
-  ObjectBody,
+  Object_,
   ObjectId,
-  PathBody,
+  Path,
   Position,
-  TextBody,
+  Text,
   SessionUserId,
   SessionUser,
 } from "../../schema";
@@ -80,7 +80,7 @@ function createObjectElement<T extends string>(
   element.setAttributeNS(null, "clip-path", "url(#clip)");
   return element as any;
 }
-function elementToObject(element: HTMLElement | SVGElement): ObjectBody | null {
+function elementToObject(element: HTMLElement | SVGElement): Object_ | null {
   const id = element.id;
   const kind = element.tagName;
   switch (kind) {
@@ -109,7 +109,7 @@ function getBBox(element: HTMLElement | SVGElement): Rectangle {
   const { x, y, width, height } = (element as any).getBBox();
   return new Rectangle(x, y, width, height);
 }
-function getBBoxMock(object: ObjectBody): Rectangle {
+function getBBoxMock(object: Object_): Rectangle {
   switch (object.kind) {
     case "text": {
       return new Rectangle(object.position.x, object.position.y, 1, 1);
@@ -252,7 +252,7 @@ export class Board {
   toDefaultCursor(): void {
     this.element.style.removeProperty("cursor");
   }
-  upsertObject(object: ObjectBody): void {
+  upsertObject(object: Object_): void {
     switch (object.kind) {
       case "text": {
         return this.upsertText(object);
@@ -262,7 +262,7 @@ export class Board {
       }
     }
   }
-  upsertText(text: TextBody): void {
+  upsertText(text: Text): void {
     const fontSize = this.options.textFontSize;
     let element = document.getElementById(text.id) as unknown as SVGTextElement;
     if (element == null) {
@@ -275,7 +275,7 @@ export class Board {
     element.setAttributeNS(null, "y", String(text.position.y));
     this.element.append(element);
   }
-  upsertPath(path: PathBody): void {
+  upsertPath(path: Path): void {
     const strokeWidth = this.options.pathStrokeWidth;
     let element = document.getElementById(
       path.id
@@ -304,7 +304,7 @@ export class Board {
   hasObject(id: ObjectId): boolean {
     return document.getElementById(id) != null;
   }
-  getObject(id: ObjectId): ObjectBody | null {
+  getObject(id: ObjectId): Object_ | null {
     const element = document.getElementById(id);
     if (element == null) {
       return null;
@@ -314,7 +314,7 @@ export class Board {
   private getAllObjectElements(): SVGElement[] {
     return document.getElementsByClassName("object") as unknown as SVGElement[];
   }
-  getAllObjects(): ObjectBody[] {
+  getAllObjects(): Object_[] {
     const elements = this.getAllObjectElements();
     const objects = [];
     for (const element of elements) {
@@ -325,7 +325,7 @@ export class Board {
     }
     return objects;
   }
-  getAllObjectsWithBoundingBox(): { object: ObjectBody; bbox: Rectangle }[] {
+  getAllObjectsWithBoundingBox(): { object: Object_; bbox: Rectangle }[] {
     const elements = this.getAllObjectElements();
     const objects = [];
     for (const element of elements) {
@@ -339,7 +339,7 @@ export class Board {
   }
   getObjectWithBoundingBox(
     objectId: ObjectId
-  ): { object: ObjectBody; bbox: Rectangle } | null {
+  ): { object: Object_; bbox: Rectangle } | null {
     const element = document.getElementById(objectId);
     if (element == null) {
       return null;

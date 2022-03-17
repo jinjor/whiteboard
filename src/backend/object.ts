@@ -1,9 +1,8 @@
 import {
   RequestEvent,
   Objects,
-  Object_,
   ResponseEvent,
-  ObjectBody,
+  Object_,
   RequestEventBody,
 } from "../schema";
 import { deepEqual } from "../deep-equal";
@@ -34,11 +33,7 @@ export function applyEvent(
       if (objects[event.object.id] != null) {
         break;
       }
-      const newObject = {
-        ...event.object,
-        lastEditedAt: event.uniqueTimestamp,
-        lastEditedBy: event.requestedBy,
-      };
+      const newObject = event.object;
       objects[newObject.id] = newObject;
       events.push({
         event: {
@@ -55,7 +50,7 @@ export function applyEvent(
         console.log(objects);
         break;
       }
-      const oldObject: ObjectBody = { ...objects[objectId] };
+      const oldObject: Object_ = { ...objects[objectId] };
       const oldValue = (oldObject as any)[event.key];
       if (oldValue == null) {
         throw new InvalidEvent();
@@ -67,8 +62,6 @@ export function applyEvent(
       const newObject = {
         ...oldObject,
         [event.key]: event.value.new,
-        lastEditedAt: event.uniqueTimestamp,
-        lastEditedBy: event.requestedBy,
       };
       if (!validateObject(newObject)) {
         throw new InvalidEvent();
@@ -89,9 +82,7 @@ export function applyEvent(
         console.log(objects);
         break;
       }
-      const oldObject: ObjectBody = { ...objects[objectId] };
-      delete (oldObject as any).lastEditedAt;
-      delete (oldObject as any).lastEditedBy;
+      const oldObject = objects[objectId];
       if (!deepEqual(oldObject, event.object)) {
         console.log(oldObject, event.object);
         break;

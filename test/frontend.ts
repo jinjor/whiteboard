@@ -971,8 +971,6 @@ describe("frontend", () => {
           id: firstId,
           kind: "path",
           d: "M7.0000,7.0000L8.0000,8.0000",
-          lastEditedAt: 0,
-          lastEditedBy: "",
         },
       },
     });
@@ -1119,8 +1117,6 @@ describe("frontend", () => {
           id: "a",
           kind: "path",
           d: "M0.0000,0.0000L1.0000,1.0000",
-          lastEditedAt: 0,
-          lastEditedBy: "",
         },
       },
     });
@@ -1169,8 +1165,6 @@ describe("frontend", () => {
           id,
           kind: "path",
           d: "M1.0000,1.0000L2.0000,2.0000",
-          lastEditedAt: 0,
-          lastEditedBy: "",
         },
       },
     });
@@ -1188,8 +1182,6 @@ describe("frontend", () => {
           id,
           kind: "path",
           d: "M7.0000,7.0000L8.0000,8.0000",
-          lastEditedAt: 0,
-          lastEditedBy: "",
         },
       },
     });
@@ -1334,8 +1326,6 @@ describe("frontend", () => {
           id: firstId,
           kind: "path",
           d: "M7.0000,0.0000L8.0000,1.0000", // to right
-          lastEditedAt: 0,
-          lastEditedBy: "",
         },
       },
     });
@@ -1422,8 +1412,6 @@ describe("frontend", () => {
             id: firstId,
             kind: "path",
             d: "M7.0000,0.0000L8.0000,1.0000", // to right (from original position)
-            lastEditedAt: 0,
-            lastEditedBy: "",
           },
         },
       });
