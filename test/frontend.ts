@@ -939,6 +939,47 @@ describe("frontend", () => {
       ["add", "add", "delete", "delete", "add", "add", "delete", "delete"]
     );
   });
+  it("send skips undos that cannot be applied", async () => {
+    const requests: RequestEventBody[] = [];
+    const api = apiForActiveRoom((e) => requests.push(e));
+    const state = createState(api);
+    const effect = () => {};
+    const u = (e: ApplicationEvent) => update(e, state, effect);
+    await u({ kind: "room:init" });
+    await u({ kind: "ws:open", websocket: new WebSocket(`ws://dummy`) });
+    assert.strictEqual(state.shortcuts.isUndoDisabled(), true);
+    assert.strictEqual(state.shortcuts.isRedoDisabled(), true);
+    await drawLine(u, { x: 0, y: 0 }, { x: 1, y: 1 });
+    const firstId = state.board.getAllObjects()[0].id;
+    await drawLine(u, { x: 3, y: 3 }, { x: 4, y: 4 });
+    await select(u, { x: 3, y: 3 }, { x: 4, y: 4 });
+    const secondId = state.board.getSelectedObjectIds()[0];
+    await u({ kind: "ws:message", data: { kind: "delete", id: secondId } });
+    assert.strictEqual(state.board.getAllObjects().length, 1);
+    assert.strictEqual(state.undos.length, 2);
+    assert.strictEqual(state.redos.length, 0);
+    await u({ kind: "key:undo" });
+    assert.strictEqual(state.board.getAllObjects().length, 0);
+    assert.strictEqual(state.undos.length, 0);
+    assert.strictEqual(state.redos.length, 1);
+    // conflict
+    await u({
+      kind: "ws:message",
+      data: {
+        kind: "upsert",
+        object: {
+          id: firstId,
+          kind: "path",
+          d: "M7.0000,7.0000L8.0000,8.0000",
+          lastEditedAt: 0,
+          lastEditedBy: "",
+        },
+      },
+    });
+    await u({ kind: "key:redo" });
+    assert.strictEqual(state.undos.length, 0);
+    assert.strictEqual(state.redos.length, 0);
+  });
 });
 function apiForActiveRoom(send: (event: RequestEventBody) => void): API {
   return {
