@@ -1347,7 +1347,7 @@ describe("frontend", () => {
       assert.strictEqual(state.editing.kind, "none");
     }
   });
-  it.skip("updates path position if object is upserted while moving (move -> move)", async () => {
+  it("cancel selecting if object is upserted while moving (move -> move)", async () => {
     const requests: RequestEventBody[] = [];
     const api = apiForActiveRoom((e) => requests.push(e));
     const state = createState(api);
@@ -1395,16 +1395,16 @@ describe("frontend", () => {
         },
       });
       assert.strictEqual(state.board.getAllObjects().length, 1);
-      assert.strictEqual(state.board.getSelectedObjectIds().length, 1);
+      assert.strictEqual(state.board.getSelectedObjectIds().length, 0);
       assert.strictEqual(state.editing.kind, "move");
     }
     {
-      await u({ kind: "board:mouse_move", position: { x: 0, y: 5 } }); // to bottom (3)
+      await u({ kind: "board:mouse_move", position: { x: 0, y: 5 } });
       assert.strictEqual(state.board.getAllObjects().length, 1);
       const object = state.board.getAllObjects()[0];
       assert.ok(object.kind === "path");
-      assert.strictEqual(object.d, "M7.0000,3.0000L8.0000,4.0000");
-      assert.strictEqual(state.selected.length, 1);
+      assert.strictEqual(object.d, "M7.0000,0.0000L8.0000,1.0000");
+      assert.strictEqual(state.selected.length, 0);
       assert.strictEqual(state.editing.kind, "move");
     }
     {
@@ -1412,7 +1412,7 @@ describe("frontend", () => {
       assert.strictEqual(state.board.getAllObjects().length, 1);
       const object = state.board.getAllObjects()[0];
       assert.ok(object.kind === "path");
-      assert.strictEqual(object.d, "M7.0000,3.0000L8.0000,4.0000");
+      assert.strictEqual(object.d, "M7.0000,0.0000L8.0000,1.0000");
       assert.strictEqual(state.selected.length, 0);
       assert.strictEqual(state.editing.kind, "none");
     }
