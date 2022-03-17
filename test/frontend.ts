@@ -1191,6 +1191,232 @@ describe("frontend", () => {
     assert.strictEqual(state.selector.isShown(), false);
     assert.strictEqual(state.editing.kind, "none");
   });
+  it("cancel selection if object is deleted while moving (before down)", async () => {
+    const requests: RequestEventBody[] = [];
+    const api = apiForActiveRoom((e) => requests.push(e));
+    const state = createState(api);
+    const effect = () => {};
+    const u = (e: ApplicationEvent) => update(e, state, effect);
+    await u({ kind: "room:init" });
+    await u({ kind: "ws:open", websocket: new WebSocket(`ws://dummy`) });
+    await drawLine(u, { x: 0, y: 0 }, { x: 1, y: 1 });
+    await select(u, { x: 0, y: 0 }, { x: 1, y: 1 });
+    const firstId = state.board.getSelectedObjectIds()[0];
+    await u({ kind: "ws:message", data: { kind: "delete", id: firstId } });
+    assert.strictEqual(state.board.getAllObjects().length, 0);
+    assert.strictEqual(state.board.getSelectedObjectIds().length, 0);
+    assert.strictEqual(state.editing.kind, "none");
+    // this is a pen
+    await u({
+      kind: "board:mouse_down",
+      position: { x: 0, y: 0 },
+      isRight: false,
+    });
+    assert.strictEqual(state.board.getAllObjects().length, 0);
+    assert.strictEqual(state.board.getSelectedObjectIds().length, 0);
+    assert.strictEqual(state.editing.kind, "path");
+    await u({ kind: "board:mouse_move", position: { x: 1, y: 1 } });
+    assert.strictEqual(state.board.getAllObjects().length, 1);
+    assert.strictEqual(state.selected.length, 0);
+    assert.strictEqual(state.editing.kind, "path");
+    await u({ kind: "board:mouse_up", position: { x: 1, y: 1 } });
+    assert.strictEqual(state.board.getAllObjects().length, 1);
+    assert.strictEqual(state.selected.length, 0);
+    assert.strictEqual(state.editing.kind, "none");
+  });
+  it("cancel selection if object is deleted while moving (down -> move)", async () => {
+    const requests: RequestEventBody[] = [];
+    const api = apiForActiveRoom((e) => requests.push(e));
+    const state = createState(api);
+    const effect = () => {};
+    const u = (e: ApplicationEvent) => update(e, state, effect);
+    await u({ kind: "room:init" });
+    await u({ kind: "ws:open", websocket: new WebSocket(`ws://dummy`) });
+    await drawLine(u, { x: 0, y: 0 }, { x: 1, y: 1 });
+    await select(u, { x: 0, y: 0 }, { x: 1, y: 1 });
+    const firstId = state.board.getSelectedObjectIds()[0];
+    await u({
+      kind: "board:mouse_down",
+      position: { x: 0, y: 0 },
+      isRight: false,
+    });
+    assert.strictEqual(state.board.getAllObjects().length, 1);
+    assert.strictEqual(state.board.getSelectedObjectIds().length, 1);
+    assert.strictEqual(state.editing.kind, "move");
+    await u({ kind: "ws:message", data: { kind: "delete", id: firstId } });
+    assert.strictEqual(state.board.getAllObjects().length, 0);
+    assert.strictEqual(state.board.getSelectedObjectIds().length, 0);
+    assert.strictEqual(state.editing.kind, "move");
+    await u({ kind: "board:mouse_move", position: { x: 1, y: 1 } });
+    assert.strictEqual(state.board.getAllObjects().length, 0);
+    assert.strictEqual(state.selected.length, 0);
+    assert.strictEqual(state.editing.kind, "move");
+    await u({ kind: "board:mouse_up", position: { x: 1, y: 1 } });
+    assert.strictEqual(state.board.getAllObjects().length, 0);
+    assert.strictEqual(state.selected.length, 0);
+    assert.strictEqual(state.editing.kind, "none");
+  });
+  it("cancel selection if object is deleted while moving (move -> up)", async () => {
+    const requests: RequestEventBody[] = [];
+    const api = apiForActiveRoom((e) => requests.push(e));
+    const state = createState(api);
+    const effect = () => {};
+    const u = (e: ApplicationEvent) => update(e, state, effect);
+    await u({ kind: "room:init" });
+    await u({ kind: "ws:open", websocket: new WebSocket(`ws://dummy`) });
+    await drawLine(u, { x: 0, y: 0 }, { x: 1, y: 1 });
+    await select(u, { x: 0, y: 0 }, { x: 1, y: 1 });
+    const firstId = state.board.getSelectedObjectIds()[0];
+    await u({
+      kind: "board:mouse_down",
+      position: { x: 0, y: 0 },
+      isRight: false,
+    });
+    assert.strictEqual(state.board.getAllObjects().length, 1);
+    assert.strictEqual(state.board.getSelectedObjectIds().length, 1);
+    assert.strictEqual(state.editing.kind, "move");
+    await u({ kind: "board:mouse_move", position: { x: 1, y: 1 } });
+    assert.strictEqual(state.board.getAllObjects().length, 1);
+    assert.strictEqual(state.selected.length, 1);
+    assert.strictEqual(state.editing.kind, "move");
+    await u({ kind: "ws:message", data: { kind: "delete", id: firstId } });
+    assert.strictEqual(state.board.getAllObjects().length, 0);
+    assert.strictEqual(state.board.getSelectedObjectIds().length, 0);
+    assert.strictEqual(state.editing.kind, "move");
+    await u({ kind: "board:mouse_up", position: { x: 1, y: 1 } });
+    assert.strictEqual(state.board.getAllObjects().length, 0);
+    assert.strictEqual(state.selected.length, 0);
+    assert.strictEqual(state.editing.kind, "none");
+  });
+  it("updates path position if object is upserted while moving (before down)", async () => {
+    const requests: RequestEventBody[] = [];
+    const api = apiForActiveRoom((e) => requests.push(e));
+    const state = createState(api);
+    const effect = () => {};
+    const u = (e: ApplicationEvent) => update(e, state, effect);
+    await u({ kind: "room:init" });
+    await u({ kind: "ws:open", websocket: new WebSocket(`ws://dummy`) });
+    await drawLine(u, { x: 0, y: 0 }, { x: 1, y: 1 });
+    await select(u, { x: 0, y: 0 }, { x: 1, y: 1 });
+    const firstId = state.board.getSelectedObjectIds()[0];
+    await u({
+      kind: "ws:message",
+      data: {
+        kind: "upsert",
+        object: {
+          id: firstId,
+          kind: "path",
+          d: "M7.0000,0.0000L8.0000,1.0000", // to right
+          lastEditedAt: 0,
+          lastEditedBy: "",
+        },
+      },
+    });
+    assert.strictEqual(state.board.getAllObjects().length, 1);
+    assert.strictEqual(state.board.getSelectedObjectIds().length, 1);
+    assert.strictEqual(state.editing.kind, "none");
+    {
+      await u({
+        kind: "board:mouse_down",
+        position: { x: 0, y: 0 },
+        isRight: false,
+      });
+      assert.strictEqual(state.board.getAllObjects().length, 1);
+      const object = state.board.getAllObjects()[0];
+      assert.ok(object.kind === "path");
+      assert.strictEqual(object.d, "M7.0000,0.0000L8.0000,1.0000");
+      assert.strictEqual(state.board.getSelectedObjectIds().length, 1);
+      assert.strictEqual(state.editing.kind, "move");
+    }
+    {
+      await u({ kind: "board:mouse_move", position: { x: 0, y: 5 } }); // to bottom
+      assert.strictEqual(state.board.getAllObjects().length, 1);
+      const object = state.board.getAllObjects()[0];
+      assert.ok(object.kind === "path");
+      assert.strictEqual(object.d, "M7.0000,5.0000L8.0000,6.0000");
+      assert.strictEqual(state.selected.length, 1);
+      assert.strictEqual(state.editing.kind, "move");
+    }
+    {
+      await u({ kind: "board:mouse_up", position: { x: 0, y: 5 } });
+      assert.strictEqual(state.board.getAllObjects().length, 1);
+      const object = state.board.getAllObjects()[0];
+      assert.ok(object.kind === "path");
+      assert.strictEqual(object.d, "M7.0000,5.0000L8.0000,6.0000");
+      assert.strictEqual(state.selected.length, 0);
+      assert.strictEqual(state.editing.kind, "none");
+    }
+  });
+  it.skip("updates path position if object is upserted while moving (move -> move)", async () => {
+    const requests: RequestEventBody[] = [];
+    const api = apiForActiveRoom((e) => requests.push(e));
+    const state = createState(api);
+    const effect = () => {};
+    const u = (e: ApplicationEvent) => update(e, state, effect);
+    await u({ kind: "room:init" });
+    await u({ kind: "ws:open", websocket: new WebSocket(`ws://dummy`) });
+    await drawLine(u, { x: 0, y: 0 }, { x: 1, y: 1 });
+    await select(u, { x: 0, y: 0 }, { x: 1, y: 1 });
+    const firstId = state.board.getSelectedObjectIds()[0];
+    {
+      await u({
+        kind: "board:mouse_down",
+        position: { x: 0, y: 0 },
+        isRight: false,
+      });
+      assert.strictEqual(state.board.getAllObjects().length, 1);
+      const object = state.board.getAllObjects()[0];
+      assert.ok(object.kind === "path");
+      assert.strictEqual(object.d, "M0.0000,0.0000L1.0000,1.0000");
+      assert.strictEqual(state.board.getSelectedObjectIds().length, 1);
+      assert.strictEqual(state.editing.kind, "move");
+    }
+    {
+      await u({ kind: "board:mouse_move", position: { x: 0, y: 2 } }); // to bottom (2)
+      assert.strictEqual(state.board.getAllObjects().length, 1);
+      const object = state.board.getAllObjects()[0];
+      assert.ok(object.kind === "path");
+      assert.strictEqual(object.d, "M0.0000,2.0000L1.0000,3.0000");
+      assert.strictEqual(state.selected.length, 1);
+      assert.strictEqual(state.editing.kind, "move");
+    }
+    {
+      await u({
+        kind: "ws:message",
+        data: {
+          kind: "upsert",
+          object: {
+            id: firstId,
+            kind: "path",
+            d: "M7.0000,0.0000L8.0000,1.0000", // to right (from original position)
+            lastEditedAt: 0,
+            lastEditedBy: "",
+          },
+        },
+      });
+      assert.strictEqual(state.board.getAllObjects().length, 1);
+      assert.strictEqual(state.board.getSelectedObjectIds().length, 1);
+      assert.strictEqual(state.editing.kind, "move");
+    }
+    {
+      await u({ kind: "board:mouse_move", position: { x: 0, y: 5 } }); // to bottom (3)
+      assert.strictEqual(state.board.getAllObjects().length, 1);
+      const object = state.board.getAllObjects()[0];
+      assert.ok(object.kind === "path");
+      assert.strictEqual(object.d, "M7.0000,3.0000L8.0000,4.0000");
+      assert.strictEqual(state.selected.length, 1);
+      assert.strictEqual(state.editing.kind, "move");
+    }
+    {
+      await u({ kind: "board:mouse_up", position: { x: 0, y: 5 } });
+      assert.strictEqual(state.board.getAllObjects().length, 1);
+      const object = state.board.getAllObjects()[0];
+      assert.ok(object.kind === "path");
+      assert.strictEqual(object.d, "M7.0000,3.0000L8.0000,4.0000");
+      assert.strictEqual(state.selected.length, 0);
+      assert.strictEqual(state.editing.kind, "none");
+    }
+  });
 });
 function apiForActiveRoom(send: (event: RequestEventBody) => void): API {
   return {
