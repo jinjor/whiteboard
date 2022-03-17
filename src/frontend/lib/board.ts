@@ -337,6 +337,20 @@ export class Board {
     }
     return objects;
   }
+  getObjectWithBoundingBox(
+    objectId: ObjectId
+  ): { object: ObjectBody; bbox: Rectangle } | null {
+    const element = document.getElementById(objectId);
+    if (element == null) {
+      return null;
+    }
+    const object = elementToObject(element);
+    if (object == null) {
+      return null;
+    }
+    const bbox = testing() ? getBBoxMock(object) : getBBox(element);
+    return { object, bbox };
+  }
   setObjectSelected(id: ObjectId, selected: boolean): void {
     const element = document.getElementById(id)!;
     setSelected(element, selected);

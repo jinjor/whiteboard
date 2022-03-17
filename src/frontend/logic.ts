@@ -2,6 +2,7 @@ import {
   AddEventBody,
   CloseReason,
   DeleteEventBody,
+  ObjectBody,
   ObjectId,
   PatchEventBody,
   Position,
@@ -372,6 +373,7 @@ export async function update(
         case "upsert": {
           state.board.upsertObject(data.object);
           if (state.editing.kind === "select") {
+            let found = false;
             for (const object of state.editing.objects) {
               if (object.id === data.object.id) {
                 if (object.kind === "text" && data.object.kind === "text") {
@@ -382,6 +384,16 @@ export async function update(
                 ) {
                   object.points = parseD(data.object.d);
                 }
+                found = true;
+                break;
+              }
+            }
+            if (!found) {
+              const obj = state.board.getObjectWithBoundingBox(data.object.id);
+              if (obj != null) {
+                state.editing.objects.push(
+                  makeObjectForSelect(obj.object, obj.bbox)
+                );
               }
             }
           }
@@ -555,26 +567,32 @@ function stopDrawing(state: State, pos: Position): void {
 }
 function getAllObjectsForSelect(state: State): ObjectForSelect[] {
   return state.board.getAllObjectsWithBoundingBox().map(({ object, bbox }) => {
-    switch (object.kind) {
-      case "text": {
-        return {
-          kind: "text",
-          id: object.id,
-          position: object.position,
-          bbox,
-        };
-      }
-      case "path": {
-        const points = parseD(object.d);
-        return {
-          kind: "path",
-          id: object.id,
-          bbox,
-          points,
-        };
-      }
-    }
+    return makeObjectForSelect(object, bbox);
   });
+}
+function makeObjectForSelect(
+  object: ObjectBody,
+  bbox: Rectangle
+): ObjectForSelect {
+  switch (object.kind) {
+    case "text": {
+      return {
+        kind: "text",
+        id: object.id,
+        position: object.position,
+        bbox,
+      };
+    }
+    case "path": {
+      const points = parseD(object.d);
+      return {
+        kind: "path",
+        id: object.id,
+        bbox,
+        points,
+      };
+    }
+  }
 }
 function startSelecting(state: State, pos: Position): void {
   if (state.websocket == null) {
