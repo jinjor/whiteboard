@@ -326,15 +326,11 @@ export async function update(
       state.websocket = null;
       rollbackAllTemporaryStates(state);
       effect({ kind: "room:disable_editing" });
-      if (reason === "unexpected") {
-        state.navBar.updateStatus("error", "Error", formatCloseReason(reason));
-      } else {
-        state.navBar.updateStatus(
-          "error",
-          "Disconnected",
-          formatCloseReason(reason)
-        );
-      }
+      state.navBar.updateStatus(
+        "disconnected",
+        "Disconnected",
+        formatCloseReason(reason)
+      );
       return;
     }
     case "ws:error": {
@@ -342,8 +338,8 @@ export async function update(
       rollbackAllTemporaryStates(state);
       effect({ kind: "room:disable_editing" });
       state.navBar.updateStatus(
-        "error",
-        "Error",
+        "disconnected",
+        "Disconnected",
         formatCloseReason("unexpected")
       );
       return;
@@ -508,6 +504,7 @@ function formatCloseReason(reason: CloseReason): string {
     case "invalid_data":
       return "Session closed because invalid data is sent to server.";
     case "unexpected":
+    default:
       return "Something went wrong.";
   }
 }

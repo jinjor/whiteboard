@@ -643,12 +643,12 @@ export class Shortcuts {
 
 export class NavBar {
   updateStatus(
-    kind: "active" | "inactive" | "error",
+    kind: "active" | "inactive" | "disconnected",
     title: string,
     reason?: string
   ): void {
     const buttonElement = document.getElementById("status-button")!;
-    buttonElement.classList.remove("active", "inactive", "error");
+    buttonElement.classList.remove("active", "inactive", "disconnected");
     buttonElement.classList.add(kind);
     buttonElement.classList.remove("hidden");
     buttonElement.textContent = title;
