@@ -1126,6 +1126,71 @@ describe("frontend", () => {
     assert.strictEqual(state.selector.isShown(), false);
     assert.strictEqual(state.editing.kind, "none");
   });
+  it("selects moved object while selecting", async () => {
+    const requests: RequestEventBody[] = [];
+    const api = apiForActiveRoom((e) => requests.push(e));
+    const state = createState(api);
+    const effect = () => {};
+    const u = (e: ApplicationEvent) => update(e, state, effect);
+    await u({ kind: "room:init" });
+    await u({ kind: "ws:open", websocket: new WebSocket(`ws://dummy`) });
+    await drawLine(u, { x: 8, y: 8 }, { x: 9, y: 9 });
+    const id = state.board.getAllObjects()[0].id;
+    await u({
+      kind: "board:mouse_down",
+      position: { x: 0, y: 0 },
+      isRight: true,
+    });
+    assert.strictEqual(state.board.getAllObjects().length, 1);
+    assert.strictEqual(state.selector.isShown(), true);
+    assert.strictEqual(state.editing.kind, "select");
+    await u({ kind: "board:mouse_move", position: { x: 1, y: 1 } });
+    assert.strictEqual(state.board.getAllObjects().length, 1);
+    assert.strictEqual(state.selected.length, 0);
+    assert.strictEqual(state.selector.isShown(), true);
+    assert.strictEqual(state.editing.kind, "select");
+    await u({
+      kind: "ws:message",
+      data: {
+        kind: "upsert",
+        object: {
+          id,
+          kind: "path",
+          d: "M1.0000,1.0000L2.0000,2.0000",
+          lastEditedAt: 0,
+          lastEditedBy: "",
+        },
+      },
+    });
+    await u({ kind: "board:mouse_move", position: { x: 2, y: 2 } });
+    assert.strictEqual(state.board.getAllObjects().length, 1);
+    assert.strictEqual(state.selected.length, 1);
+    assert.strictEqual(state.selector.isShown(), true);
+    assert.strictEqual(state.editing.kind, "select");
+    await u({
+      kind: "ws:message",
+      data: {
+        kind: "upsert",
+        object: {
+          id,
+          kind: "path",
+          d: "M7.0000,7.0000L8.0000,8.0000",
+          lastEditedAt: 0,
+          lastEditedBy: "",
+        },
+      },
+    });
+    await u({ kind: "board:mouse_move", position: { x: 3, y: 3 } });
+    assert.strictEqual(state.board.getAllObjects().length, 1);
+    assert.strictEqual(state.selected.length, 0);
+    assert.strictEqual(state.selector.isShown(), true);
+    assert.strictEqual(state.editing.kind, "select");
+    await u({ kind: "board:mouse_up", position: { x: 3, y: 3 } });
+    assert.strictEqual(state.board.getAllObjects().length, 1);
+    assert.strictEqual(state.selected.length, 0);
+    assert.strictEqual(state.selector.isShown(), false);
+    assert.strictEqual(state.editing.kind, "none");
+  });
 });
 function apiForActiveRoom(send: (event: RequestEventBody) => void): API {
   return {

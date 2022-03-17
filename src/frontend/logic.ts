@@ -374,15 +374,17 @@ export async function update(
           state.board.upsertObject(data.object);
           if (state.editing.kind === "select") {
             let found = false;
-            for (const object of state.editing.objects) {
+            for (let i = 0; i < state.editing.objects.length; i++) {
+              const object = state.editing.objects[i];
               if (object.id === data.object.id) {
-                if (object.kind === "text" && data.object.kind === "text") {
-                  object.position = data.object.position;
-                } else if (
-                  object.kind === "path" &&
-                  data.object.kind === "path"
-                ) {
-                  object.points = parseD(data.object.d);
+                const obj = state.board.getObjectWithBoundingBox(
+                  data.object.id
+                );
+                if (obj != null) {
+                  state.editing.objects[i] = makeObjectForSelect(
+                    obj.object,
+                    obj.bbox
+                  );
                 }
                 found = true;
                 break;
@@ -398,6 +400,7 @@ export async function update(
             }
           }
           for (const object of state.selected) {
+            // こっちも上のロジックと同じ？
             if (object.id === data.object.id) {
               if (object.kind === "text" && data.object.kind === "text") {
                 object.position = data.object.position;
