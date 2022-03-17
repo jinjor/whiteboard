@@ -1002,16 +1002,19 @@ describe("frontend", () => {
     await u({ kind: "ws:message", data: { kind: "delete", id: firstId } });
     assert.strictEqual(state.board.getAllObjects().length, 1);
     assert.strictEqual(state.selected.length, 1);
+    assert.strictEqual(state.board.getSelectedObjectIds().length, 1);
     assert.strictEqual(state.selector.isShown(), true);
     assert.strictEqual(state.editing.kind, "select");
     await u({ kind: "board:mouse_move", position: { x: 1, y: 1 } });
     assert.strictEqual(state.board.getAllObjects().length, 1);
     assert.strictEqual(state.selected.length, 1);
+    assert.strictEqual(state.board.getSelectedObjectIds().length, 1);
     assert.strictEqual(state.selector.isShown(), true);
     assert.strictEqual(state.editing.kind, "select");
     await u({ kind: "board:mouse_up", position: { x: 1, y: 1 } });
     assert.strictEqual(state.board.getAllObjects().length, 1);
     assert.strictEqual(state.selected.length, 1);
+    assert.strictEqual(state.board.getSelectedObjectIds().length, 1);
     assert.strictEqual(state.selector.isShown(), false);
     assert.strictEqual(state.editing.kind, "none");
   });
@@ -1037,16 +1040,19 @@ describe("frontend", () => {
     await u({ kind: "board:mouse_move", position: { x: 1, y: 1 } });
     assert.strictEqual(state.board.getAllObjects().length, 2);
     assert.strictEqual(state.selected.length, 2);
+    assert.strictEqual(state.board.getSelectedObjectIds().length, 2);
     assert.strictEqual(state.selector.isShown(), true);
     assert.strictEqual(state.editing.kind, "select");
     await u({ kind: "ws:message", data: { kind: "delete", id: firstId } });
     assert.strictEqual(state.board.getAllObjects().length, 1);
     assert.strictEqual(state.selected.length, 1);
+    assert.strictEqual(state.board.getSelectedObjectIds().length, 1);
     assert.strictEqual(state.selector.isShown(), true);
     assert.strictEqual(state.editing.kind, "select");
     await u({ kind: "board:mouse_up", position: { x: 1, y: 1 } });
     assert.strictEqual(state.board.getAllObjects().length, 1);
     assert.strictEqual(state.selected.length, 1);
+    assert.strictEqual(state.board.getSelectedObjectIds().length, 1);
     assert.strictEqual(state.selector.isShown(), false);
     assert.strictEqual(state.editing.kind, "none");
   });
@@ -1072,16 +1078,19 @@ describe("frontend", () => {
     await u({ kind: "board:mouse_move", position: { x: 1, y: 1 } });
     assert.strictEqual(state.board.getAllObjects().length, 2);
     assert.strictEqual(state.selected.length, 2);
+    assert.strictEqual(state.board.getSelectedObjectIds().length, 2);
     assert.strictEqual(state.selector.isShown(), true);
     assert.strictEqual(state.editing.kind, "select");
     await u({ kind: "board:mouse_up", position: { x: 1, y: 1 } });
     assert.strictEqual(state.board.getAllObjects().length, 2);
     assert.strictEqual(state.selected.length, 2);
+    assert.strictEqual(state.board.getSelectedObjectIds().length, 2);
     assert.strictEqual(state.selector.isShown(), false);
     assert.strictEqual(state.editing.kind, "none");
     await u({ kind: "ws:message", data: { kind: "delete", id: firstId } });
     assert.strictEqual(state.board.getAllObjects().length, 1);
     assert.strictEqual(state.selected.length, 1);
+    assert.strictEqual(state.board.getSelectedObjectIds().length, 1);
     assert.strictEqual(state.selector.isShown(), false);
     assert.strictEqual(state.editing.kind, "none");
   });
@@ -1118,11 +1127,13 @@ describe("frontend", () => {
     await u({ kind: "board:mouse_move", position: { x: 1, y: 1 } });
     assert.strictEqual(state.board.getAllObjects().length, 2);
     assert.strictEqual(state.selected.length, 2);
+    assert.strictEqual(state.board.getSelectedObjectIds().length, 2);
     assert.strictEqual(state.selector.isShown(), true);
     assert.strictEqual(state.editing.kind, "select");
     await u({ kind: "board:mouse_up", position: { x: 1, y: 1 } });
     assert.strictEqual(state.board.getAllObjects().length, 2);
     assert.strictEqual(state.selected.length, 2);
+    assert.strictEqual(state.board.getSelectedObjectIds().length, 2);
     assert.strictEqual(state.selector.isShown(), false);
     assert.strictEqual(state.editing.kind, "none");
   });
@@ -1147,6 +1158,7 @@ describe("frontend", () => {
     await u({ kind: "board:mouse_move", position: { x: 1, y: 1 } });
     assert.strictEqual(state.board.getAllObjects().length, 1);
     assert.strictEqual(state.selected.length, 0);
+    assert.strictEqual(state.board.getSelectedObjectIds().length, 0);
     assert.strictEqual(state.selector.isShown(), true);
     assert.strictEqual(state.editing.kind, "select");
     await u({
@@ -1165,6 +1177,7 @@ describe("frontend", () => {
     await u({ kind: "board:mouse_move", position: { x: 2, y: 2 } });
     assert.strictEqual(state.board.getAllObjects().length, 1);
     assert.strictEqual(state.selected.length, 1);
+    assert.strictEqual(state.board.getSelectedObjectIds().length, 1);
     assert.strictEqual(state.selector.isShown(), true);
     assert.strictEqual(state.editing.kind, "select");
     await u({
@@ -1183,11 +1196,13 @@ describe("frontend", () => {
     await u({ kind: "board:mouse_move", position: { x: 3, y: 3 } });
     assert.strictEqual(state.board.getAllObjects().length, 1);
     assert.strictEqual(state.selected.length, 0);
+    assert.strictEqual(state.board.getSelectedObjectIds().length, 0);
     assert.strictEqual(state.selector.isShown(), true);
     assert.strictEqual(state.editing.kind, "select");
     await u({ kind: "board:mouse_up", position: { x: 3, y: 3 } });
     assert.strictEqual(state.board.getAllObjects().length, 1);
     assert.strictEqual(state.selected.length, 0);
+    assert.strictEqual(state.board.getSelectedObjectIds().length, 0);
     assert.strictEqual(state.selector.isShown(), false);
     assert.strictEqual(state.editing.kind, "none");
   });
@@ -1204,6 +1219,7 @@ describe("frontend", () => {
     const firstId = state.board.getSelectedObjectIds()[0];
     await u({ kind: "ws:message", data: { kind: "delete", id: firstId } });
     assert.strictEqual(state.board.getAllObjects().length, 0);
+    assert.strictEqual(state.selected.length, 0);
     assert.strictEqual(state.board.getSelectedObjectIds().length, 0);
     assert.strictEqual(state.editing.kind, "none");
     // this is a pen
@@ -1213,15 +1229,18 @@ describe("frontend", () => {
       isRight: false,
     });
     assert.strictEqual(state.board.getAllObjects().length, 0);
+    assert.strictEqual(state.selected.length, 0);
     assert.strictEqual(state.board.getSelectedObjectIds().length, 0);
     assert.strictEqual(state.editing.kind, "path");
     await u({ kind: "board:mouse_move", position: { x: 1, y: 1 } });
     assert.strictEqual(state.board.getAllObjects().length, 1);
     assert.strictEqual(state.selected.length, 0);
+    assert.strictEqual(state.board.getSelectedObjectIds().length, 0);
     assert.strictEqual(state.editing.kind, "path");
     await u({ kind: "board:mouse_up", position: { x: 1, y: 1 } });
     assert.strictEqual(state.board.getAllObjects().length, 1);
     assert.strictEqual(state.selected.length, 0);
+    assert.strictEqual(state.board.getSelectedObjectIds().length, 0);
     assert.strictEqual(state.editing.kind, "none");
   });
   it("cancel selection if object is deleted while moving (down -> move)", async () => {
@@ -1241,19 +1260,23 @@ describe("frontend", () => {
       isRight: false,
     });
     assert.strictEqual(state.board.getAllObjects().length, 1);
+    assert.strictEqual(state.selected.length, 1);
     assert.strictEqual(state.board.getSelectedObjectIds().length, 1);
     assert.strictEqual(state.editing.kind, "move");
     await u({ kind: "ws:message", data: { kind: "delete", id: firstId } });
     assert.strictEqual(state.board.getAllObjects().length, 0);
+    assert.strictEqual(state.selected.length, 0);
     assert.strictEqual(state.board.getSelectedObjectIds().length, 0);
     assert.strictEqual(state.editing.kind, "move");
     await u({ kind: "board:mouse_move", position: { x: 1, y: 1 } });
     assert.strictEqual(state.board.getAllObjects().length, 0);
     assert.strictEqual(state.selected.length, 0);
+    assert.strictEqual(state.board.getSelectedObjectIds().length, 0);
     assert.strictEqual(state.editing.kind, "move");
     await u({ kind: "board:mouse_up", position: { x: 1, y: 1 } });
     assert.strictEqual(state.board.getAllObjects().length, 0);
     assert.strictEqual(state.selected.length, 0);
+    assert.strictEqual(state.board.getSelectedObjectIds().length, 0);
     assert.strictEqual(state.editing.kind, "none");
   });
   it("cancel selection if object is deleted while moving (move -> up)", async () => {
@@ -1273,19 +1296,23 @@ describe("frontend", () => {
       isRight: false,
     });
     assert.strictEqual(state.board.getAllObjects().length, 1);
+    assert.strictEqual(state.selected.length, 1);
     assert.strictEqual(state.board.getSelectedObjectIds().length, 1);
     assert.strictEqual(state.editing.kind, "move");
     await u({ kind: "board:mouse_move", position: { x: 1, y: 1 } });
     assert.strictEqual(state.board.getAllObjects().length, 1);
     assert.strictEqual(state.selected.length, 1);
+    assert.strictEqual(state.board.getSelectedObjectIds().length, 1);
     assert.strictEqual(state.editing.kind, "move");
     await u({ kind: "ws:message", data: { kind: "delete", id: firstId } });
     assert.strictEqual(state.board.getAllObjects().length, 0);
+    assert.strictEqual(state.selected.length, 0);
     assert.strictEqual(state.board.getSelectedObjectIds().length, 0);
     assert.strictEqual(state.editing.kind, "move");
     await u({ kind: "board:mouse_up", position: { x: 1, y: 1 } });
     assert.strictEqual(state.board.getAllObjects().length, 0);
     assert.strictEqual(state.selected.length, 0);
+    assert.strictEqual(state.board.getSelectedObjectIds().length, 0);
     assert.strictEqual(state.editing.kind, "none");
   });
   it("updates path position if object is upserted while moving (before down)", async () => {
@@ -1313,6 +1340,7 @@ describe("frontend", () => {
       },
     });
     assert.strictEqual(state.board.getAllObjects().length, 1);
+    assert.strictEqual(state.selected.length, 1);
     assert.strictEqual(state.board.getSelectedObjectIds().length, 1);
     assert.strictEqual(state.editing.kind, "none");
     {
@@ -1325,6 +1353,7 @@ describe("frontend", () => {
       const object = state.board.getAllObjects()[0];
       assert.ok(object.kind === "path");
       assert.strictEqual(object.d, "M7.0000,0.0000L8.0000,1.0000");
+      assert.strictEqual(state.selected.length, 1);
       assert.strictEqual(state.board.getSelectedObjectIds().length, 1);
       assert.strictEqual(state.editing.kind, "move");
     }
@@ -1335,6 +1364,7 @@ describe("frontend", () => {
       assert.ok(object.kind === "path");
       assert.strictEqual(object.d, "M7.0000,5.0000L8.0000,6.0000");
       assert.strictEqual(state.selected.length, 1);
+      assert.strictEqual(state.board.getSelectedObjectIds().length, 1);
       assert.strictEqual(state.editing.kind, "move");
     }
     {
@@ -1344,6 +1374,7 @@ describe("frontend", () => {
       assert.ok(object.kind === "path");
       assert.strictEqual(object.d, "M7.0000,5.0000L8.0000,6.0000");
       assert.strictEqual(state.selected.length, 0);
+      assert.strictEqual(state.board.getSelectedObjectIds().length, 0);
       assert.strictEqual(state.editing.kind, "none");
     }
   });
@@ -1368,6 +1399,7 @@ describe("frontend", () => {
       const object = state.board.getAllObjects()[0];
       assert.ok(object.kind === "path");
       assert.strictEqual(object.d, "M0.0000,0.0000L1.0000,1.0000");
+      assert.strictEqual(state.selected.length, 1);
       assert.strictEqual(state.board.getSelectedObjectIds().length, 1);
       assert.strictEqual(state.editing.kind, "move");
     }
@@ -1378,6 +1410,7 @@ describe("frontend", () => {
       assert.ok(object.kind === "path");
       assert.strictEqual(object.d, "M0.0000,2.0000L1.0000,3.0000");
       assert.strictEqual(state.selected.length, 1);
+      assert.strictEqual(state.board.getSelectedObjectIds().length, 1);
       assert.strictEqual(state.editing.kind, "move");
     }
     {
@@ -1395,6 +1428,7 @@ describe("frontend", () => {
         },
       });
       assert.strictEqual(state.board.getAllObjects().length, 1);
+      assert.strictEqual(state.selected.length, 0);
       assert.strictEqual(state.board.getSelectedObjectIds().length, 0);
       assert.strictEqual(state.editing.kind, "move");
     }
@@ -1405,6 +1439,7 @@ describe("frontend", () => {
       assert.ok(object.kind === "path");
       assert.strictEqual(object.d, "M7.0000,0.0000L8.0000,1.0000");
       assert.strictEqual(state.selected.length, 0);
+      assert.strictEqual(state.board.getSelectedObjectIds().length, 0);
       assert.strictEqual(state.editing.kind, "move");
     }
     {
@@ -1414,6 +1449,7 @@ describe("frontend", () => {
       assert.ok(object.kind === "path");
       assert.strictEqual(object.d, "M7.0000,0.0000L8.0000,1.0000");
       assert.strictEqual(state.selected.length, 0);
+      assert.strictEqual(state.board.getSelectedObjectIds().length, 0);
       assert.strictEqual(state.editing.kind, "none");
     }
   });
