@@ -44,9 +44,9 @@ TODO:
 - HTML と JSON を正しく返し分ける
 - 何らかの原因で session user 数 > ブラウザ数になった？
 - manager の負荷を減らす
-- ua 独立のテスト
+- Durable Objects 完全に消したい
+- Durable Storage 容量は大丈夫？
 - 参加人数が多い時のアイコン表示
-- Cloudflare が何らかの原因で 1006 で切断する？
 - RateLimit 復活する？
 - Firefox と Safari でテキストがややずれる
 - デプロイ方法を確認
