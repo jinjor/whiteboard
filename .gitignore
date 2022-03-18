@@ -3,5 +3,6 @@ assets
 dist
 src/schema.json
 test/*.js*
+tool/*.js*
 .env
 work
