@@ -341,6 +341,8 @@ const authRouter = Router()
     }
     const params = new URLSearchParams(body);
     const text = (params.get("text") ?? "").trim();
+    // Note: `mrkdwn` format
+    // https://api.slack.com/reference/surfaces/formatting
     switch (text) {
       case "": {
         const roomId = env.rooms.newUniqueId();
