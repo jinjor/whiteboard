@@ -29,17 +29,12 @@ UI
 
 参考
 - https://github.com/cloudflare/workers-chat-demo
-- https://github.com/cloudflare/durable-objects-typescript-rollup-esm
-- https://github.com/cloudflare/durable-objects-template
-- https://github.com/cloudflare/durable-objects-rollup-esm
-- https://github.com/cloudflare/durable-objects-webpack-commonjs
 - https://developers.cloudflare.com/workers/tutorials/build-a-slackbot
 - https://developers.cloudflare.com/workers/platform/pricing
 - https://developers.cloudflare.com/analytics/graphql-api/
 - https://graphql.org/learn/introspection/
 
 TODO:
-- 請求見積もり可視化
 - 部屋がユーザーでいっぱいだった時の表示
 - Slack のマークダウン
 - ステータス表示を洗練させる
@@ -48,8 +43,8 @@ TODO:
 - HTML と JSON を正しく返し分ける
 - 何らかの原因で session user 数 > ブラウザ数になった？
 - manager の負荷を減らす
+- Storage と無駄に大きいオブジェクトをやりとりしている
 - Durable Objects 完全に消したい
-- Durable Storage 容量は大丈夫？
 - 参加人数が多い時のアイコン表示
 - RateLimit 復活する？
 - Firefox と Safari でテキストがややずれる
