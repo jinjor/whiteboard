@@ -38,11 +38,11 @@ TODO:
 - 部屋がユーザーでいっぱいだった時の表示
 - ログアウト or revoke
 - HTML と JSON を正しく返し分ける
-- 何らかの原因で session user 数 > ブラウザ数になった？
 - manager の負荷を減らす（config の問い合わせも無駄）
 - Storage と無駄に大きいオブジェクトをやりとりしている
 - Durable Objects 完全に消したい
 - 参加人数が多い時のアイコン表示
+- ChatRoom をリネーム
 - RateLimit 復活する？
 - Firefox と Safari でテキストがややずれる
 - デプロイ方法を確認
@@ -50,13 +50,10 @@ TODO:
 - GitHub auth で org を optional に
 - GitHub 要らない説
 - dev 環境
-- キャプチャ
 - 有効期限を表示
-- 再接続
 - ogp
 - コマンドのヘルプ
 - HTML のテンプレート化
-- object と member の element id が被りうる
 
 メモ：
 - logo のフォントは Verdana
