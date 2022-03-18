@@ -359,7 +359,7 @@ const authRouter = Router()
             type: "section",
             text: {
               type: "mrkdwn",
-              text: `どうぞ！ ${url}`,
+              text: `Here you are. ${url}`,
             },
           });
         } else if (res.status === 403) {
@@ -367,7 +367,7 @@ const authRouter = Router()
             type: "section",
             text: {
               type: "mrkdwn",
-              text: `部屋がいっぱいです`,
+              text: `The number of active rooms has reached the limit. Type \`/wb status\` to check the situation.`,
             },
           });
         } else {
@@ -375,7 +375,7 @@ const authRouter = Router()
             type: "section",
             text: {
               type: "mrkdwn",
-              text: `部屋の作成に失敗しました`,
+              text: `Filed to create a room...`,
             },
           });
         }
