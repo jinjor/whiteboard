@@ -4,3 +4,4 @@ dist
 src/schema.json
 test/*.js*
 .env
+work

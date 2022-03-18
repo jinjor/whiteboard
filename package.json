@@ -8,7 +8,9 @@
     "build:frontend": "esbuild --tsconfig=src/frontend/tsconfig.json src/frontend/*.ts --bundle --sourcemap --outdir=assets && cp src/frontend/*.html src/frontend/*.css src/frontend/*.ico assets",
     "dev": "miniflare -e .env.dev --watch --debug",
     "dev:auth": "miniflare --watch --debug",
-    "test": "npm run build && tsc -p test/tsconfig.json && mocha -r source-map-support/register test/dist/test/*.js"
+    "test": "npm run build && tsc -p test/tsconfig.json && mocha -r source-map-support/register test/dist/test/*.js",
+    "analytics": "esbuild tool/analytics.ts --sourcemap | node --input-type=module",
+    "get-graphql-schema": "get-graphql-schema -h Content-Type=application/json -h Authorization=Bearer\\ $CLOUDFLARE_API_KEY https://api.cloudflare.com/client/v4/graphql/ > work/schema.graphql"
   },
   "keywords": [],
   "author": "",
@@ -29,6 +31,7 @@
     "cookie": "^0.4.2",
     "deep-equal": "^2.0.5",
     "esbuild": "^0.14.13",
+    "get-graphql-schema": "^2.1.2",
     "itty-router": "^2.4.10",
     "jsdom": "^19.0.0",
     "miniflare": "^2.2.0",

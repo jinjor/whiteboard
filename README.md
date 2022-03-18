@@ -34,8 +34,12 @@ UI
 - https://github.com/cloudflare/durable-objects-rollup-esm
 - https://github.com/cloudflare/durable-objects-webpack-commonjs
 - https://developers.cloudflare.com/workers/tutorials/build-a-slackbot
+- https://developers.cloudflare.com/workers/platform/pricing
+- https://developers.cloudflare.com/analytics/graphql-api/
+- https://graphql.org/learn/introspection/
 
 TODO:
+- 請求見積もり可視化
 - 部屋がユーザーでいっぱいだった時の表示
 - Slack のマークダウン
 - ステータス表示を洗練させる
