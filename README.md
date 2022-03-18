@@ -36,11 +36,10 @@ UI
 
 TODO:
 - 部屋がユーザーでいっぱいだった時の表示
-- Slack のマークダウン
 - ログアウト or revoke
 - HTML と JSON を正しく返し分ける
 - 何らかの原因で session user 数 > ブラウザ数になった？
-- manager の負荷を減らす
+- manager の負荷を減らす（config の問い合わせも無駄）
 - Storage と無駄に大きいオブジェクトをやりとりしている
 - Durable Objects 完全に消したい
 - 参加人数が多い時のアイコン表示

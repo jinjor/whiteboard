@@ -359,7 +359,7 @@ const authRouter = Router()
             type: "section",
             text: {
               type: "mrkdwn",
-              text: `Here you are. ${url}`,
+              text: `Here you are: <${url}|*Enter*>`,
             },
           });
         } else if (res.status === 403) {
@@ -402,7 +402,7 @@ const authRouter = Router()
         const now = Date.now();
         const message = [
           `Total rooms: ${rooms.length}`,
-          `Active rooms: ${activeRooms.length} / ${config.MAX_ACTIVE_ROOMS}`,
+          `Active rooms: *${activeRooms.length} / ${config.MAX_ACTIVE_ROOMS}*`,
           ...activeRooms.map((room, i) => {
             const left = (room.activeUntil - now) / 1000; // seconds
             const formatted =
