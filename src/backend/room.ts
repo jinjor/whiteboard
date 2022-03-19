@@ -2,15 +2,7 @@ import { Router } from "itty-router";
 import { applyEvent, InvalidEvent, validateEvent } from "./object";
 import { Objects, SessionUser, UserId } from "../schema";
 import { Config, defaultConfig } from "./config";
-
-function immediatelyCloseWebSocket(code: number, reason: string) {
-  const pair = new WebSocketPair();
-  pair[1].accept();
-  setTimeout(() => {
-    pair[1].close(code, reason);
-  });
-  return new Response(null, { status: 101, webSocket: pair[0] });
-}
+import { immediatelyCloseWebSocket } from "./worker-util";
 
 const roomRouter = Router()
   .delete("/", async (request: Request, state: RoomState) => {
