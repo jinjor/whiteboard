@@ -190,7 +190,9 @@ describe("backend", function () {
       await useWebsocket("a", `/foo`, async () => {});
     });
     await assert.rejects(async () => {
-      await useWebsocket("a", `/api/rooms/foo/websocket`, async () => {});
+      await useWebsocket("a", `/api/rooms/foo/websocket`, async () => {
+        await setTimeout(100);
+      });
     });
     const ACTIVE_DURATION = 1000;
     const LIVE_DURATION = 2000;
