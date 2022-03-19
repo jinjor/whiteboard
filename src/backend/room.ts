@@ -3,8 +3,6 @@ import { applyEvent, InvalidEvent, validateEvent } from "./object";
 import { Objects, SessionUser, UserId } from "../schema";
 import { Config, defaultConfig } from "./config";
 
-type Env = {};
-
 function immediatelyCloseWebSocket(code: number, reason: string) {
   const pair = new WebSocketPair();
   pair[1].accept();
@@ -66,14 +64,12 @@ type Session = {
 
 class RoomState {
   private storage: DurableObjectStorage;
-  private env: Env;
   private sessions: Session[];
   private lastTimestamp: number;
   private HOT_DURATION!: number;
   private MAX_ACTIVE_USERS!: number;
-  constructor(controller: any, env: Env) {
+  constructor(controller: any) {
     this.storage = controller.storage;
-    this.env = env;
     this.sessions = [];
     // 同時にメッセージが来てもタイムスタンプを単調増加にするための仕掛け
     this.lastTimestamp = Date.now();
@@ -224,8 +220,8 @@ class RoomState {
 
 export class Room implements DurableObject {
   private state: RoomState;
-  constructor(controller: any, env: Env) {
-    this.state = new RoomState(controller, env);
+  constructor(controller: any) {
+    this.state = new RoomState(controller);
   }
   async fetch(request: Request) {
     return roomRouter.handle(request, this.state).catch((error: unknown) => {
