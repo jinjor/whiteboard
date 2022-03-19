@@ -35,6 +35,7 @@ UI
 - https://graphql.org/learn/introspection/
 
 TODO:
+- accountTag の決め打ちをやめる
 - Safari で文字が選択状態になって削除がうまくできない
 - ログアウト or revoke
 - manager の負荷を減らす（config の問い合わせも無駄）

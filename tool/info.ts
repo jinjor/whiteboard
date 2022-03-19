@@ -31,11 +31,6 @@ async function send(path: string) {
   return json.result;
 }
 
-type DateRange = {
-  firstDate: string;
-  lastDate: string;
-};
-
 async function getDurableObjectNamespaces(): Promise<any[]> {
   const namespaces = await send(`/workers/durable_objects/namespaces`);
   return namespaces.filter((ns) => ns.script === scriptName);

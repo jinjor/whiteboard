@@ -17,6 +17,10 @@ import {
 import { RoomInfo, SessionUser, User } from "../schema";
 import { check, handleCallback, OAuth } from "./oauth";
 import { Config } from "./config";
+import {
+  getDurableObjectNamespaces,
+  getDurableObjects,
+} from "./cloudflare-api";
 
 type Env = {
   manager: DurableObjectNamespace;
@@ -24,6 +28,7 @@ type Env = {
   limiters: DurableObjectNamespace;
 
   DEBUG_API: "true" | "false";
+  ADMIN_KEY: string;
 } & (
   | {
       AUTH_TYPE: "header";
@@ -139,17 +144,63 @@ const debugRouter = Router({ base: "/debug" })
       method: "DELETE",
     });
   });
+
+const adminRouter = Router({ base: "/admin" }).delete(
+  "/gc",
+  async (request: Request, env: Env) => {
+    const CLOUDFLARE_API_TOKEN = request.headers.get("WB-CLOUDFLARE_API_TOKEN");
+    const body: any = await request.json();
+    const { scriptName, accountTag } = body;
+    if (
+      CLOUDFLARE_API_TOKEN == null ||
+      scriptName == null ||
+      accountTag == null
+    ) {
+      return new Response("Invalid request", { status: 400 });
+    }
+    const config = {
+      accountTag,
+      CLOUDFLARE_API_TOKEN,
+    };
+    const namespaces = await getDurableObjectNamespaces(config, scriptName);
+    const roomNamespace = namespaces.find((ns) => ns.class === "Room");
+    if (roomNamespace == null) {
+      return new Response("Unexpected", { status: 500 });
+    }
+    const roomObjects = await getDurableObjects(config, roomNamespace.id);
+    const deleted = [];
+    for (const { id } of roomObjects) {
+      const singletonId = env.manager.idFromName("singleton");
+      const managerStub = env.manager.get(singletonId);
+      const res = await managerStub.fetch("https://dummy-url/rooms/" + id);
+      if (res.status === 404) {
+        const roomId = env.rooms.idFromString(id);
+        const roomStub = env.rooms.get(roomId);
+        const res = await roomStub.fetch("https://dummy-url/", {
+          method: "DELETE",
+        });
+        if (res.status !== 200) {
+          throw new Error("failed to execute GC");
+        }
+        deleted.push(id);
+      }
+    }
+    return new Response(
+      JSON.stringify({
+        deleted,
+      })
+    );
+  }
+);
+
 const apiRouter = Router({ base: "/api" })
   .post("/rooms", async (request: Request, env: Env) => {
     const roomId = env.rooms.newUniqueId();
     const singletonId = env.manager.idFromName("singleton");
     const managerStub = env.manager.get(singletonId);
-    const res = await managerStub.fetch(
-      "https://dummy-url/rooms/" + roomId.toString(),
-      {
-        method: "PUT",
-      }
-    );
+    const res = await managerStub.fetch("https://dummy-url/rooms/" + roomId, {
+      method: "PUT",
+    });
     if (res.status === 200) {
       const roomInfo = await res.json();
       return new Response(JSON.stringify(roomInfo));
@@ -175,10 +226,7 @@ const apiRouter = Router({ base: "/api" })
       } catch (e) {
         return new Response("Not found.", { status: 404 });
       }
-      const res = await managerStub.fetch(
-        "https://dummy-url/rooms/" + roomId.toString(),
-        request
-      );
+      const res = await managerStub.fetch("https://dummy-url/rooms/" + roomId);
       if (res.status === 200) {
         const room: RoomInfo = await res.json();
         return new Response(
@@ -298,6 +346,18 @@ const authRouter = Router()
   .get("/assets/*", async (req: Request, env: Env, ctx: ExecutionContext) => {
     return getAsset(req, env, ctx, (path) => path.replace("/assets/", "/"));
   })
+  .all(
+    "/admin/*",
+    async (request: Request, env: Env, ctx: ExecutionContext) => {
+      if (
+        env.ADMIN_KEY == null ||
+        env.ADMIN_KEY != request.headers.get("WB-ADMIN_KEY")
+      ) {
+        return getAsset(request, env, ctx, () => "/404.html");
+      }
+    },
+    adminRouter.handle
+  )
   .get("/callback/*", async (request: Request, env: Env) => {
     let auth: OAuth;
     switch (env.AUTH_TYPE) {
@@ -576,7 +636,7 @@ export default {
     await clean(env);
   },
 };
-
+async function strongClean(env: Env) {}
 async function clean(env: Env) {
   const singletonId = env.manager.idFromName("singleton");
   const managerStub = env.manager.get(singletonId);
