@@ -1,6 +1,6 @@
 import fetch from "node-fetch";
 
-const CLOUDFLARE_API_KEY = process.env.CLOUDFLARE_API_KEY;
+const CLOUDFLARE_API_TOKEN = process.env.CLOUDFLARE_API_TOKEN;
 const accountTag = "7e155f728b0311833218e72046aaa90a";
 const scriptName = "whiteboard";
 
@@ -11,10 +11,19 @@ async function send(path: string) {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${CLOUDFLARE_API_KEY}`,
+        Authorization: `Bearer ${CLOUDFLARE_API_TOKEN}`,
+        Accepts: "application/json",
       },
     }
   );
+  if (res.status >= 400) {
+    throw new Error(
+      JSON.stringify({
+        status: res.status,
+        body: await res.text(),
+      })
+    );
+  }
   const json = await res.json();
   if (!json.success) {
     throw new Error(JSON.stringify(json));
