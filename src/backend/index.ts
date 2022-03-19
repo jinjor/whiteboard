@@ -592,15 +592,21 @@ async function clean(env: Env) {
   for (const patch of patches) {
     const roomId = env.rooms.idFromString(patch.id);
     const roomStub = env.rooms.get(roomId);
-    // TODO: 消す方法
-    if (!patch.active || !patch.alive) {
+    if (!patch.active) {
       const res = await roomStub.fetch("https://dummy-url/deactivate", {
         method: "POST",
       });
       if (res.status !== 200) {
         throw new Error("failed to clean");
       }
-      continue;
+    }
+    if (!patch.alive) {
+      const res = await roomStub.fetch("https://dummy-url/", {
+        method: "DELETE",
+      });
+      if (res.status !== 200) {
+        throw new Error("failed to clean");
+      }
     }
     if (patch.active && patch.alive) {
       const res = await roomStub.fetch("https://dummy-url/cooldown", {

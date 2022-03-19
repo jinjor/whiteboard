@@ -18,6 +18,11 @@ function immediatelyCloseWebSocket(code: number, reason: string) {
 }
 
 const roomRouter = Router()
+  .delete("/", async (request: Request, state: RoomState) => {
+    await state.disconnectAllSessions("room_got_inactive");
+    await state.deleteAll();
+    return new Response("null");
+  })
   .patch("/config", async (request: Request, state: RoomState) => {
     const config = await request.json();
     await state.updateConfig(config as any);
@@ -76,6 +81,9 @@ class RoomState {
     // 同時にメッセージが来てもタイムスタンプを単調増加にするための仕掛け
     this.lastTimestamp = Date.now();
     this.updateConfig(defaultConfig);
+  }
+  async deleteAll(): Promise<void> {
+    await this.storage.deleteAll();
   }
   updateConfig(config: Partial<Config>): void {
     if (config.HOT_DURATION != null) {

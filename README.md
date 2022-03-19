@@ -39,7 +39,6 @@ TODO:
 - HTML と JSON を正しく返し分ける
 - manager の負荷を減らす（config の問い合わせも無駄）
 - Storage と無駄に大きいオブジェクトをやりとりしている
-- Durable Objects 完全に消したい
 - 参加人数が多い時のアイコン表示
 - iPhone からログイン直後に Something went wrong
 - RateLimit 復活する？
@@ -53,6 +52,7 @@ TODO:
 - ogp
 - コマンドのヘルプ
 - HTML のテンプレート化
+- Durable Objects のゴミをチェック
 
 メモ：
 - logo のフォントは Verdana
