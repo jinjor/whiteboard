@@ -3,9 +3,7 @@ import { applyEvent, InvalidEvent, validateEvent } from "./object";
 import { Objects, SessionUser, UserId } from "../schema";
 import { Config, defaultConfig } from "./config";
 
-type Env = {
-  limiters: DurableObjectNamespace;
-};
+type Env = {};
 
 function immediatelyCloseWebSocket(code: number, reason: string) {
   const pair = new WebSocketPair();

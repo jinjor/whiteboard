@@ -22,10 +22,42 @@ import {
   getDurableObjects,
 } from "./cloudflare-api";
 
+class DurableObjectClient {
+  private stub: DurableObjectStub;
+  constructor(ns: DurableObjectNamespace, id: DurableObjectId) {
+    this.stub = ns.get(id);
+  }
+  async fetch(...originalArgs: Parameters<typeof fetch>): Promise<Response> {
+    const [url, ...rest] = originalArgs;
+    const args = [
+      typeof url === "string" ? "http://dummy-url" + url : url,
+      ...rest,
+    ] as const;
+    return this.stub.fetch(...args);
+  }
+}
+class RoomManagerClient extends DurableObjectClient {
+  constructor(ns: DurableObjectNamespace) {
+    super(ns, ns.idFromName("singleton"));
+  }
+}
+class RoomClient extends DurableObjectClient {
+  constructor(ns: DurableObjectNamespace, roomId: string) {
+    super(ns, ns.idFromString(roomId));
+  }
+}
+function isRoomIdValid(ns: DurableObjectNamespace, roomId: string): boolean {
+  try {
+    ns.idFromString(roomId);
+  } catch (e) {
+    return false;
+  }
+  return true;
+}
+
 type Env = {
   manager: DurableObjectNamespace;
   rooms: DurableObjectNamespace;
-  limiters: DurableObjectNamespace;
 
   DEBUG_API: "true" | "false";
   ADMIN_KEY: string;
@@ -118,26 +150,22 @@ function immediatelyCloseWebSocket(code: number, reason: string) {
 const debugRouter = Router({ base: "/debug" })
   .patch("/config", async (request: Request, env: Env) => {
     const config = await request.json();
-    const singletonId = env.manager.idFromName("singleton");
-    const managerStub = env.manager.get(singletonId);
-    return await managerStub.fetch("https://dummy-url/config", {
+    const managerClient = new RoomManagerClient(env.manager);
+    return await managerClient.fetch("/config", {
       method: "PATCH",
       body: JSON.stringify(config),
     });
   })
   .patch(
-    "/rooms/:roomName/config",
-    async (request: Request & { params: { roomName: string } }, env: Env) => {
+    "/rooms/:roomId/config",
+    async (request: Request & { params: { roomId: string } }, env: Env) => {
       const config = await request.json();
-      const roomName = request.params.roomName;
-      let roomId;
-      try {
-        roomId = env.rooms.idFromString(roomName);
-      } catch (e) {
+      const roomId = request.params.roomId;
+      if (!isRoomIdValid(env.rooms, roomId)) {
         return new Response("Not found.", { status: 404 });
       }
-      const roomStub = env.rooms.get(roomId);
-      return roomStub.fetch("https://dummy-url/config", {
+      const roomClient = new RoomClient(env.rooms, roomId);
+      return roomClient.fetch("/config", {
         method: "PATCH",
         body: JSON.stringify(config),
       });
@@ -148,9 +176,8 @@ const debugRouter = Router({ base: "/debug" })
     return new Response();
   })
   .delete("/", async (request: Request, env: Env) => {
-    const singletonId = env.manager.idFromName("singleton");
-    const managerStub = env.manager.get(singletonId);
-    return await managerStub.fetch("https://dummy-url", {
+    const managerClient = new RoomManagerClient(env.manager);
+    return await managerClient.fetch("/", {
       method: "DELETE",
     });
   });
@@ -180,37 +207,26 @@ const adminRouter = Router({ base: "/admin" }).delete(
     const roomObjects = await getDurableObjects(config, roomNamespace.id);
     const deleted = [];
     for (const { id } of roomObjects) {
-      const singletonId = env.manager.idFromName("singleton");
-      const managerStub = env.manager.get(singletonId);
-      const res = await managerStub.fetch("https://dummy-url/rooms/" + id);
+      const managerClient = new RoomManagerClient(env.manager);
+      const res = await managerClient.fetch("/rooms/" + id);
       if (res.status === 404) {
-        const roomId = env.rooms.idFromString(id);
-        const roomStub = env.rooms.get(roomId);
-        const res = await roomStub.fetch("https://dummy-url/", {
-          method: "DELETE",
-        });
+        const roomClient = new RoomClient(env.rooms, id);
+        const res = await roomClient.fetch("/", { method: "DELETE" });
         if (res.status !== 200) {
           throw new Error("failed to execute GC");
         }
         deleted.push(id);
       }
     }
-    return new Response(
-      JSON.stringify({
-        deleted,
-      })
-    );
+    return new Response(JSON.stringify({ deleted }));
   }
 );
 
 const apiRouter = Router({ base: "/api" })
   .post("/rooms", async (request: Request, env: Env) => {
     const roomId = env.rooms.newUniqueId();
-    const singletonId = env.manager.idFromName("singleton");
-    const managerStub = env.manager.get(singletonId);
-    const res = await managerStub.fetch("https://dummy-url/rooms/" + roomId, {
-      method: "PUT",
-    });
+    const manager = new RoomManagerClient(env.manager);
+    const res = await manager.fetch("/rooms/" + roomId, { method: "PUT" });
     if (res.status === 200) {
       const roomInfo = await res.json();
       return new Response(JSON.stringify(roomInfo));
@@ -220,23 +236,17 @@ const apiRouter = Router({ base: "/api" })
     }
     const errorMessage = await res.text();
     console.log(errorMessage);
-    return new Response("Internal server error", {
-      status: 500,
-    });
+    return new Response("Internal server error", { status: 500 });
   })
   .get(
-    "/rooms/:roomName",
-    async (request: Request & { params: { roomName: string } }, env: Env) => {
-      const roomName = request.params.roomName;
-      const singletonId = env.manager.idFromName("singleton");
-      const managerStub = env.manager.get(singletonId);
-      let roomId;
-      try {
-        roomId = env.rooms.idFromString(roomName);
-      } catch (e) {
+    "/rooms/:roomId",
+    async (request: Request & { params: { roomId: string } }, env: Env) => {
+      const roomId = request.params.roomId;
+      const manager = new RoomManagerClient(env.manager);
+      if (!isRoomIdValid(env.rooms, roomId)) {
         return new Response("Not found.", { status: 404 });
       }
-      const res = await managerStub.fetch("https://dummy-url/rooms/" + roomId);
+      const res = await manager.fetch("/rooms/" + roomId);
       if (res.status === 200) {
         const room: RoomInfo = await res.json();
         return new Response(
@@ -247,9 +257,9 @@ const apiRouter = Router({ base: "/api" })
     }
   )
   .get(
-    "/rooms/:roomName/websocket",
+    "/rooms/:roomId/websocket",
     async (
-      request: Request & { params: { roomName: string } },
+      request: Request & { params: { roomId: string } },
       env: Env,
       context: ExecutionContext,
       user: User
@@ -257,16 +267,12 @@ const apiRouter = Router({ base: "/api" })
       if (request.headers.get("Upgrade") !== "websocket") {
         return new Response("expected websocket", { status: 400 });
       }
-      const roomName = request.params.roomName;
-      let roomId;
-      try {
-        roomId = env.rooms.idFromString(roomName);
-      } catch (e) {
+      const roomId = request.params.roomId;
+      if (!isRoomIdValid(env.rooms, roomId)) {
         return immediatelyCloseWebSocket(4000, "room_not_found");
       }
-      const singletonId = env.manager.idFromName("singleton");
-      const managerStub = env.manager.get(singletonId);
-      const res = await managerStub.fetch("https://dummy-url/rooms/" + roomId);
+      const manager = new RoomManagerClient(env.manager);
+      const res = await manager.fetch("/rooms/" + roomId);
       if (res.status !== 200) {
         return immediatelyCloseWebSocket(4000, "room_not_found");
       }
@@ -274,8 +280,8 @@ const apiRouter = Router({ base: "/api" })
       if (!room.active) {
         return immediatelyCloseWebSocket(4000, "room_not_active");
       }
-      const roomStub = env.rooms.get(roomId);
-      return roomStub.fetch("https://dummy-url/websocket", {
+      const roomClient = new RoomClient(env.rooms, roomId);
+      return roomClient.fetch("/websocket", {
         headers: {
           Connection: "Upgrade",
           Upgrade: "websocket",
@@ -287,23 +293,19 @@ const apiRouter = Router({ base: "/api" })
     }
   )
   .get(
-    "/rooms/:roomName/objects",
-    async (request: Request & { params: { roomName: string } }, env: Env) => {
-      const roomName = request.params.roomName;
-      let roomId;
-      try {
-        roomId = env.rooms.idFromString(roomName);
-      } catch (e) {
+    "/rooms/:roomId/objects",
+    async (request: Request & { params: { roomId: string } }, env: Env) => {
+      const roomId = request.params.roomId;
+      if (!isRoomIdValid(env.rooms, roomId)) {
         return new Response("Not found.", { status: 404 });
       }
-      const singletonId = env.manager.idFromName("singleton");
-      const managerStub = env.manager.get(singletonId);
-      const res = await managerStub.fetch("https://dummy-url/rooms/" + roomId);
+      const manager = new RoomManagerClient(env.manager);
+      const res = await manager.fetch("/rooms/" + roomId);
       if (res.status !== 200) {
         return new Response("Not found.", { status: 404 });
       }
-      const roomStub = env.rooms.get(roomId);
-      return roomStub.fetch("https://dummy-url/objects");
+      const roomClient = new RoomClient(env.rooms, roomId);
+      return roomClient.fetch("/objects");
     }
   );
 
@@ -319,25 +321,18 @@ const router = Router()
   )
   .all("/api/*", apiRouter.handle)
   .get(
-    "/rooms/:roomName",
+    "/rooms/:roomId",
     async (
-      request: Request & { params: { roomName: string } },
+      request: Request & { params: { roomId: string } },
       env: Env,
       ctx: ExecutionContext
     ) => {
-      const roomName = request.params.roomName;
-      const singletonId = env.manager.idFromName("singleton");
-      const managerStub = env.manager.get(singletonId);
-      let roomId;
-      try {
-        roomId = env.rooms.idFromString(roomName);
-      } catch (e) {
+      const roomId = request.params.roomId;
+      if (!isRoomIdValid(env.rooms, roomId)) {
         return respondNotFoundHtml(request, env, ctx);
       }
-      const res = await managerStub.fetch(
-        "https://dummy-url/rooms/" + roomId.toString(),
-        request
-      );
+      const manager = new RoomManagerClient(env.manager);
+      const res = await manager.fetch("/rooms/" + roomId);
       if (res.status === 200) {
         return getAsset(request, env, ctx, () => "/room.html");
       }
@@ -419,14 +414,10 @@ const authRouter = Router()
     switch (text) {
       case "": {
         const roomId = env.rooms.newUniqueId();
-        const singletonId = env.manager.idFromName("singleton");
-        const managerStub = env.manager.get(singletonId);
-        const res = await managerStub.fetch(
-          "https://dummy-url/rooms/" + roomId.toString(),
-          {
-            method: "PUT",
-          }
-        );
+        const manager = new RoomManagerClient(env.manager);
+        const res = await manager.fetch("/rooms/" + roomId, {
+          method: "PUT",
+        });
         const blocks = [];
         if (res.status === 200) {
           const url = `${new URL(request.url).origin}/rooms/${roomId}`;
@@ -463,11 +454,10 @@ const authRouter = Router()
         );
       }
       case "status": {
-        const singletonId = env.manager.idFromName("singleton");
-        const managerStub = env.manager.get(singletonId);
-        const configRes = await managerStub.fetch("https://dummy-url/config");
+        const manager = new RoomManagerClient(env.manager);
+        const configRes = await manager.fetch("/config");
         const config = (await configRes.json()) as Partial<Config>;
-        const roomsRes = await managerStub.fetch("https://dummy-url/rooms");
+        const roomsRes = await manager.fetch("/rooms");
         const rooms = (await roomsRes.json()) as RoomInfo[];
         const activeRooms = rooms
           .filter((room) => room.active)
@@ -646,44 +636,35 @@ export default {
     await clean(env);
   },
 };
-async function strongClean(env: Env) {}
 async function clean(env: Env) {
-  const singletonId = env.manager.idFromName("singleton");
-  const managerStub = env.manager.get(singletonId);
-  const res = await managerStub.fetch("https://dummy-url/clean");
+  const manager = new RoomManagerClient(env.manager);
+  const res = await manager.fetch("/clean");
   if (res.status !== 200) {
     throw new Error("failed to clean");
   }
   const { patches }: { patches: RoomPatch[] } = await res.json();
   for (const patch of patches) {
-    const roomId = env.rooms.idFromString(patch.id);
-    const roomStub = env.rooms.get(roomId);
+    const roomClient = new RoomClient(env.rooms, patch.id);
     if (!patch.active) {
-      const res = await roomStub.fetch("https://dummy-url/deactivate", {
-        method: "POST",
-      });
+      const res = await roomClient.fetch("/deactivate", { method: "POST" });
       if (res.status !== 200) {
         throw new Error("failed to clean");
       }
     }
     if (!patch.alive) {
-      const res = await roomStub.fetch("https://dummy-url/", {
-        method: "DELETE",
-      });
+      const res = await roomClient.fetch("/", { method: "DELETE" });
       if (res.status !== 200) {
         throw new Error("failed to clean");
       }
     }
     if (patch.active && patch.alive) {
-      const res = await roomStub.fetch("https://dummy-url/cooldown", {
-        method: "POST",
-      });
+      const res = await roomClient.fetch("/cooldown", { method: "POST" });
       if (res.status !== 200) {
         throw new Error("failed to clean");
       }
     }
   }
-  return managerStub.fetch("https://dummy-url/clean", {
+  return manager.fetch("/clean", {
     method: "POST",
     body: JSON.stringify({
       patches,
