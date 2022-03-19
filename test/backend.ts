@@ -186,8 +186,6 @@ describe("backend", function () {
     await useWebsocket("tester", `/api/rooms/${id}/websocket`, async () => {});
   });
   it("does not accept websocket connection to invalid rooms", async function () {
-    // TODO: miniflare が修正したらステータスコードをチェックしたい
-    // https://github.com/cloudflare/miniflare/issues/174
     await assert.rejects(async () => {
       await useWebsocket("a", `/foo`, async () => {});
     });
@@ -204,12 +202,16 @@ describe("backend", function () {
     await setTimeout(ACTIVE_DURATION);
     await clean();
     await assert.rejects(async () => {
-      await useWebsocket("a", `/api/rooms/${id}/websocket`, async () => {});
+      await useWebsocket("a", `/api/rooms/${id}/websocket`, async () => {
+        await setTimeout(100);
+      });
     });
     await setTimeout(LIVE_DURATION - ACTIVE_DURATION);
     await clean();
     await assert.rejects(async () => {
-      await useWebsocket("a", `/api/rooms/${id}/websocket`, async () => {});
+      await useWebsocket("a", `/api/rooms/${id}/websocket`, async () => {
+        await setTimeout(100);
+      });
     });
   });
   it("closes all connections with 1001 when a room is deactivated", async function () {
@@ -326,7 +328,9 @@ describe("backend", function () {
       i += 10;
       // i = 10...19
       promises.push(
-        useWebsocket(String(i), `/api/rooms/${id}/websocket`, async () => {})
+        useWebsocket(String(i), `/api/rooms/${id}/websocket`, async () => {
+          await setTimeout(500);
+        })
           .then(() => {
             success.push(i);
           })

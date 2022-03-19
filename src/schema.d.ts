@@ -99,6 +99,9 @@ export type SessionUser = {
   image: string | null;
 };
 export type CloseReason =
+  | "room_not_found"
+  | "room_not_active"
+  | "room_is_full"
   | "room_got_inactive"
   | "no_recent_activity"
   | "rate_limit_exceeded"

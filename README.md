@@ -35,7 +35,6 @@ UI
 - https://graphql.org/learn/introspection/
 
 TODO:
-- 部屋がユーザーでいっぱいだった時の表示
 - ログアウト or revoke
 - HTML と JSON を正しく返し分ける
 - manager の負荷を減らす（config の問い合わせも無駄）

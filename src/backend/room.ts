@@ -8,6 +8,15 @@ type Env = {
   limiters: DurableObjectNamespace;
 };
 
+function immediatelyCloseWebSocket(code: number, reason: string) {
+  const pair = new WebSocketPair();
+  pair[1].accept();
+  setTimeout(() => {
+    pair[1].close(code, reason);
+  });
+  return new Response("null", { status: 101, webSocket: pair[0] });
+}
+
 const roomRouter = Router()
   .patch("/config", async (request: Request, state: RoomState) => {
     const config = await request.json();
@@ -35,11 +44,10 @@ const roomRouter = Router()
       image: userImage || null,
     };
     if (!state.canStart(userId)) {
-      return new Response("room is full", { status: 403 });
+      return immediatelyCloseWebSocket(4000, "room_is_full");
     }
     const pair = new WebSocketPair();
     await state.handleSession(pair[1], user);
-    // 101 Switching Protocols
     return new Response(null, { status: 101, webSocket: pair[0] });
   })
   .get("/objects", async (request: Request, state: RoomState) => {

@@ -334,11 +334,25 @@ export async function update(
       state.websocket = null;
       rollbackAllTemporaryStates(state);
       effect({ kind: "room:disable_editing" });
-      state.navBar.updateStatus(
-        "disconnected",
-        "Disconnected",
-        formatCloseReason(reason)
-      );
+      switch (reason) {
+        case "room_not_active":
+        case "room_got_inactive": {
+          state.navBar.updateStatus(
+            "inactive",
+            "Inactive",
+            formatCloseReason(reason)
+          );
+          break;
+        }
+        default: {
+          state.navBar.updateStatus(
+            "disconnected",
+            "Disconnected",
+            formatCloseReason(reason)
+          );
+          break;
+        }
+      }
       return;
     }
     case "ws:error": {
@@ -501,6 +515,12 @@ function getPageInfo(): PageInfo {
 
 function formatCloseReason(reason: CloseReason): string {
   switch (reason) {
+    case "room_not_found":
+      return "This room is not found.";
+    case "room_not_active":
+      return "This room is not active.";
+    case "room_is_full":
+      return "The number of members in this room has reached the limit.";
     case "room_got_inactive":
       return "Session closed because this room got inactive.";
     case "no_recent_activity":

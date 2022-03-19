@@ -92,6 +92,15 @@ async function getAsset(
   }
 }
 
+function immediatelyCloseWebSocket(code: number, reason: string) {
+  const pair = new WebSocketPair();
+  pair[1].accept();
+  setTimeout(() => {
+    pair[1].close(code, reason);
+  });
+  return new Response(null, { status: 101, webSocket: pair[0] });
+}
+
 const debugRouter = Router({ base: "/debug" })
   .patch("/config", async (request: Request, env: Env) => {
     const config = await request.json();
@@ -178,7 +187,6 @@ const apiRouter = Router({ base: "/api" })
         );
       }
       return res;
-      // return new Response("Not found.", { status: 404 });
     }
   )
   .get(
@@ -189,26 +197,25 @@ const apiRouter = Router({ base: "/api" })
       context: ExecutionContext,
       user: User
     ) => {
+      if (request.headers.get("Upgrade") !== "websocket") {
+        return new Response("expected websocket", { status: 400 });
+      }
       const roomName = request.params.roomName;
       let roomId;
       try {
         roomId = env.rooms.idFromString(roomName);
       } catch (e) {
-        return new Response("Not found.", { status: 404 });
+        return immediatelyCloseWebSocket(4000, "room_not_found");
       }
       const singletonId = env.manager.idFromName("singleton");
       const managerStub = env.manager.get(singletonId);
       const res = await managerStub.fetch("https://dummy-url/rooms/" + roomId);
       if (res.status !== 200) {
-        return new Response("Not found.", { status: 404 });
+        return immediatelyCloseWebSocket(4000, "room_not_found");
       }
       const room: RoomInfo = await res.json();
       if (!room.active) {
-        // TODO: テスト
-        console.log(room);
-        return new Response("Cannot connect to an inactive room.", {
-          status: 403,
-        });
+        return immediatelyCloseWebSocket(4000, "room_not_active");
       }
       const roomStub = env.rooms.get(roomId);
       return roomStub.fetch("https://dummy-url/websocket", {
