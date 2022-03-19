@@ -41,7 +41,6 @@ TODO:
 - Storage と無駄に大きいオブジェクトをやりとりしている
 - 参加人数が多い時のアイコン表示
 - iPhone からログイン直後に Something went wrong
-- RateLimit 復活する？
 - Firefox と Safari でテキストがややずれる
 - デプロイ方法を確認
 - GitHub auth のアイコン

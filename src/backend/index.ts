@@ -7,7 +7,6 @@ import { digest, hmacSha256 } from "./crypto";
 import { GitHubOAuth } from "./github";
 import { SlackOAuth } from "./slack";
 import { RoomPatch } from "./room-manager";
-export { RateLimiter } from "./rate-limiter";
 export { Room } from "./room";
 export { RoomManager } from "./room-manager";
 import {

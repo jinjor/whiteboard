@@ -1,5 +1,4 @@
 import { Router } from "itty-router";
-import { RateLimiterClient } from "./rate-limiter";
 import { applyEvent, InvalidEvent, validateEvent } from "./object";
 import { Objects, SessionUser, UserId } from "../schema";
 import { Config, defaultConfig } from "./config";
@@ -126,16 +125,6 @@ class RoomState {
   }
   async handleSession(webSocket: WebSocket, user: SessionUser): Promise<void> {
     webSocket.accept();
-
-    const limiterId = this.env.limiters.idFromName(user.id);
-    const limiter = new RateLimiterClient(
-      () => this.env.limiters.get(limiterId),
-      (err) => {
-        console.log(err);
-        webSocket.close(1011, "rate_limit_exceeded");
-      }
-    );
-
     const session: Session = {
       webSocket,
       user,
@@ -156,15 +145,6 @@ class RoomState {
         if (session.quit) {
           throw new Error("unexpected session.quit");
         }
-        // TODO
-        // if (!limiter.checkLimit()) {
-        //   webSocket.send(
-        //     JSON.stringify({
-        //       error: "You are being rate-limited, please try again later.",
-        //     })
-        //   );
-        //   return;
-        // }
         const event = JSON.parse(msg.data as string);
         console.log("event", event);
         if (!validateEvent(event)) {

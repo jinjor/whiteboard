@@ -23,8 +23,7 @@ crons = ["*/10 * * * *"]
 [durable_objects]
 bindings = [
   { name = "manager", class_name = "RoomManager" },
-  { name = "rooms", class_name = "Room" },
-  { name = "limiters", class_name = "RateLimiter" }
+  { name = "rooms", class_name = "Room" }
 ]
 
 [[migrations]]
@@ -38,3 +37,7 @@ new_classes = ["RoomManager"]
 [[migrations]]
 tag = "v3"
 renamed_classes = [{from = "ChatRoom", to = "Room" }]
+
+[[migrations]]
+tag = "v4"
+deleted_classes = ["RateLimiter"]
