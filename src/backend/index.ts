@@ -150,16 +150,16 @@ const adminRouter = Router({ base: "/admin" }).delete(
   async (request: Request, env: Env) => {
     const CLOUDFLARE_API_TOKEN = request.headers.get("WB-CLOUDFLARE_API_TOKEN");
     const body: any = await request.json();
-    const { scriptName, accountTag } = body;
+    const { scriptName, accountId } = body;
     if (
       CLOUDFLARE_API_TOKEN == null ||
       scriptName == null ||
-      accountTag == null
+      accountId == null
     ) {
       return new Response("Invalid request", { status: 400 });
     }
     const config = {
-      accountTag,
+      accountId,
       CLOUDFLARE_API_TOKEN,
     };
     const namespaces = await getDurableObjectNamespaces(config, scriptName);

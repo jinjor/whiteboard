@@ -1,11 +1,11 @@
 type Config = {
-  accountTag: string;
+  accountId: string;
   CLOUDFLARE_API_TOKEN: string;
 };
 
 async function send(config: Config, path: string) {
   const res = await fetch(
-    `https://api.cloudflare.com/client/v4/accounts/${config.accountTag}${path}`,
+    `https://api.cloudflare.com/client/v4/accounts/${config.accountId}${path}`,
     {
       method: "GET",
       headers: {

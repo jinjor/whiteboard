@@ -1,12 +1,12 @@
 import fetch from "node-fetch";
 
 const CLOUDFLARE_API_TOKEN = process.env.CLOUDFLARE_API_TOKEN;
-const accountTag = "7e155f728b0311833218e72046aaa90a";
-const scriptName = "whiteboard";
+const accountId = process.env.ACCOUNT_ID;
+const scriptName = process.env.SCRIPT_NAME;
 
 async function send(path: string) {
   const res = await fetch(
-    `https://api.cloudflare.com/client/v4/accounts/${accountTag}${path}`,
+    `https://api.cloudflare.com/client/v4/accounts/${accountId}${path}`,
     {
       method: "GET",
       headers: {

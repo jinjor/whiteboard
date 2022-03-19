@@ -2,12 +2,11 @@ import fetch from "node-fetch";
 
 const ADMIN_KEY = process.env.ADMIN_KEY;
 const CLOUDFLARE_API_TOKEN = process.env.CLOUDFLARE_API_TOKEN;
+const accountId = process.env.ACCOUNT_ID;
+const scriptName = process.env.SCRIPT_NAME;
 const ORIGIN = process.env.ORIGIN;
-const accountTag = "7e155f728b0311833218e72046aaa90a";
-const scriptName = "whiteboard";
 
 async function adminApi(method: string, path: string, body: any) {
-  console.log(`${ORIGIN}/admin${path}`);
   const res = await fetch(`${ORIGIN}/admin${path}`, {
     method: method,
     headers: {
@@ -31,7 +30,7 @@ async function adminApi(method: string, path: string, body: any) {
 
 async function gc(): Promise<any[]> {
   return await adminApi("DELETE", `/gc`, {
-    accountTag,
+    accountId,
     scriptName,
   });
 }
