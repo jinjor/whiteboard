@@ -230,12 +230,7 @@ const apiRouter = Router({ base: "/api" })
   )
   .get(
     "/rooms/:roomName/objects",
-    async (
-      request: Request & { params: { roomName: string } },
-      env: Env,
-      context: ExecutionContext,
-      user: User
-    ) => {
+    async (request: Request & { params: { roomName: string } }, env: Env) => {
       const roomName = request.params.roomName;
       let roomId;
       try {
@@ -257,9 +252,9 @@ const apiRouter = Router({ base: "/api" })
 const router = Router()
   .all(
     "/debug/*",
-    (req: Request, env: Env) => {
+    async (request: Request, env: Env, ctx: ExecutionContext) => {
       if (env.DEBUG_API !== "true") {
-        return new Response("Not found.", { status: 404 });
+        return getAsset(request, env, ctx, () => "/404.html");
       }
     },
     debugRouter.handle
@@ -291,7 +286,9 @@ const router = Router()
       return getAsset(request, env, ctx, () => "/404.html");
     }
   )
-  .all("*", () => new Response("Not found.", { status: 404 }));
+  .all("*", async (request: Request, env: Env, ctx: ExecutionContext) => {
+    return getAsset(request, env, ctx, () => "/404.html");
+  });
 
 const authRouter = Router()
   .get("/", async (req: Request, env: Env, ctx: ExecutionContext) => {
