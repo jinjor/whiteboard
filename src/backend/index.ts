@@ -8,7 +8,7 @@ import { GitHubOAuth } from "./github";
 import { SlackOAuth } from "./slack";
 import { RoomPatch } from "./room-manager";
 export { RateLimiter } from "./rate-limiter";
-export { ChatRoom } from "./room";
+export { Room } from "./room";
 export { RoomManager } from "./room-manager";
 import {
   getAssetFromKV,

@@ -42,7 +42,7 @@ TODO:
 - Storage と無駄に大きいオブジェクトをやりとりしている
 - Durable Objects 完全に消したい
 - 参加人数が多い時のアイコン表示
-- ChatRoom をリネーム
+- iPhone からログイン直後に Something went wrong
 - RateLimit 復活する？
 - Firefox と Safari でテキストがややずれる
 - デプロイ方法を確認
@@ -67,7 +67,7 @@ TODO:
 1. wrangler.toml の `account_id` を更新
 1. `npm ci`
 1. `npx wrangler login`
-1. `npx wrangler deploy`
+1. `npx wrangler publish`
 1. Slack アプリを作る
    - Slash command
       - `/wb`: `https://whiteboard.{}.workers.dev/app/slack`

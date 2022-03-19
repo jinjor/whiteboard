@@ -228,7 +228,7 @@ class RoomState {
   }
 }
 
-export class ChatRoom implements DurableObject {
+export class Room implements DurableObject {
   private state: RoomState;
   constructor(controller: any, env: Env) {
     this.state = new RoomState(controller, env);

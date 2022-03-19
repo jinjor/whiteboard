@@ -20,24 +20,10 @@ entry-point = "./dist"
 [triggers]
 crons = ["*/10 * * * *"]
 
-[vars]
-HOGE = "hoge"
-FUGA = "fuga"
-
-# [env.production]
-# name = "my-worker-production"
-[env.production.vars]
-HOGE = "hogehoge"
-FUGA = "fugafuga"
-
-[env.dev.vars]
-HOGE = "hogehoge"
-FUGA = "fugafuga"
-
 [durable_objects]
 bindings = [
   { name = "manager", class_name = "RoomManager" },
-  { name = "rooms", class_name = "ChatRoom" },
+  { name = "rooms", class_name = "Room" },
   { name = "limiters", class_name = "RateLimiter" }
 ]
 
@@ -48,3 +34,7 @@ new_classes = ["ChatRoom", "RateLimiter"]
 [[migrations]]
 tag = "v2"
 new_classes = ["RoomManager"]
+
+[[migrations]]
+tag = "v3"
+renamed_classes = [{from = "ChatRoom", to = "Room" }]
