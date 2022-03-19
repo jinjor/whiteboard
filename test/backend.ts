@@ -103,7 +103,7 @@ describe("backend", function () {
     }
     {
       const res = await request("GET", "/rooms/foo");
-      assert.strictEqual(res.status, 200);
+      assert.strictEqual(res.status, 404);
     }
   });
   it("handles invalid rooms", async function () {

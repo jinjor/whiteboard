@@ -60,14 +60,23 @@ type Env = {
       }
   );
 
+async function respondNotFoundHtml(
+  request: Request,
+  env: Env,
+  ctx: ExecutionContext
+) {
+  return getAsset(request, env, ctx, () => "/404.html", 404);
+}
+
 async function getAsset(
   request: Request,
   env: Env,
   context: ExecutionContext,
-  modifyPath: (path: string) => string
+  modifyPath: (path: string) => string,
+  status = 200
 ): Promise<Response> {
   try {
-    return await getAssetFromKV(
+    const res = await getAssetFromKV(
       {
         request,
         waitUntil(promise) {
@@ -88,6 +97,7 @@ async function getAsset(
         },
       }
     );
+    return new Response(res.body, { status });
   } catch (e) {
     if (e instanceof NotFoundError || e instanceof MethodNotAllowedError) {
       return new Response("Not found.", { status: 404 });
@@ -302,7 +312,7 @@ const router = Router()
     "/debug/*",
     async (request: Request, env: Env, ctx: ExecutionContext) => {
       if (env.DEBUG_API !== "true") {
-        return getAsset(request, env, ctx, () => "/404.html");
+        return respondNotFoundHtml(request, env, ctx);
       }
     },
     debugRouter.handle
@@ -322,7 +332,7 @@ const router = Router()
       try {
         roomId = env.rooms.idFromString(roomName);
       } catch (e) {
-        return getAsset(request, env, ctx, () => "/404.html");
+        return respondNotFoundHtml(request, env, ctx);
       }
       const res = await managerStub.fetch(
         "https://dummy-url/rooms/" + roomId.toString(),
@@ -331,11 +341,11 @@ const router = Router()
       if (res.status === 200) {
         return getAsset(request, env, ctx, () => "/room.html");
       }
-      return getAsset(request, env, ctx, () => "/404.html");
+      return respondNotFoundHtml(request, env, ctx);
     }
   )
   .all("*", async (request: Request, env: Env, ctx: ExecutionContext) => {
-    return getAsset(request, env, ctx, () => "/404.html");
+    return respondNotFoundHtml(request, env, ctx);
   });
 
 const authRouter = Router()
@@ -353,7 +363,7 @@ const authRouter = Router()
         env.ADMIN_KEY == null ||
         env.ADMIN_KEY != request.headers.get("WB-ADMIN_KEY")
       ) {
-        return getAsset(request, env, ctx, () => "/404.html");
+        return respondNotFoundHtml(request, env, ctx);
       }
     },
     adminRouter.handle
