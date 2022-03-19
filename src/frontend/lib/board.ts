@@ -418,7 +418,8 @@ export class Board {
       const boardRect = o.getBoardRect();
       const pos = getPixelPositionFromMouse(e);
       const npos = this.toBoardPosition(boardRect.size, pos);
-      o.mouseDown(npos, e.button !== 0);
+      const isRight = e.button !== 0;
+      o.mouseDown(npos, isRight);
     };
     let touchdown = false;
     this.element.ontouchstart = (e: TouchEvent) => {
@@ -515,6 +516,7 @@ export class Input {
   hideAndReset(): void {
     this.element.value = "";
     this.element.classList.add("hidden");
+    this.element.blur();
   }
   listen(o: { enter: () => void }): void {
     this.element.onkeydown = (e: KeyboardEvent) => {
