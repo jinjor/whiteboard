@@ -114,7 +114,7 @@ class RoomManagerState {
 const roomManagerRouter = Router()
   .delete("/", async (request: Request, state: RoomManagerState) => {
     await state.reset();
-    return new Response("null");
+    return new Response();
   })
   .get("/config", async (request: Request, state: RoomManagerState) => {
     return new Response(JSON.stringify(state.getConfig()));
@@ -122,7 +122,7 @@ const roomManagerRouter = Router()
   .patch("/config", async (request: Request, state: RoomManagerState) => {
     const config = await request.json();
     await state.updateConfig(config as any);
-    return new Response("null");
+    return new Response();
   })
   .get("/clean", async (request: Request, state: RoomManagerState) => {
     const list = await state.dryClean();
@@ -131,7 +131,7 @@ const roomManagerRouter = Router()
   .post("/clean", async (request: Request, state: RoomManagerState) => {
     const { patches } = await request.json();
     await state.clean(patches);
-    return new Response(JSON.stringify(null));
+    return new Response();
   })
   .get("/rooms", async (request: Request, state: RoomManagerState) => {
     const rooms = await state.listRoom();

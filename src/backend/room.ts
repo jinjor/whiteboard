@@ -13,27 +13,27 @@ function immediatelyCloseWebSocket(code: number, reason: string) {
   setTimeout(() => {
     pair[1].close(code, reason);
   });
-  return new Response("null", { status: 101, webSocket: pair[0] });
+  return new Response(null, { status: 101, webSocket: pair[0] });
 }
 
 const roomRouter = Router()
   .delete("/", async (request: Request, state: RoomState) => {
     await state.disconnectAllSessions("room_got_inactive");
     await state.deleteAll();
-    return new Response("null");
+    return new Response();
   })
   .patch("/config", async (request: Request, state: RoomState) => {
     const config = await request.json();
     await state.updateConfig(config as any);
-    return new Response("null");
+    return new Response();
   })
   .post("/deactivate", async (request: Request, state: RoomState) => {
     await state.disconnectAllSessions("room_got_inactive");
-    return new Response("null");
+    return new Response();
   })
   .post("/cooldown", async (request: Request, state: RoomState) => {
     await state.cooldown();
-    return new Response("null");
+    return new Response();
   })
   .get("/websocket", async (request: Request, state: RoomState) => {
     if (request.headers.get("Upgrade") !== "websocket") {
