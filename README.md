@@ -35,8 +35,8 @@ UI
 - https://graphql.org/learn/introspection/
 
 TODO:
+- Safari で文字が選択状態になって削除がうまくできない
 - ログアウト or revoke
-- HTML と JSON を正しく返し分ける
 - manager の負荷を減らす（config の問い合わせも無駄）
 - Storage と無駄に大きいオブジェクトをやりとりしている
 - 参加人数が多い時のアイコン表示
@@ -51,7 +51,6 @@ TODO:
 - ogp
 - コマンドのヘルプ
 - HTML のテンプレート化
-- Durable Objects のゴミをチェック
 
 メモ：
 - logo のフォントは Verdana
