@@ -127,7 +127,11 @@ export async function update(
           };
         }
       } else {
-        // show error
+        state.navBar.updateStatus(
+          "disconnected",
+          "Disconnected",
+          formatCloseReason("unexpected")
+        );
         if (debugging()) {
           document.getElementById("board")!.remove();
           await appendCreateRoomButton(document.body);
