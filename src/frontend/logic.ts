@@ -147,21 +147,33 @@ export async function update(
       return;
     }
     case "key:delete": {
+      if (state.editing.kind === "select") {
+        return;
+      }
       deleteSelectedObjects(state);
       syncCursorAndButtons(state);
       return;
     }
     case "key:select_all": {
+      if (state.editing.kind === "select") {
+        return;
+      }
       selectAll(state);
       syncCursorAndButtons(state);
       return;
     }
     case "key:redo": {
+      if (state.editing.kind === "select") {
+        return;
+      }
       redo(state);
       syncCursorAndButtons(state);
       return;
     }
     case "key:undo": {
+      if (state.editing.kind === "select") {
+        return;
+      }
       undo(state);
       syncCursorAndButtons(state);
       return;
