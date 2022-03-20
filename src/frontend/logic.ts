@@ -319,6 +319,11 @@ export async function update(
     }
     case "board:touch_end": {
       switch (state.editing.kind) {
+        case "text": {
+          // for iOS
+          state.input.showAndFocus();
+          break;
+        }
         case "move": {
           stopMoving(state, e.position);
           break;

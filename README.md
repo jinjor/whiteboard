@@ -35,8 +35,6 @@ UI
 - https://graphql.org/learn/introspection/
 
 TODO:
-- Slack であらかじめワークスペースにログインしていないと認証画面でエラーになる
-- long tap が実機で効いていないかも
 - 端末がスリープしたときに disconnected になる
 - manager の負荷を減らす（config の問い合わせも無駄）
 - Storage と無駄に大きいオブジェクトをやりとりしている
@@ -49,6 +47,7 @@ TODO:
 - ogp
 - コマンドのヘルプ
 - HTML のテンプレート化
+- Slack であらかじめワークスペースにログインしていないと認証画面でエラーになる
 
 メモ：
 - logo のフォントは Verdana
