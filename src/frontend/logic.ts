@@ -550,7 +550,7 @@ function formatCloseReason(reason: CloseReason): string {
       return "Session closed because invalid data is sent to server.";
     case "unexpected":
     default:
-      return "Something went wrong.";
+      return ""; // Something went wrong... (Many reasons!)
   }
 }
 function generateObjectId(): ObjectId {
