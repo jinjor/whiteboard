@@ -35,7 +35,7 @@ UI
 - https://graphql.org/learn/introspection/
 
 TODO:
-- ヘルプ文字列の上をドラッグできない
+- 選択中に画面外でドラッグやめる => backspace で消す => 画面内に戻るとエラー
 - ログアウト or revoke
 - manager の負荷を減らす（config の問い合わせも無駄）
 - Storage と無駄に大きいオブジェクトをやりとりしている
