@@ -35,7 +35,6 @@ UI
 - https://graphql.org/learn/introspection/
 
 TODO:
-- ログアウト or revoke
 - manager の負荷を減らす（config の問い合わせも無駄）
 - Storage と無駄に大きいオブジェクトをやりとりしている
 - 参加人数が多い時のアイコン表示

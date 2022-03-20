@@ -1,5 +1,6 @@
 // @ts-ignore
 import { Router } from "itty-router";
+import Cookie from "cookie";
 import { digest, hmacSha256 } from "./crypto";
 import { GitHubOAuth } from "./github";
 import { SlackOAuth } from "./slack";
@@ -430,6 +431,21 @@ const authRouter = Router()
         );
       }
     }
+  })
+  .get("/logout", async () => {
+    return new Response(null, {
+      status: 302,
+      headers: {
+        "Set-Cookie": Cookie.serialize("session", "", {
+          path: "/",
+          httpOnly: true,
+          expires: new Date(0),
+          secure: true,
+          sameSite: "lax",
+        }),
+        Location: "/",
+      },
+    });
   })
   .all("*", async (request: Request, env: Env, context: ExecutionContext) => {
     let user: SessionUser;
