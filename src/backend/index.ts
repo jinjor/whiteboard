@@ -282,8 +282,7 @@ const router = Router()
 
 const authRouter = Router()
   .get("/", async (req: Request, env: Env, ctx: ExecutionContext) => {
-    const res = await getAsset(req, env, ctx, () => "/index.html");
-    return preserveSession(req, res);
+    return await getAsset(req, env, ctx, () => "/index.html");
   })
   .get("/assets/*", async (req: Request, env: Env, ctx: ExecutionContext) => {
     return getAsset(req, env, ctx, (path) => path.replace("/assets/", "/"));
@@ -472,33 +471,13 @@ const authRouter = Router()
     if (user == null) {
       throw new Error("assertion error");
     }
-    const res: Response = await router.handle(request, env, context, user);
-    return preserveSession(request, res);
+    return await router.handle(request, env, context, user);
   });
 
 async function getUserAgentHash(request: Request) {
   const userAgent = request.headers.get("User-Agent") ?? "";
   const hash = await digest(userAgent);
   return hash.slice(0, 7);
-}
-
-function preserveSession(req: Request, res: Response): Response {
-  const cookie = Cookie.parse(req.headers.get("Cookie") ?? "");
-  if (cookie.session == null) {
-    return res;
-  }
-  res = new Response(res.body, res);
-  res.headers.set(
-    "Set-Cookie",
-    Cookie.serialize("session", cookie.session, {
-      path: "/",
-      httpOnly: true,
-      maxAge: 60 * 60 * 24 * 7, // 1 week
-      secure: true,
-      sameSite: "strict",
-    })
-  );
-  return res;
 }
 
 function isEnvValid(env: Env): boolean {
