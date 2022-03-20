@@ -35,10 +35,12 @@ UI
 - https://graphql.org/learn/introspection/
 
 TODO:
+- Slack であらかじめワークスペースにログインしていないと認証画面でエラーになる
+- long tap が実機で効いていないかも
+- 端末がスリープしたときに disconnected になる
 - manager の負荷を減らす（config の問い合わせも無駄）
 - Storage と無駄に大きいオブジェクトをやりとりしている
 - 参加人数が多い時のアイコン表示
-- iPhone からログイン直後に Something went wrong
 - Firefox と Safari でテキストがややずれる
 - デプロイ方法を確認
 - GitHub auth のアイコン
