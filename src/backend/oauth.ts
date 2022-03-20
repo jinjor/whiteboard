@@ -27,7 +27,9 @@ export async function check(
   request: Request,
   oauth: OAuth,
   cookieSecret: string
-): Promise<{ ok: true; user: User } | { ok: false; response: Response }> {
+): Promise<
+  { ok: true; user: User } | { ok: false; response: Response | null }
+> {
   const rawSession = await getDecryptedSessionFromCookie(request, cookieSecret);
   if (rawSession == null) {
     return {
@@ -68,7 +70,7 @@ export async function check(
     if (e instanceof NotAMemberOfOrg) {
       return {
         ok: false,
-        response: new Response("Not found.", { status: 404 }),
+        response: null,
       };
     }
     throw e;

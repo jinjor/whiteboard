@@ -43,9 +43,7 @@ TODO:
 - 参加人数が多い時のアイコン表示
 - Firefox と Safari でテキストがややずれる
 - デプロイ方法を確認
-- GitHub auth のアイコン
 - GitHub auth で org を optional に
-- GitHub 要らない説
 - dev 環境
 - 有効期限を表示
 - ogp
@@ -66,18 +64,35 @@ TODO:
 1. `npx wrangler login`
 1. `npx wrangler publish`
 1. Slack アプリを作る
-   - Slash command
-      - `/wb`: `https://whiteboard.{}.workers.dev/app/slack`
-   - OAuth
-      - Redirect URL: `https://whiteboard.{}.workers.dev/callback/slack`
-      - Bot Token Scopes: `commands`
-      - User Token Scopes: `identity.avatar`, `identity.basic`
+1. Slash command 設定: `/wb` => `https://whiteboard.{}.workers.dev/app/slack`
 1. Slack アプリをワークスペースにインストール
+1. `npx wrangler secret put <name>`
+   - DEBUG_API: `false`
+   - SLACK_APP: `true`
+   - SLACK_SIGNING_SECRET: `xxxxx`
+
+### GitHub 認証の設定
+
+1. GitHub アプリを作る
+   - Redirect URL: `https://whiteboard.{}.workers.dev/callback/github`
+1. `npx wrangler secret put <name>`
+   - AUTH_TYPE: `github`
+   - COOKIE_SECRET: `xxxxxxx`
+   - GITHUB_CLIENT_ID: `xxxxx`
+   - GITHUB_CLIENT_SECRET: `xxxxx`
+   - GITHUB_ORG: `xxxxx`
+
+
+### Slack 認証の設定
+
+制限: ユーザーはあらかじめブラウザでワークスペースにログインしている必要あり
+
+1. Slack アプリの OAuth 設定:
+   - Redirect URL: `https://whiteboard.{}.workers.dev/callback/slack`
+   - Bot Token Scopes: `commands`
+   - User Token Scopes: `identity.avatar`, `identity.basic`
 1. `npx wrangler secret put <name>`
    - AUTH_TYPE: `slack`
    - COOKIE_SECRET: `xxxxxxx`
-   - DEBUG_API: `false`
-   - SLACK_APP: `true`
    - SLACK_CLIENT_ID: `xxxxx`
    - SLACK_CLIENT_SECRET: `xxxxx`
-   - SLACK_SIGNING_SECRET: `xxxxx`

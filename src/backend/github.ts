@@ -70,11 +70,8 @@ export class GitHubOAuth implements OAuth {
   }
   async getUser(accessToken: string): Promise<User> {
     const login = await getUserLogin(accessToken);
-    console.log("login:", login);
     const isMemberOfOrg = await isUserMemberOfOrg(accessToken, login, this.org);
-    console.log("isMemberOfOrg:", isMemberOfOrg);
-    // const userId = isMemberOfOrg ? "gh/" + login : "gh/_guest"; // "_guest" is an invalid github name
-    const id = "gh/" + login; // TODO: for debug
+    const id = isMemberOfOrg ? "gh/" + login : "gh/_guest"; // "_guest" is an invalid github name
     const name = login;
     const image = `https://github.com/${login}.png`;
     return { id, name, image };
@@ -112,7 +109,7 @@ async function isUserMemberOfOrg(
       },
     }
   );
-  return membershipRes.status === 204;
+  return membershipRes.status === 200;
 }
 
 async function getAccessToken(

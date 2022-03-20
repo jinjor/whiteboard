@@ -473,7 +473,10 @@ const authRouter = Router()
       }
       const result = await check(request, oauth, env.COOKIE_SECRET);
       if (!result.ok) {
-        return result.response;
+        if (result.response != null) {
+          return result.response;
+        }
+        return respondNotFoundHtml(request, env, context);
       }
       const uaHash = await getUserAgentHash(request);
       user = {
