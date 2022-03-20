@@ -180,9 +180,8 @@ export class RoomManager implements DurableObject {
     this.state = new RoomManagerState(controller.storage);
   }
   async fetch(request: Request) {
-    console.log("RoomManager's fetch(): " + request.method, request.url);
     return roomManagerRouter.handle(request, this.state).catch((error: any) => {
-      console.log("RoomManager:", error);
+      console.log(error);
       return new Response("unexpected error", { status: 500 });
     });
   }

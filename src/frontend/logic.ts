@@ -1178,7 +1178,6 @@ function connect(
   });
   ws.addEventListener("message", (event) => {
     const data: ResponseEvent = JSON.parse(event.data);
-    console.log(data);
     handle({ kind: "ws:message", data });
   });
   ws.addEventListener("close", (event) => {

@@ -485,7 +485,6 @@ const authRouter = Router()
         image: result.user.image,
       };
     }
-    console.log("user:", user);
     if (user == null) {
       throw new Error("assertion error");
     }
@@ -555,7 +554,6 @@ function isEnvValid(env: Env): boolean {
 
 export default {
   async fetch(request: Request, env: Env, context: ExecutionContext) {
-    console.log("Root's fetch(): " + request.method, request.url);
     if (!isEnvValid(env)) {
       return new Response("Configuration Error", { status: 500 });
     }

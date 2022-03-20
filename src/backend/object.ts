@@ -47,7 +47,6 @@ export function applyEvent(
     case "patch": {
       const objectId = event.id;
       if (objects[objectId] == null) {
-        console.log(objects);
         break;
       }
       const oldObject: Object_ = { ...objects[objectId] };
@@ -56,7 +55,6 @@ export function applyEvent(
         throw new InvalidEvent();
       }
       if (!deepEqual(oldValue, event.value.old)) {
-        console.log(oldObject, event.value.old);
         break;
       }
       const newObject = {
@@ -79,12 +77,10 @@ export function applyEvent(
     case "delete": {
       const objectId = event.object.id;
       if (objects[objectId] == null) {
-        console.log(objects);
         break;
       }
       const oldObject = objects[objectId];
       if (!deepEqual(oldObject, event.object)) {
-        console.log(oldObject, event.object);
         break;
       }
       delete objects[objectId];
