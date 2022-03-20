@@ -4,6 +4,7 @@ import {
   ResponseEvent,
   Object_,
   RequestEventBody,
+  ObjectId,
 } from "../schema";
 import { deepEqual } from "../deep-equal";
 import { Validator } from "@cfworker/json-schema";
@@ -23,18 +24,53 @@ function validateObject(object: any): object is Object_ {
 
 export class InvalidEvent extends Error {}
 
-export function applyEvent(
+export class RoomStorage {
+  constructor(private storage: DurableObjectStorage) {}
+  async deleteAll(): Promise<void> {
+    await this.storage.deleteAll();
+  }
+  async hasObject(id: ObjectId): Promise<boolean> {
+    const object = await this.getObject(id);
+    return object != null;
+  }
+  async getObject(id: ObjectId): Promise<Object_ | undefined> {
+    const key = "object/" + id;
+    const object = await this.storage.get(key);
+    return object as Object_ | undefined;
+  }
+  async putObject(object: Object_): Promise<void> {
+    const key = "object/" + object.id;
+    await this.storage.put(key, object);
+  }
+  async deleteObject(objectId: ObjectId): Promise<void> {
+    const key = "object/" + objectId;
+    await this.storage.delete(key);
+  }
+  async getObjects(): Promise<Objects> {
+    const objectMap = await this.storage.list({
+      prefix: "object/",
+    });
+    const objects: Objects = {};
+    for (const [key, object] of objectMap.entries()) {
+      const id = key.slice("object/".length);
+      objects[id] = object as Object_;
+    }
+    return objects;
+  }
+}
+
+export async function applyEvent(
   event: RequestEvent,
-  objects: Objects
-): { event: ResponseEvent; to: "self" | "others" }[] {
-  const events: ReturnType<typeof applyEvent> = [];
+  storage: RoomStorage
+): Promise<{ event: ResponseEvent; to: "self" | "others" }[]> {
+  const events: { event: ResponseEvent; to: "self" | "others" }[] = [];
   switch (event.kind) {
     case "add": {
-      if (objects[event.object.id] != null) {
+      if (await storage.hasObject(event.object.id)) {
         break;
       }
       const newObject = event.object;
-      objects[newObject.id] = newObject;
+      await storage.putObject(newObject);
       events.push({
         event: {
           kind: "upsert",
@@ -46,10 +82,10 @@ export function applyEvent(
     }
     case "patch": {
       const objectId = event.id;
-      if (objects[objectId] == null) {
+      const oldObject = await storage.getObject(objectId);
+      if (oldObject == null) {
         break;
       }
-      const oldObject: Object_ = { ...objects[objectId] };
       const oldValue = (oldObject as any)[event.key];
       if (oldValue == null) {
         throw new InvalidEvent();
@@ -64,7 +100,7 @@ export function applyEvent(
       if (!validateObject(newObject)) {
         throw new InvalidEvent();
       }
-      objects[newObject.id] = newObject;
+      await storage.putObject(newObject);
       events.push({
         event: {
           kind: "upsert",
@@ -76,14 +112,14 @@ export function applyEvent(
     }
     case "delete": {
       const objectId = event.object.id;
-      if (objects[objectId] == null) {
+      const oldObject = await storage.getObject(objectId);
+      if (oldObject == null) {
         break;
       }
-      const oldObject = objects[objectId];
       if (!deepEqual(oldObject, event.object)) {
         break;
       }
-      delete objects[objectId];
+      await storage.deleteObject(objectId);
       events.push({
         event: {
           kind: "delete",

@@ -1,5 +1,5 @@
 import { Router } from "itty-router";
-import { applyEvent, InvalidEvent, validateEvent } from "./object";
+import { applyEvent, InvalidEvent, RoomStorage, validateEvent } from "./object";
 import { Objects, SessionUser, UserId } from "../schema";
 import { Config, defaultConfig } from "./config";
 import { immediatelyCloseWebSocket } from "./worker-util";
@@ -55,13 +55,13 @@ type Session = {
 };
 
 class RoomState {
-  private storage: DurableObjectStorage;
+  private storage: RoomStorage;
   private sessions: Session[];
   private lastTimestamp: number;
   private HOT_DURATION!: number;
   private MAX_ACTIVE_USERS!: number;
   constructor(controller: any) {
-    this.storage = controller.storage;
+    this.storage = new RoomStorage(controller.storage);
     this.sessions = [];
     // 同時にメッセージが来てもタイムスタンプを単調増加にするための仕掛け
     this.lastTimestamp = Date.now();
@@ -102,12 +102,7 @@ class RoomState {
     return timestamp;
   }
   async getObjects(): Promise<Objects> {
-    const objects = await this.storage.get("objects");
-    if (objects == null) {
-      await this.storage.put("objects", {});
-      return {};
-    }
-    return objects as Objects;
+    return this.storage.getObjects();
   }
   async handleSession(webSocket: WebSocket, user: SessionUser): Promise<void> {
     webSocket.accept();
@@ -132,21 +127,18 @@ class RoomState {
           throw new Error("unexpected session.quit");
         }
         const event = JSON.parse(msg.data as string);
-        console.log("event", event);
         if (!validateEvent(event)) {
           throw new InvalidEvent();
         }
         const timestamp = this.newUniqueTimestamp();
-        const objects = await this.getObjects();
-        const events = applyEvent(
+        const events = await applyEvent(
           {
             ...event,
             uniqueTimestamp: timestamp,
             requestedBy: session.user.id,
           },
-          objects
+          this.storage
         );
-        await this.storage.put("objects", objects);
         for (const e of events) {
           switch (e.to) {
             case "self": {
