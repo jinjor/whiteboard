@@ -18,20 +18,10 @@ export class SlackOAuth implements OAuth {
   getAuthType(): string {
     return "slack";
   }
-  async getUserFromSession(session: string): Promise<User> {
-    let user: User;
-    try {
-      user = JSON.parse(session);
-    } catch (e) {
-      throw new InvalidSession();
-    }
-    if (user.id == null || user.name == null || user.image == null) {
-      throw new InvalidSession();
-    }
+  async checkUser(user: User): Promise<void> {
     if (!user.id.startsWith("sl/")) {
       throw new InvalidSession();
     }
-    return user;
   }
   getFormUrl(request: Request): string {
     const url = new URL(request.url);
@@ -53,13 +43,12 @@ export class SlackOAuth implements OAuth {
     }
     return accessToken;
   }
-  async createInitialSession(accessToken: string): Promise<string> {
+  async getUser(accessToken: string): Promise<User> {
     const slackUser = await getUser(accessToken);
     const id = "sl/" + slackUser.name;
     const name = slackUser.name;
     const image = slackUser.image_48;
-    const user: User = { id, name, image };
-    return JSON.stringify(user);
+    return { id, name, image };
   }
 }
 

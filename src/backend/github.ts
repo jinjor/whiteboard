@@ -25,6 +25,14 @@ export class GitHubOAuth implements OAuth {
   getAuthType(): string {
     return "github";
   }
+  async checkUser(user: User): Promise<void> {
+    if (!user.id.startsWith("gh/")) {
+      throw new InvalidSession();
+    }
+    if (user.id === "gh/_guest") {
+      throw new NotAMemberOfOrg();
+    }
+  }
   async getUserFromSession(session: string): Promise<User> {
     let user: User;
     try {
@@ -60,7 +68,7 @@ export class GitHubOAuth implements OAuth {
     }
     return accessToken;
   }
-  async createInitialSession(accessToken: string): Promise<string> {
+  async getUser(accessToken: string): Promise<User> {
     const login = await getUserLogin(accessToken);
     console.log("login:", login);
     const isMemberOfOrg = await isUserMemberOfOrg(accessToken, login, this.org);
@@ -69,8 +77,7 @@ export class GitHubOAuth implements OAuth {
     const id = "gh/" + login; // TODO: for debug
     const name = login;
     const image = `https://github.com/${login}.png`;
-    const user: User = { id, name, image };
-    return JSON.stringify(user);
+    return { id, name, image };
   }
 }
 

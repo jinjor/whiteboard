@@ -2,6 +2,7 @@ import Cookie from "cookie";
 import { User } from "../schema";
 import { decrypt, encrypt } from "./crypto";
 
+export class SessionExpired extends Error {}
 export class InvalidSession extends Error {}
 export class NotAMemberOfOrg extends Error {}
 export class InvalidCallback extends Error {}
@@ -27,21 +28,38 @@ export async function check(
   oauth: OAuth,
   cookieSecret: string
 ): Promise<{ ok: true; user: User } | { ok: false; response: Response }> {
-  const session = await getDecryptedSessionFromCookie(request, cookieSecret);
-  if (session == null) {
+  const rawSession = await getDecryptedSessionFromCookie(request, cookieSecret);
+  if (rawSession == null) {
     return {
       ok: false,
       response: createRedirectToFormResponse(request, oauth),
     };
   }
   try {
-    const user = await oauth.getUserFromSession(session);
+    let parsed;
+    try {
+      parsed = JSON.parse(rawSession);
+    } catch (e) {
+      throw new InvalidSession();
+    }
+    const user = parsed.user;
+    const expiresAt = parsed.expiresAt;
+    if (user == null || typeof expiresAt !== "number") {
+      throw new InvalidSession();
+    }
+    if (user.id == null || user.name == null || user.image == null) {
+      throw new InvalidSession();
+    }
+    await oauth.checkUser(user);
+    if (expiresAt < Date.now()) {
+      throw new SessionExpired();
+    }
     return {
       ok: true,
       user,
     };
   } catch (e: unknown) {
-    if (e instanceof InvalidSession) {
+    if (e instanceof InvalidSession || e instanceof SessionExpired) {
       return {
         ok: false,
         response: createRedirectToFormResponse(request, oauth),
@@ -93,7 +111,12 @@ export async function handleCallback(
       throw new InvalidCallback();
     }
     const accessToken = await oauth.getAccessToken(code);
-    const rawSession = await oauth.createInitialSession(accessToken);
+    const user = await oauth.getUser(accessToken);
+    const maxAge = 60 * 60 * 24 * 7; // 1 week
+    const rawSession = JSON.stringify({
+      user,
+      expiresAt: Date.now() + maxAge * 1000,
+    });
     const session = await encrypt(cookieSecret, rawSession);
     const res = new Response(null, {
       status: 302,
@@ -101,7 +124,7 @@ export async function handleCallback(
         "Set-Cookie": Cookie.serialize("session", session, {
           path: "/",
           httpOnly: true,
-          maxAge: 60 * 60 * 24 * 7, // 1 week
+          maxAge,
           secure: true,
           sameSite: "lax", // strict だと直後に cookie を送信してくれない
         }),
@@ -122,9 +145,9 @@ export async function handleCallback(
 }
 export type OAuth = {
   getAuthType: () => string;
-  getUserFromSession(session: string): Promise<User>;
+  checkUser(user: User): Promise<void>;
   getFormUrl(request: Request): string;
   getCodeFromCallback: (request: Request) => string | null;
   getAccessToken: (code: string) => Promise<string>;
-  createInitialSession: (accessToken: string) => Promise<string>;
+  getUser: (accessToken: string) => Promise<User>;
 };

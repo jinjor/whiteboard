@@ -1,6 +1,5 @@
 // @ts-ignore
 import { Router } from "itty-router";
-import Cookie from "cookie";
 import { digest, hmacSha256 } from "./crypto";
 import { GitHubOAuth } from "./github";
 import { SlackOAuth } from "./slack";
