@@ -23,10 +23,8 @@ Slack コマンドでホワイトボードを作って共同編集。
 
 1. Slack アプリを作る
 1. Slash コマンドを設定
-
-- Command: `/wb`
-- Request URL: `https://whiteboard.{}.workers.dev/app/slack`
-
+   - Command: `/wb`
+   - Request URL: `https://whiteboard.{}.workers.dev/app/slack`
 1. Slack アプリをワークスペースにインストール
 1. `npx wrangler secret put <name>`
    - SLACK_SIGNING_SECRET: `xxxxx`
