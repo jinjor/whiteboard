@@ -1,8 +1,11 @@
-name = "whiteboard"
+name = "whiteboard-develop"
 type = "javascript"
 workers_dev = true
 compatibility_date = "2021-11-08"
 account_id = "7e155f728b0311833218e72046aaa90a"
+
+[env.production]
+name = "whiteboard"
 
 [build]
 command = "npm run build"

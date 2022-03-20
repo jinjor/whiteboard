@@ -12,8 +12,8 @@ Slack コマンドでホワイトボードを作って共同編集。
 1. wrangler.toml の `account_id` を更新
 1. `npm ci`
 1. `npx wrangler login`
-1. `npx wrangler publish`
-1. `npx wrangler secret put <name>`
+1. `npx wrangler publish --env production`
+1. `npx wrangler secret put --env production <name>`
    - DEBUG_API: `false`
    - SLACK_APP: `true`
 
@@ -26,14 +26,14 @@ Slack コマンドでホワイトボードを作って共同編集。
    - Command: `/wb`
    - Request URL: `https://whiteboard.{}.workers.dev/app/slack`
 1. Slack アプリをワークスペースにインストール
-1. `npx wrangler secret put <name>`
+1. `npx wrangler secret put --env production <name>`
    - SLACK_SIGNING_SECRET: `xxxxx`
 
 ### GitHub 認証の設定
 
 1. GitHub アプリを作る
    - Redirect URL: `https://whiteboard.{}.workers.dev/callback/github`
-1. `npx wrangler secret put <name>`
+1. `npx wrangler secret put --env production <name>`
    - AUTH_TYPE: `github`
    - COOKIE_SECRET: `xxxxxxx`
    - GITHUB_CLIENT_ID: `xxxxx`
@@ -48,7 +48,7 @@ Slack コマンドでホワイトボードを作って共同編集。
    - Redirect URL: `https://whiteboard.{}.workers.dev/callback/slack`
    - Bot Token Scopes: `commands`
    - User Token Scopes: `identity.avatar`, `identity.basic`
-1. `npx wrangler secret put <name>`
+1. `npx wrangler secret put --env production <name>`
    - AUTH_TYPE: `slack`
    - COOKIE_SECRET: `xxxxxxx`
    - SLACK_CLIENT_ID: `xxxxx`

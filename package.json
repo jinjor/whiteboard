@@ -6,16 +6,14 @@
     "build": "npm run build:backend && npm run build:frontend",
     "build:backend": "esbuild --tsconfig=src/backend/tsconfig.json src/backend/index.ts --bundle --sourcemap --external:__STATIC_CONTENT_MANIFEST --format=esm --outfile=dist/index.mjs",
     "build:frontend": "esbuild --tsconfig=src/frontend/tsconfig.json src/frontend/*.ts --bundle --sourcemap --outdir=assets && cp src/frontend/*.html src/frontend/*.css src/frontend/*.ico assets",
-    "dev": "miniflare -e .env.dev --watch --debug",
+    "dev": "miniflare -e .env.local --watch --debug",
     "test": "npm run build && tsc -p test/tsconfig.json && mocha -r source-map-support/register test/dist/test/*.js",
     "analytics": "esbuild tool/analytics.ts --platform=node --bundle --sourcemap --outdir=tool && node -r source-map-support -r dotenv/config tool/analytics",
     "info": "esbuild tool/info.ts --platform=node --bundle --sourcemap --outdir=tool && node -r source-map-support -r dotenv/config tool/info",
     "gc": "esbuild tool/gc.ts --platform=node --bundle --sourcemap --outdir=tool && node -r source-map-support -r dotenv/config tool/gc",
+    "gen-syncenv": "esbuild tool/gen-syncenv.ts --platform=node --bundle --sourcemap --outdir=tool && node -r source-map-support -r dotenv/config tool/gen-syncenv",
     "get-graphql-schema": "get-graphql-schema -h Content-Type=application/json -h Authorization=Bearer\\ $CLOUDFLARE_API_KEY https://api.cloudflare.com/client/v4/graphql/ > work/schema.graphql"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
   "devDependencies": {
     "@cfworker/json-schema": "^1.12.1",
     "@cloudflare/kv-asset-handler": "^0.2.0",
