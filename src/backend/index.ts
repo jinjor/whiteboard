@@ -39,33 +39,33 @@ function isRoomIdValid(ns: DurableObjectNamespace, roomId: string): boolean {
   return true;
 }
 
-type Env = {
+type Env = Record<keyof Config, string> & {
   manager: DurableObjectNamespace;
   rooms: DurableObjectNamespace;
 
   DEBUG_API: "true" | "false";
   ADMIN_KEY: string;
 } & (
-  | {
-      AUTH_TYPE: "header";
-    }
-  | {
-      AUTH_TYPE: "user_agent";
-    }
-  | {
-      AUTH_TYPE: "github";
-      GITHUB_CLIENT_ID: string;
-      GITHUB_CLIENT_SECRET: string;
-      GITHUB_ORG: string;
-      COOKIE_SECRET: string;
-    }
-  | {
-      AUTH_TYPE: "slack";
-      SLACK_CLIENT_ID: string;
-      SLACK_CLIENT_SECRET: string;
-      COOKIE_SECRET: string;
-    }
-) &
+    | {
+        AUTH_TYPE: "header";
+      }
+    | {
+        AUTH_TYPE: "user_agent";
+      }
+    | {
+        AUTH_TYPE: "github";
+        GITHUB_CLIENT_ID: string;
+        GITHUB_CLIENT_SECRET: string;
+        GITHUB_ORG: string;
+        COOKIE_SECRET: string;
+      }
+    | {
+        AUTH_TYPE: "slack";
+        SLACK_CLIENT_ID: string;
+        SLACK_CLIENT_SECRET: string;
+        COOKIE_SECRET: string;
+      }
+  ) &
   (
     | {
         SLACK_APP: "true";

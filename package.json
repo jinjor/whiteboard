@@ -11,7 +11,7 @@
     "analytics": "esbuild tool/analytics.ts --platform=node --bundle --sourcemap --outdir=tool && node -r source-map-support tool/analytics",
     "info": "esbuild tool/info.ts --platform=node --bundle --sourcemap --outdir=tool && node -r source-map-support tool/info",
     "gc": "esbuild tool/gc.ts --platform=node --bundle --sourcemap --outdir=tool && node -r source-map-support tool/gc",
-    "syncenv": "esbuild tool/syncenv.ts --platform=node --bundle --sourcemap --outdir=tool && node -r source-map-support tool/syncenv",
+    "sync-env": "esbuild tool/sync-env.ts --platform=node --bundle --sourcemap --outdir=tool && node -r source-map-support tool/sync-env",
     "get-graphql-schema": "get-graphql-schema -h Content-Type=application/json -h Authorization=Bearer\\ $CLOUDFLARE_API_KEY https://api.cloudflare.com/client/v4/graphql/ > work/schema.graphql"
   },
   "devDependencies": {

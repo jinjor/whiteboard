@@ -30,6 +30,11 @@ const keysToSync = [
   "SLACK_SIGNING_SECRET",
   "DEBUG_API",
   "ADMIN_KEY",
+  "MAX_ACTIVE_ROOMS",
+  "LIVE_DURATION",
+  "ACTIVE_DURATION",
+  "HOT_DURATION",
+  "MAX_ACTIVE_USERS",
 ];
 for (const key of keysToSync) {
   if (config[key] != null) {
