@@ -6,6 +6,11 @@ account_id = "7e155f728b0311833218e72046aaa90a"
 
 [env.production]
 name = "whiteboard"
+# https://github.com/cloudflare/wrangler/issues/2142
+durable_objects.bindings = [
+  { name = "manager", class_name = "RoomManager" },
+  { name = "rooms", class_name = "Room" }
+]
 
 [build]
 command = "npm run build"
