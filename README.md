@@ -73,5 +73,5 @@ SLACK_APP=true
 以下のコマンドで同期する
 
 ```shell
-npm run syncenv -- production
+npm run sync-env -- production
 ```

@@ -8,7 +8,7 @@ develop 環境の場合
 - `npm run generate-schema`
 - `npm run dev`
 - `npm test`
-- `npm run syncenv -- develop`
+- `npm run sync-env -- develop`
 - `npm run analytics -- develop`
 - `npx wrangler publish`
 
@@ -33,6 +33,12 @@ develop 環境の場合
   - SCRIPT_NAME=whiteboard
   - CLOUDFLARE_API_TOKEN=xxxx
   - ORIGIN=https://whiteboard-develop.xxxx.workers.dev
+- 設定
+  - MAX_ACTIVE_ROOMS: 10
+  - LIVE_DURATION: 604800000
+  - ACTIVE_DURATION: 86400000
+  - HOT_DURATION: 3600000
+  - MAX_ACTIVE_USERS: 10
 
 ## エレベーターピッチ
 
