@@ -10,12 +10,17 @@ export type RoomPatch = {
 
 class RoomManagerState {
   private storage: DurableObjectStorage;
-  private MAX_ACTIVE_ROOMS!: number;
-  private LIVE_DURATION!: number;
-  private ACTIVE_DURATION!: number;
-  constructor(storage: DurableObjectStorage) {
+  private MAX_ACTIVE_ROOMS: number;
+  private LIVE_DURATION: number;
+  private ACTIVE_DURATION: number;
+  constructor(storage: DurableObjectStorage, env: any) {
     this.storage = storage;
-    this.updateConfig(defaultConfig);
+    this.MAX_ACTIVE_ROOMS =
+      parseInt(env["MAX_ACTIVE_ROOMS"]) || defaultConfig.MAX_ACTIVE_ROOMS;
+    this.LIVE_DURATION =
+      parseInt(env["LIVE_DURATION"]) || defaultConfig.LIVE_DURATION;
+    this.ACTIVE_DURATION =
+      parseInt(env["ACTIVE_DURATION"]) || defaultConfig.ACTIVE_DURATION;
   }
   getConfig(): Partial<Config> {
     return {
@@ -176,8 +181,8 @@ const roomManagerRouter = Router()
 export class RoomManager implements DurableObject {
   private state: RoomManagerState;
 
-  constructor(state: DurableObjectState) {
-    this.state = new RoomManagerState(state.storage);
+  constructor(state: DurableObjectState, env: any) {
+    this.state = new RoomManagerState(state.storage, env);
   }
   async fetch(request: Request) {
     return roomManagerRouter.handle(request, this.state).catch((error: any) => {

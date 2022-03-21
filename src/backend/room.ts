@@ -58,14 +58,17 @@ class RoomState {
   private storage: RoomStorage;
   private sessions: Session[];
   private lastTimestamp: number;
-  private HOT_DURATION!: number;
-  private MAX_ACTIVE_USERS!: number;
-  constructor(state: DurableObjectState) {
+  private HOT_DURATION: number;
+  private MAX_ACTIVE_USERS: number;
+  constructor(state: DurableObjectState, env: any) {
     this.storage = new RoomStorage(state.storage);
     this.sessions = [];
     // 同時にメッセージが来てもタイムスタンプを単調増加にするための仕掛け
     this.lastTimestamp = Date.now();
-    this.updateConfig(defaultConfig);
+    this.HOT_DURATION =
+      parseInt(env["HOT_DURATION"]) || defaultConfig.HOT_DURATION;
+    this.MAX_ACTIVE_USERS =
+      parseInt(env["MAX_ACTIVE_USERS"]) || defaultConfig.MAX_ACTIVE_USERS;
   }
   async deleteAll(): Promise<void> {
     await this.storage.deleteAll();
@@ -204,8 +207,8 @@ class RoomState {
 
 export class Room implements DurableObject {
   private state: RoomState;
-  constructor(state: DurableObjectState) {
-    this.state = new RoomState(state);
+  constructor(state: DurableObjectState, env: any) {
+    this.state = new RoomState(state, env);
   }
   async fetch(request: Request) {
     return roomRouter.handle(request, this.state).catch((error: unknown) => {
