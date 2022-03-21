@@ -282,6 +282,9 @@ const router = Router()
 
 const authRouter = Router()
   .get("/", async (req: Request, env: Env, ctx: ExecutionContext) => {
+    if (requiresOGP(req)) {
+      return new Response(makeOgpHtml(req));
+    }
     return await getAsset(req, env, ctx, () => "/index.html");
   })
   .get("/assets/*", async (req: Request, env: Env, ctx: ExecutionContext) => {
@@ -448,6 +451,9 @@ const authRouter = Router()
     });
   })
   .all("*", async (request: Request, env: Env, context: ExecutionContext) => {
+    if (requiresOGP(request)) {
+      return new Response(makeOgpHtml(request));
+    }
     let user: SessionUser;
     if (env.AUTH_TYPE === "header") {
       const userId = request.headers.get("WB-TEST-USER");
@@ -490,6 +496,39 @@ const authRouter = Router()
     }
     return await router.handle(request, env, context, user);
   });
+function requiresOGP(request: Request): boolean {
+  const ua = (request.headers.get("User-Agent") ?? "").toLowerCase();
+  return (
+    ua.includes("twitterbot") ||
+    ua.includes("facebookexternalhit") ||
+    ua.includes("discordbot") ||
+    ua.includes("slackbot")
+  );
+}
+function makeOgpHtml(request: Request): string {
+  return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>Whiteboard</title>
+<meta name="description" content="An online whiteboard implementation" />
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="Whiteboard" />
+<meta property="og:title" content="Whiteboard" />
+<meta property="og:url" content="${request.url}" />
+<meta
+property="og:image"
+content="${new URL(request.url).origin}/assets/ogp.png"
+/>
+<meta
+property="og:description"
+content="An online whiteboard implementation"
+/>
+<meta name="twitter:card" content="summary" />
+</head>
+<body></body>
+</html>`;
+}
 
 async function getUserAgentHash(request: Request) {
   const userAgent = request.headers.get("User-Agent") ?? "";
