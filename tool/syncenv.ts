@@ -1,5 +1,6 @@
 import * as fs from "fs";
 import dotenv from "dotenv";
+import { execSync } from "child_process";
 
 const env = process.argv[2];
 if (env == null) {
@@ -13,7 +14,15 @@ if (dotEnvFile == null) {
 if (!fs.existsSync(dotEnvFile)) {
   throw new Error("dotenv not found: " + dotEnvFile);
 }
+const envFlag =
+  env === "production" ? "--env production" : env === "develop" ? "" : null;
+if (envFlag == null) {
+  throw new Error("unknown environment: " + env);
+}
 const config = dotenv.parse(fs.readFileSync(dotEnvFile));
+
+const list = execSync("npx wrangler secret list", { encoding: "utf8" });
+const existingKeys = JSON.parse(list).map((item) => item.name);
 
 const keysToSync = [
   "AUTH_TYPE",
@@ -28,21 +37,19 @@ const keysToSync = [
   "DEBUG_API",
   "ADMIN_KEY",
 ];
-const lines = [];
-lines.push("#!/bin/sh");
-lines.push("set -e");
 for (const key of keysToSync) {
   if (config[key] != null) {
-    const envFlag =
-      env === "production" ? "--env production" : env === "develop" ? "" : null;
-    if (envFlag == null) {
-      continue;
-    }
-    lines.push(
-      `echo ${config[key]} | npx wrangler secret put ${envFlag} ${key}`
-    );
+    execSync(`npx wrangler secret put ${envFlag} ${key}`, {
+      input: config[key],
+      stdio: ["pipe", "inherit", "inherit"],
+    });
   }
 }
-const shellFile = `sync.${env}.sh`;
-fs.writeFileSync(shellFile, lines.join("\n"));
-fs.chmodSync(shellFile, 0o755);
+for (const key of existingKeys) {
+  if (config[key] == null) {
+    execSync(`npx wrangler secret delete ${envFlag} ${key}`, {
+      input: "y",
+      stdio: ["pipe", "inherit", "inherit"],
+    });
+  }
+}
