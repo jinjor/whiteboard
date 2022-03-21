@@ -4,6 +4,6 @@ dist
 src/schema.json
 test/*.js*
 tool/*.js*
-.env
+.env.production
 .env.develop
 work

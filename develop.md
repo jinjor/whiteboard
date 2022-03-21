@@ -2,12 +2,14 @@
 
 ## 主なコマンド
 
+develop 環境の場合
+
 - `npm install`
 - `npm run generate-schema`
 - `npm run dev`
 - `npm test`
-- `npm run analytics`
-- `npx wrangler secret put <name>`
+- `npm run syncenv -- develop`
+- `npm run analytics -- develop`
 - `npx wrangler publish`
 
 ## 環境変数
@@ -30,7 +32,7 @@
   - ACCOUNT_ID=xxxx
   - SCRIPT_NAME=whiteboard
   - CLOUDFLARE_API_TOKEN=xxxx
-  - ORIGIN=https://whiteboard.xxxx.workers.dev
+  - ORIGIN=https://whiteboard-develop.xxxx.workers.dev
 
 ## エレベーターピッチ
 
