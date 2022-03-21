@@ -1,18 +1,26 @@
 import fetch from "node-fetch";
+import { getEnv } from "./env";
 
-const ADMIN_KEY = process.env.ADMIN_KEY;
-const CLOUDFLARE_API_TOKEN = process.env.CLOUDFLARE_API_TOKEN;
-const accountId = process.env.ACCOUNT_ID;
-const scriptName = process.env.SCRIPT_NAME;
-const ORIGIN = process.env.ORIGIN;
+type Config = {
+  CLOUDFLARE_API_TOKEN: string;
+  ACCOUNT_ID: string;
+  SCRIPT_NAME: string;
+  ORIGIN: string;
+  ADMIN_KEY: string;
+};
 
-async function adminApi(method: string, path: string, body: any) {
-  const res = await fetch(`${ORIGIN}/admin${path}`, {
+async function adminApi(
+  config: Config,
+  method: string,
+  path: string,
+  body: any
+) {
+  const res = await fetch(`${config.ORIGIN}/admin${path}`, {
     method: method,
     headers: {
       "Content-Type": "application/json",
-      "WB-ADMIN_KEY": ADMIN_KEY,
-      "WB-CLOUDFLARE_API_TOKEN": CLOUDFLARE_API_TOKEN,
+      "WB-ADMIN_KEY": config.ADMIN_KEY,
+      "WB-CLOUDFLARE_API_TOKEN": config.CLOUDFLARE_API_TOKEN,
       Accepts: "application/json",
     },
     body: JSON.stringify(body),
@@ -28,18 +36,23 @@ async function adminApi(method: string, path: string, body: any) {
   return await res.json();
 }
 
-async function gc(): Promise<any[]> {
-  return await adminApi("DELETE", `/gc`, {
-    accountId,
-    scriptName,
+async function gc(config: Config): Promise<any[]> {
+  return await adminApi(config, "DELETE", `/gc`, {
+    accountId: config.ACCOUNT_ID,
+    scriptName: config.SCRIPT_NAME,
   });
 }
-async function run(): Promise<void> {
-  const result = await gc();
+async function run(config: Config): Promise<void> {
+  const result = await gc(config);
   console.log(result);
 }
 
-run().catch((e) => {
+const env = process.argv[2];
+if (env == null) {
+  throw new Error("arg not found");
+}
+const config = getEnv(env) as Config;
+run(config).catch((e) => {
   console.log(e);
   process.exit(1);
 });

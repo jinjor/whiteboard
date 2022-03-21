@@ -1,8 +1,16 @@
-name = "whiteboard"
+name = "whiteboard-develop"
 type = "javascript"
 workers_dev = true
 compatibility_date = "2021-11-08"
 account_id = "7e155f728b0311833218e72046aaa90a"
+
+[env.production]
+name = "whiteboard"
+# https://github.com/cloudflare/wrangler/issues/2142
+durable_objects.bindings = [
+  { name = "manager", class_name = "RoomManager" },
+  { name = "rooms", class_name = "Room" }
+]
 
 [build]
 command = "npm run build"

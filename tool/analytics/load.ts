@@ -1,14 +1,20 @@
 import fetch from "node-fetch";
 
-const CLOUDFLARE_API_TOKEN = process.env.CLOUDFLARE_API_TOKEN;
-const accountId = process.env.ACCOUNT_ID;
-const scriptName = process.env.SCRIPT_NAME;
+export type Config = {
+  CLOUDFLARE_API_TOKEN: string;
+  ACCOUNT_ID: string;
+  SCRIPT_NAME: string;
+};
 
 function graphql(s: TemplateStringsArray): string {
   return s.join("");
 }
 
-async function send(query: string, variables: Record<string, string>) {
+async function send(
+  config: Config,
+  query: string,
+  variables: Record<string, string>
+) {
   const res = await fetch(`https://api.cloudflare.com/client/v4/graphql/`, {
     method: "POST",
     body: JSON.stringify({
@@ -17,7 +23,7 @@ async function send(query: string, variables: Record<string, string>) {
     }),
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${CLOUDFLARE_API_TOKEN}`,
+      Authorization: `Bearer ${config.CLOUDFLARE_API_TOKEN}`,
       Accepts: "application/json",
     },
   });
@@ -41,7 +47,10 @@ export type DateRange = {
   lastDate: string;
 };
 
-export async function workersInvocationsAdaptive(range: DateRange) {
+export async function workersInvocationsAdaptive(
+  config: Config,
+  range: DateRange
+) {
   const q = graphql`
     query workersInvocationsAdaptive(
       $accountTag: string
@@ -82,16 +91,17 @@ export async function workersInvocationsAdaptive(range: DateRange) {
       }
     }
   `;
-  const data = await send(q, {
-    accountTag: accountId,
+  const data = await send(config, q, {
+    accountTag: config.ACCOUNT_ID,
     date_geq: range.firstDate,
     date_leq: range.lastDate,
-    scriptName,
+    scriptName: config.SCRIPT_NAME,
   });
   return data.viewer.accounts[0].workersInvocationsAdaptive;
 }
 
 export async function durableObjectsInvocationsAdaptiveGroups(
+  config: Config,
   range: DateRange
 ) {
   const q = graphql`
@@ -136,16 +146,19 @@ export async function durableObjectsInvocationsAdaptiveGroups(
       }
     }
   `;
-  const data = await send(q, {
-    accountTag: accountId,
+  const data = await send(config, q, {
+    accountTag: config.ACCOUNT_ID,
     date_geq: range.firstDate,
     date_leq: range.lastDate,
-    scriptName,
+    scriptName: config.SCRIPT_NAME,
   });
   return data.viewer.accounts[0].durableObjectsInvocationsAdaptiveGroups;
 }
 
-export async function durableObjectsStorageGroups(range: DateRange) {
+export async function durableObjectsStorageGroups(
+  config: Config,
+  range: DateRange
+) {
   const q = graphql`
     query durableObjectsStorageGroups(
       $accountTag: string
@@ -170,15 +183,18 @@ export async function durableObjectsStorageGroups(range: DateRange) {
       }
     }
   `;
-  const data = await send(q, {
-    accountTag: accountId,
+  const data = await send(config, q, {
+    accountTag: config.ACCOUNT_ID,
     date_geq: range.firstDate,
     date_leq: range.lastDate,
   });
   return data.viewer.accounts[0].durableObjectsStorageGroups;
 }
 
-export async function durableObjectsPeriodicGroups(range: DateRange) {
+export async function durableObjectsPeriodicGroups(
+  config: Config,
+  range: DateRange
+) {
   const q = graphql`
     query durableObjectsPeriodicGroups(
       $accountTag: string
@@ -209,7 +225,6 @@ export async function durableObjectsPeriodicGroups(range: DateRange) {
               outboundWebsocketMsgCount
             }
             dimensions {
-              # namespaceId
               date
             }
           }
@@ -217,8 +232,8 @@ export async function durableObjectsPeriodicGroups(range: DateRange) {
       }
     }
   `;
-  const data = await send(q, {
-    accountTag: accountId,
+  const data = await send(config, q, {
+    accountTag: config.ACCOUNT_ID,
     date_geq: range.firstDate,
     date_leq: range.lastDate,
   });
