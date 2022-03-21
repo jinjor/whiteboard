@@ -176,8 +176,8 @@ const roomManagerRouter = Router()
 export class RoomManager implements DurableObject {
   private state: RoomManagerState;
 
-  constructor(controller: any) {
-    this.state = new RoomManagerState(controller.storage);
+  constructor(state: DurableObjectState) {
+    this.state = new RoomManagerState(state.storage);
   }
   async fetch(request: Request) {
     return roomManagerRouter.handle(request, this.state).catch((error: any) => {

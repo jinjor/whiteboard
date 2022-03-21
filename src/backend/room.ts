@@ -60,8 +60,8 @@ class RoomState {
   private lastTimestamp: number;
   private HOT_DURATION!: number;
   private MAX_ACTIVE_USERS!: number;
-  constructor(controller: any) {
-    this.storage = new RoomStorage(controller.storage);
+  constructor(state: DurableObjectState) {
+    this.storage = new RoomStorage(state.storage);
     this.sessions = [];
     // 同時にメッセージが来てもタイムスタンプを単調増加にするための仕掛け
     this.lastTimestamp = Date.now();
@@ -204,8 +204,8 @@ class RoomState {
 
 export class Room implements DurableObject {
   private state: RoomState;
-  constructor(controller: any) {
-    this.state = new RoomState(controller);
+  constructor(state: DurableObjectState) {
+    this.state = new RoomState(state);
   }
   async fetch(request: Request) {
     return roomRouter.handle(request, this.state).catch((error: unknown) => {
