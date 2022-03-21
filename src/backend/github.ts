@@ -6,24 +6,25 @@ import {
   ReturnedScopeDoesNotMatch,
 } from "./oauth";
 
-const OAUTH_SCOPE = "read:org";
-
 export class GitHubOAuth implements OAuth {
-  private org: string;
+  private org: string | null;
   private clientId: string;
   private clientSecret: string;
   constructor(env: {
     AUTH_TYPE: "github";
     GITHUB_CLIENT_ID: string;
     GITHUB_CLIENT_SECRET: string;
-    GITHUB_ORG: string;
+    GITHUB_ORG?: string;
   }) {
-    this.org = env.GITHUB_ORG;
+    this.org = env.GITHUB_ORG ?? null;
     this.clientId = env.GITHUB_CLIENT_ID;
     this.clientSecret = env.GITHUB_CLIENT_SECRET;
   }
   getAuthType(): string {
     return "github";
+  }
+  private getScope(): string {
+    return this.org != null ? "read:org" : "";
   }
   async checkUser(user: User): Promise<void> {
     if (!user.id.startsWith("gh/")) {
@@ -52,7 +53,7 @@ export class GitHubOAuth implements OAuth {
     return user;
   }
   getFormUrl(): string {
-    return makeFormUrl(this.clientId, OAUTH_SCOPE);
+    return makeFormUrl(this.clientId, this.getScope());
   }
   getCodeFromCallback(request: Request): string | null {
     return new URL(request.url).searchParams.get("code");
@@ -63,15 +64,20 @@ export class GitHubOAuth implements OAuth {
       this.clientSecret,
       code
     );
-    if (scope !== OAUTH_SCOPE) {
+    if ((scope ?? "") !== this.getScope()) {
       throw new ReturnedScopeDoesNotMatch();
     }
     return accessToken;
   }
   async getUser(accessToken: string): Promise<User> {
-    const login = await getUserLogin(accessToken);
-    const isMemberOfOrg = await isUserMemberOfOrg(accessToken, login, this.org);
-    const id = isMemberOfOrg ? "gh/" + login : "gh/_guest"; // "_guest" is an invalid github name
+    let login = await getUserLogin(accessToken);
+    if (this.org) {
+      const ok = await isUserMemberOfOrg(accessToken, login, this.org);
+      if (!ok) {
+        login = "_guest"; // "_guest" is an invalid github name
+      }
+    }
+    const id = "gh/" + login;
     const name = login;
     const image = `https://github.com/${login}.png`;
     return { id, name, image };

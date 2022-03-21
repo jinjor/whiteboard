@@ -56,7 +56,7 @@ type Env = Record<keyof Config, string> & {
         AUTH_TYPE: "github";
         GITHUB_CLIENT_ID: string;
         GITHUB_CLIENT_SECRET: string;
-        GITHUB_ORG: string;
+        GITHUB_ORG?: string;
         COOKIE_SECRET: string;
       }
     | {
@@ -515,10 +515,6 @@ function isEnvValid(env: Env): boolean {
     if (!env.GITHUB_CLIENT_SECRET) {
       ok = false;
       console.log("GITHUB_CLIENT_SECRET not found");
-    }
-    if (!env.GITHUB_ORG) {
-      ok = false;
-      console.log("GITHUB_ORG not found");
     }
     if (!env.COOKIE_SECRET) {
       ok = false;
