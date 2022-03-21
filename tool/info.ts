@@ -1,17 +1,20 @@
 import fetch from "node-fetch";
+import { getEnv } from "./env";
 
-const CLOUDFLARE_API_TOKEN = process.env.CLOUDFLARE_API_TOKEN;
-const accountId = process.env.ACCOUNT_ID;
-const scriptName = process.env.SCRIPT_NAME;
+export type Config = {
+  CLOUDFLARE_API_TOKEN: string;
+  ACCOUNT_ID: string;
+  SCRIPT_NAME: string;
+};
 
-async function send(path: string) {
+async function send(config: Config, path: string) {
   const res = await fetch(
-    `https://api.cloudflare.com/client/v4/accounts/${accountId}${path}`,
+    `https://api.cloudflare.com/client/v4/accounts/${config.ACCOUNT_ID}${path}`,
     {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${CLOUDFLARE_API_TOKEN}`,
+        Authorization: `Bearer ${config.CLOUDFLARE_API_TOKEN}`,
         Accepts: "application/json",
       },
     }
@@ -31,24 +34,35 @@ async function send(path: string) {
   return json.result;
 }
 
-async function getDurableObjectNamespaces(): Promise<any[]> {
-  const namespaces = await send(`/workers/durable_objects/namespaces`);
-  return namespaces.filter((ns) => ns.script === scriptName);
+async function getDurableObjectNamespaces(config: Config): Promise<any[]> {
+  const namespaces = await send(config, `/workers/durable_objects/namespaces`);
+  return namespaces.filter((ns) => ns.script === config.SCRIPT_NAME);
 }
-async function getDurableObjects(namespaceId: string): Promise<any[]> {
-  return send(`/workers/durable_objects/namespaces/${namespaceId}/objects`);
+async function getDurableObjects(
+  config: Config,
+  namespaceId: string
+): Promise<any[]> {
+  return send(
+    config,
+    `/workers/durable_objects/namespaces/${namespaceId}/objects`
+  );
 }
 
-async function run(): Promise<void> {
-  const namespaces = await getDurableObjectNamespaces();
+async function run(config: Config): Promise<void> {
+  const namespaces = await getDurableObjectNamespaces(config);
   console.log("namespaces:", namespaces);
   for (const ns of namespaces) {
-    const objects = await getDurableObjects(ns.id);
+    const objects = await getDurableObjects(config, ns.id);
     console.log(`# of ${ns.class}:`, objects.length);
   }
 }
 
-run().catch((e) => {
+const env = process.argv[2];
+if (env == null) {
+  throw new Error("arg not found");
+}
+const config = getEnv(env) as Config;
+run(config).catch((e) => {
   console.log(e);
   process.exit(1);
 });

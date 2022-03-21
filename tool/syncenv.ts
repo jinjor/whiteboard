@@ -1,25 +1,19 @@
-import * as fs from "fs";
-import dotenv from "dotenv";
 import { execSync } from "child_process";
+import { getEnv } from "./env";
 
 const env = process.argv[2];
 if (env == null) {
   throw new Error("arg not found");
 }
-const dotEnvFile =
-  env === "production" ? ".env" : env === "develop" ? ".env.develop" : null;
-if (dotEnvFile == null) {
+const config = getEnv(env);
+if (config == null) {
   throw new Error("unknown environment: " + env);
-}
-if (!fs.existsSync(dotEnvFile)) {
-  throw new Error("dotenv not found: " + dotEnvFile);
 }
 const envFlag =
   env === "production" ? "--env production" : env === "develop" ? "" : null;
 if (envFlag == null) {
   throw new Error("unknown environment: " + env);
 }
-const config = dotenv.parse(fs.readFileSync(dotEnvFile));
 
 const list = execSync("npx wrangler secret list", { encoding: "utf8" });
 const existingKeys = JSON.parse(list).map((item) => item.name);

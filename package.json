@@ -8,10 +8,10 @@
     "build:frontend": "esbuild --tsconfig=src/frontend/tsconfig.json src/frontend/*.ts --bundle --sourcemap --outdir=assets && cp src/frontend/*.html src/frontend/*.css src/frontend/*.ico assets",
     "dev": "miniflare -e .env.local --watch --debug",
     "test": "npm run build && tsc -p test/tsconfig.json && mocha -r source-map-support/register test/dist/test/*.js",
-    "analytics": "esbuild tool/analytics.ts --platform=node --bundle --sourcemap --outdir=tool && node -r source-map-support -r dotenv/config tool/analytics",
-    "info": "esbuild tool/info.ts --platform=node --bundle --sourcemap --outdir=tool && node -r source-map-support -r dotenv/config tool/info",
-    "gc": "esbuild tool/gc.ts --platform=node --bundle --sourcemap --outdir=tool && node -r source-map-support -r dotenv/config tool/gc",
-    "syncenv": "esbuild tool/syncenv.ts --platform=node --bundle --sourcemap --outdir=tool && node -r source-map-support -r dotenv/config tool/syncenv",
+    "analytics": "esbuild tool/analytics.ts --platform=node --bundle --sourcemap --outdir=tool && node -r source-map-support tool/analytics",
+    "info": "esbuild tool/info.ts --platform=node --bundle --sourcemap --outdir=tool && node -r source-map-support tool/info",
+    "gc": "esbuild tool/gc.ts --platform=node --bundle --sourcemap --outdir=tool && node -r source-map-support tool/gc",
+    "syncenv": "esbuild tool/syncenv.ts --platform=node --bundle --sourcemap --outdir=tool && node -r source-map-support tool/syncenv",
     "get-graphql-schema": "get-graphql-schema -h Content-Type=application/json -h Authorization=Bearer\\ $CLOUDFLARE_API_KEY https://api.cloudflare.com/client/v4/graphql/ > work/schema.graphql"
   },
   "devDependencies": {

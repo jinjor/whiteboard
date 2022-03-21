@@ -16,7 +16,7 @@ const color2 = "#a63";
 const color3 = "#6a3";
 const color4 = "#a36";
 
-export function writeHTMLReport(data: any): string {
+export function writeHTMLReport(env: string, data: any): string {
   const workerReqsTotal = sum(data.workerReqs);
   const workerDurationsTotal = sum(data.workerDurations);
   const durableObjectReqsTotal = sum(data.durableObjectReqs);
@@ -199,13 +199,13 @@ export function writeHTMLReport(data: any): string {
   </style>
 </head>
 <body>
-  <h2>Worker</h2>
+  <h2>Worker (env: ${env})</h2>
   <div class="raw">${chart1}${chart2}</div>
   <div class="raw">${pichart1}${pichart2}</div>
-  <h2>Durable Object</h2>
+  <h2>Durable Object (env: ${env})</h2>
   <div class="raw">${chart3}${chart4}</div>
   <div class="raw">${pichart3}${pichart4}</div>
-  <h2>Durable Storage</h2>
+  <h2>Durable Storage (all environments)</h2>
   <div class="raw">${chart5}${chart6}</div>
   <div class="raw">${pichart5a}${pichart5b}${pichart5c}${pichart6}</div>
 </body>

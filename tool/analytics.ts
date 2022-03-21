@@ -1,9 +1,14 @@
 import * as util from "util";
 import * as fs from "fs";
-import * as load from "./load";
-import * as report from "./report";
+import * as load from "./analytics/load";
+import * as report from "./analytics/report";
+import { getEnv } from "./env";
 
-async function getData(days: string[], jsonFile: string): Promise<void> {
+async function getData(
+  config: load.Config,
+  days: string[],
+  jsonFile: string
+): Promise<void> {
   console.log("Fetching...");
   const result = {
     workerReqs: new Map<string, number>(),
@@ -20,21 +25,24 @@ async function getData(days: string[], jsonFile: string): Promise<void> {
     firstDate: days[0],
     lastDate: days.at(-1),
   };
-  for (const d of await load.workersInvocationsAdaptive(range)) {
+  for (const d of await load.workersInvocationsAdaptive(config, range)) {
     const date = d.dimensions.date;
     result.workerReqs.set(date, d.sum.requests);
     result.workerDurations.set(date, d.sum.duration);
   }
-  for (const d of await load.durableObjectsInvocationsAdaptiveGroups(range)) {
+  for (const d of await load.durableObjectsInvocationsAdaptiveGroups(
+    config,
+    range
+  )) {
     const date = d.dimensions.date;
     result.durableObjectReqs.set(date, d.sum.requests);
     result.durableObjectWallTimes.set(date, d.sum.wallTime);
   }
-  for (const d of await load.durableObjectsStorageGroups(range)) {
+  for (const d of await load.durableObjectsStorageGroups(config, range)) {
     const date = d.dimensions.date;
     result.durableObjectStored.set(date, d.max.storedBytes);
   }
-  for (const d of await load.durableObjectsPeriodicGroups(range)) {
+  for (const d of await load.durableObjectsPeriodicGroups(config, range)) {
     const date = d.dimensions.date;
     result.durableObjectCpuTimes.set(date, d.sum.cpuTime);
     result.durableObjectReads.set(date, d.sum.storageReadUnits);
@@ -78,19 +86,25 @@ function get30DaysUntilToday(): string[] {
   return dates;
 }
 
-async function run(): Promise<void> {
+async function run(env: string): Promise<void> {
+  const config = getEnv(env) as load.Config;
   fs.mkdirSync("work", { recursive: true });
   const days = get30DaysUntilToday();
-  const jsonFile = "work/data.json";
-  await getData(days, jsonFile);
+  const jsonFile = `work/data.${env}.json`;
+  await getData(config, days, jsonFile);
   const data = JSON.parse(fs.readFileSync(jsonFile, "utf8"));
-  const html = report.writeHTMLReport(data);
-  const htmlFile = "work/index.html";
+  const html = report.writeHTMLReport(env, data);
+  const htmlFile = `work/index.${env}.html`;
   fs.writeFileSync(htmlFile, html);
   console.log(`Done. Open ${htmlFile}.`);
 }
 
-run().catch((e) => {
+const env = process.argv[2];
+if (env == null) {
+  throw new Error("arg not found");
+}
+
+run(env).catch((e) => {
   console.log(e);
   process.exit(1);
 });
