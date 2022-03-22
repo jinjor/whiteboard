@@ -34,24 +34,6 @@ export class GitHubOAuth implements OAuth {
       throw new NotAMemberOfOrg();
     }
   }
-  async getUserFromSession(session: string): Promise<User> {
-    let user: User;
-    try {
-      user = JSON.parse(session);
-    } catch (e) {
-      throw new InvalidSession();
-    }
-    if (user.id == null || user.name == null || user.image == null) {
-      throw new InvalidSession();
-    }
-    if (!user.id.startsWith("gh/")) {
-      throw new InvalidSession();
-    }
-    if (user.id === "gh/_guest") {
-      throw new NotAMemberOfOrg();
-    }
-    return user;
-  }
   getFormUrl(): string {
     return makeFormUrl(this.clientId, this.getScope());
   }

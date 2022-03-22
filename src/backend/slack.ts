@@ -1,9 +1,15 @@
 import { User } from "../schema";
-import { InvalidSession, OAuth, ReturnedScopeDoesNotMatch } from "./oauth";
+import {
+  InvalidSession,
+  NotAMemberOfOrg,
+  OAuth,
+  ReturnedScopeDoesNotMatch,
+} from "./oauth";
 
-const OAUTH_SCOPE = "identity.basic,identity.avatar";
+const OAUTH_SCOPE = "identity.basic,identity.avatar,openid,email,profile";
 
 export class SlackOAuth implements OAuth {
+  private teamDomain: string | null;
   private clientId: string;
   private clientSecret: string;
 
@@ -11,7 +17,9 @@ export class SlackOAuth implements OAuth {
     AUTH_TYPE: "slack";
     SLACK_CLIENT_ID: string;
     SLACK_CLIENT_SECRET: string;
+    SLACK_TEAM_DOMAIN?: string;
   }) {
+    this.teamDomain = env.SLACK_TEAM_DOMAIN ?? null;
     this.clientId = env.SLACK_CLIENT_ID;
     this.clientSecret = env.SLACK_CLIENT_SECRET;
   }
@@ -21,6 +29,9 @@ export class SlackOAuth implements OAuth {
   async checkUser(user: User): Promise<void> {
     if (!user.id.startsWith("sl/")) {
       throw new InvalidSession();
+    }
+    if (user.id === "sl/") {
+      throw new NotAMemberOfOrg();
     }
   }
   getFormUrl(request: Request): string {
@@ -44,9 +55,15 @@ export class SlackOAuth implements OAuth {
     return accessToken;
   }
   async getUser(accessToken: string): Promise<User> {
-    const slackUser = await getUser(accessToken);
-    const id = "sl/" + slackUser.name;
-    const name = slackUser.name;
+    const [slackUser, slackTeam] = await getUserAndTeam(accessToken);
+    let name = slackUser.name;
+    if (this.teamDomain) {
+      const ok = slackTeam.domain === this.teamDomain;
+      if (!ok) {
+        name = ""; // "" should be an invalid name
+      }
+    }
+    const id = "sl/" + name;
     const image = slackUser.image_48;
     return { id, name, image };
   }
@@ -64,7 +81,7 @@ function makeFormUrl(
 }
 
 // https://api.slack.com/methods/users.identity
-async function getUser(accessToken: string): Promise<any> {
+async function getUserAndTeam(accessToken: string): Promise<[any, any]> {
   const res = await fetch(`https://slack.com/api/users.identity`, {
     headers: {
       Authorization: `Bearer ${accessToken}`,
@@ -72,7 +89,7 @@ async function getUser(accessToken: string): Promise<any> {
   });
   const data: any = await res.json();
   if (data.ok) {
-    return data.user;
+    return [data.user, data.team];
   }
   throw new Error(JSON.stringify(data));
 }

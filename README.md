@@ -48,17 +48,17 @@ Slack コマンドでホワイトボードを作って共同編集。
 
 #### Slack 認証の設定
 
-制限: ユーザーはあらかじめブラウザでワークスペースにログインしている必要あり
-
 1. Slack アプリの OAuth 設定:
    - Redirect URL: `https://whiteboard.{}.workers.dev/callback/slack`
    - Bot Token Scopes: `commands`
    - User Token Scopes: `identity.avatar`, `identity.basic`
+1. Slack アプリを public distribution する
 1. `npx wrangler secret put --env production <name>`
    - AUTH_TYPE: `slack`
    - COOKIE_SECRET: `xxxxxxx`
    - SLACK_CLIENT_ID: `xxxxx`
    - SLACK_CLIENT_SECRET: `xxxxx`
+   - SLACK_TEAM_DOMAIN: `xxxxx`
 
 ### 環境変数の一括設定
 

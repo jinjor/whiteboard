@@ -63,6 +63,7 @@ type Env = Record<keyof Config, string> & {
         AUTH_TYPE: "slack";
         SLACK_CLIENT_ID: string;
         SLACK_CLIENT_SECRET: string;
+        SLACK_TEAM_DOMAIN?: string;
         COOKIE_SECRET: string;
       }
   ) &
