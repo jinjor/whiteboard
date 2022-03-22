@@ -55,10 +55,10 @@ export class SlackOAuth implements OAuth {
     return accessToken;
   }
   async getUser(accessToken: string): Promise<User> {
-    const slackUser = await getUser(accessToken);
+    const [slackUser, slackTeam] = await getUserAndTeam(accessToken);
     let name = slackUser.name;
     if (this.teamDomain) {
-      const ok = slackUser.team.domain === this.teamDomain;
+      const ok = slackTeam.domain === this.teamDomain;
       if (!ok) {
         name = ""; // "" should be an invalid name
       }
@@ -81,7 +81,7 @@ function makeFormUrl(
 }
 
 // https://api.slack.com/methods/users.identity
-async function getUser(accessToken: string): Promise<any> {
+async function getUserAndTeam(accessToken: string): Promise<[any, any]> {
   const res = await fetch(`https://slack.com/api/users.identity`, {
     headers: {
       Authorization: `Bearer ${accessToken}`,
@@ -89,7 +89,7 @@ async function getUser(accessToken: string): Promise<any> {
   });
   const data: any = await res.json();
   if (data.ok) {
-    return data.user;
+    return [data.user, data.team];
   }
   throw new Error(JSON.stringify(data));
 }
