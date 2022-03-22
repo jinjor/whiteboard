@@ -21,6 +21,7 @@ develop 環境の場合
   - GITHUB_ORG: xxxx
   - SLACK_CLIENT_ID: xxxx
   - SLACK_CLIENT_SECRET: xxxx
+  - SLACK_TEAM_DOMAIN: xxxx
   - COOKIE_SECRET: xxxx
 - Slack アプリ
   - SLACK_APP: true | false
