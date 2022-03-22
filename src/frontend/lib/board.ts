@@ -523,7 +523,9 @@ export class Input {
       e.stopPropagation();
       if (e.key === "Enter") {
         e.preventDefault();
-        o.enter();
+        if (!e.isComposing) {
+          o.enter();
+        }
       }
     };
   }
