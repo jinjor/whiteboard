@@ -30,6 +30,7 @@ Slack コマンドでホワイトボードを作って共同編集。
 1. Slack アプリをワークスペースにインストール
 1. `npx wrangler secret put --env production <name>`
    - SLACK_SIGNING_SECRET: `xxxxx`
+   - SLACK_TEAM_DOMAIN: `xxxxx`
 
 ### 認証の設定
 
