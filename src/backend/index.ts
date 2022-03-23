@@ -70,6 +70,7 @@ type Env = Record<keyof Config, string> & {
   (
     | {
         SLACK_APP: "true";
+        SLACK_TEAM_DOMAIN?: string;
         SLACK_SIGNING_SECRET: string;
       }
     | {
@@ -348,6 +349,26 @@ const authRouter = Router()
       return new Response("invalid request", { status: 403 });
     }
     const params = new URLSearchParams(body);
+    if (
+      env.SLACK_TEAM_DOMAIN != null &&
+      params.get("team_domain") !== env.SLACK_TEAM_DOMAIN
+    ) {
+      return new Response(
+        JSON.stringify({
+          blocks: [
+            {
+              type: "section",
+              text: {
+                type: "mrkdwn",
+                text: `Your workspace is not allowed to use this app.`,
+              },
+            },
+          ],
+          response_type: "in_channel",
+        }),
+        { headers: { "Content-type": "application/json" } }
+      );
+    }
     const text = (params.get("text") ?? "").trim();
     // Note: `mrkdwn` format
     // https://api.slack.com/reference/surfaces/formatting

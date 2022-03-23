@@ -26,6 +26,7 @@ develop 環境の場合
 - Slack アプリ
   - SLACK_APP: true | false
   - SLACK_SIGNING_SECRET: xxxx
+  - SLACK_TEAM_DOMAIN: xxxxx
 - デバッグ
   - DEBUG_API: true | false
 - オペレーション
